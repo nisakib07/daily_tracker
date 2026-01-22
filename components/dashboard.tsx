@@ -1,14 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AccountCard } from "@/components/account-card";
 import { TransactionModal } from "@/components/transaction-modal";
@@ -19,6 +15,7 @@ import { EditTransactionModal } from "@/components/edit-transaction-modal";
 import { ActivityList } from "@/components/activity-list";
 import { Ledger } from "@/components/ledger";
 import { MonthlyStats } from "@/components/monthly-stats";
+import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
 import { createClient } from "@/lib/supabase/client";
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
@@ -34,7 +31,16 @@ import {
   Activity,
   BarChart3,
 } from "lucide-react";
-import { format, startOfDay, endOfDay, isToday, subDays, addDays, startOfMonth, endOfMonth } from "date-fns";
+import {
+  format,
+  startOfDay,
+  endOfDay,
+  isToday,
+  subDays,
+  addDays,
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { cn } from "@/lib/utils";
 
 export function Dashboard() {
@@ -59,6 +65,10 @@ export function Dashboard() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   const [typeFilter, setTypeFilter] = useState("all");
+
+  // ✅ NEW: Person ledger drawer state
+  const [personSheetOpen, setPersonSheetOpen] = useState(false);
+  const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -100,12 +110,18 @@ export function Dashboard() {
     balance: calculateBalance(acc.id),
   }));
 
-  const totalBalance = accountsWithBalance.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalBalance = accountsWithBalance.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+
+  // ✅ Selected person object for PersonLedgerSheet
+  const selectedPerson = useMemo(() => {
+    if (!selectedPersonId) return null;
+    return people.find((p) => p.id === selectedPersonId) || null;
+  }, [people, selectedPersonId]);
 
   // Filter transactions by selected date/month and type
   const filteredTransactions = allTransactions.filter((tx) => {
     const txDate = new Date(tx.date);
-    
+
     if (viewMode === "daily") {
       const start = startOfDay(selectedDate);
       const end = endOfDay(selectedDate);
@@ -115,7 +131,7 @@ export function Dashboard() {
       const end = endOfMonth(selectedMonth);
       if (txDate < start || txDate > end) return false;
     }
-    
+
     if (typeFilter !== "all" && tx.type !== typeFilter) return false;
     return true;
   });
@@ -138,13 +154,13 @@ export function Dashboard() {
   // Helper to get account name by ID
   const getAccountName = (accountId: string | null) => {
     if (!accountId) return null;
-    return accounts.find(a => a.id === accountId)?.name || null;
+    return accounts.find((a) => a.id === accountId)?.name || null;
   };
 
   // Helper to get person name by ID
   const getPersonName = (personId: string | null) => {
     if (!personId) return null;
-    return people.find(p => p.id === personId)?.name || null;
+    return people.find((p) => p.id === personId)?.name || null;
   };
 
   // Handle edit account
@@ -162,9 +178,12 @@ export function Dashboard() {
   // Handle month change from MonthlyStats
   const handleMonthChange = (month: Date) => {
     setSelectedMonth(month);
-    if (viewMode === "monthly") {
-      // Update filtered transactions based on new month
-    }
+  };
+
+  // ✅ NEW: Open sheet from Ledger click
+  const handleViewPerson = (personId: string) => {
+    setSelectedPersonId(personId);
+    setPersonSheetOpen(true);
   };
 
   if (loading) {
@@ -189,15 +208,18 @@ export function Dashboard() {
                 <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div>
-                <h1 className="text-base sm:text-lg font-bold text-foreground group-hover:text-emerald-600 transition-colors">Daily Tracker</h1>
+                <h1 className="text-base sm:text-lg font-bold text-foreground group-hover:text-emerald-600 transition-colors">
+                  Daily Tracker
+                </h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">Tap for Analytics</p>
               </div>
             </Link>
+
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/analytics">
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300"
                 >
                   <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -205,10 +227,12 @@ export function Dashboard() {
               </Link>
               <div className="text-right">
                 <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">Balance</p>
-                <p className={cn(
-                  "text-lg sm:text-2xl font-bold whitespace-nowrap",
-                  totalBalance >= 0 ? "text-emerald-600" : "text-rose-600"
-                )}>
+                <p
+                  className={cn(
+                    "text-lg sm:text-2xl font-bold whitespace-nowrap",
+                    totalBalance >= 0 ? "text-emerald-600" : "text-rose-600"
+                  )}
+                >
                   ৳{totalBalance.toLocaleString()}
                 </p>
               </div>
@@ -222,11 +246,7 @@ export function Dashboard() {
         <section>
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             {accountsWithBalance.map((account) => (
-              <AccountCard 
-                key={account.id} 
-                account={account} 
-                onEdit={handleEditAccount}
-              />
+              <AccountCard key={account.id} account={account} onEdit={handleEditAccount} />
             ))}
           </div>
         </section>
@@ -279,10 +299,7 @@ export function Dashboard() {
                 variant={viewMode === "daily" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setViewMode("daily")}
-                className={cn(
-                  "text-xs h-8",
-                  viewMode === "daily" ? "bg-slate-900" : "bg-transparent"
-                )}
+                className={cn("text-xs h-8", viewMode === "daily" ? "bg-slate-900" : "bg-transparent")}
               >
                 Daily
               </Button>
@@ -290,10 +307,7 @@ export function Dashboard() {
                 variant={viewMode === "monthly" ? "default" : "outline"}
                 size="sm"
                 onClick={() => setViewMode("monthly")}
-                className={cn(
-                  "text-xs h-8",
-                  viewMode === "monthly" ? "bg-slate-900" : "bg-transparent"
-                )}
+                className={cn("text-xs h-8", viewMode === "monthly" ? "bg-slate-900" : "bg-transparent")}
               >
                 Monthly
               </Button>
@@ -312,7 +326,7 @@ export function Dashboard() {
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
-                    
+
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -327,12 +341,7 @@ export function Dashboard() {
                         </Button>
                       </PopoverTrigger>
                       <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={selectedDate}
-                          onSelect={(date) => date && setSelectedDate(date)}
-                          initialFocus
-                        />
+                        <Calendar mode="single" selected={selectedDate} onSelect={(date) => date && setSelectedDate(date)} initialFocus />
                       </PopoverContent>
                     </Popover>
 
@@ -363,11 +372,15 @@ export function Dashboard() {
               {/* Day/Month Summary */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-3 sm:p-4 border border-emerald-100">
-                  <p className="text-[10px] sm:text-xs font-medium text-emerald-600 uppercase tracking-wide mb-0.5 sm:mb-1">Money In</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-emerald-600 uppercase tracking-wide mb-0.5 sm:mb-1">
+                    Money In
+                  </p>
                   <p className="text-lg sm:text-xl font-bold text-emerald-700">+৳{todaySummary.income.toLocaleString()}</p>
                 </div>
                 <div className="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100/50 p-3 sm:p-4 border border-rose-100">
-                  <p className="text-[10px] sm:text-xs font-medium text-rose-600 uppercase tracking-wide mb-0.5 sm:mb-1">Money Out</p>
+                  <p className="text-[10px] sm:text-xs font-medium text-rose-600 uppercase tracking-wide mb-0.5 sm:mb-1">
+                    Money Out
+                  </p>
                   <p className="text-lg sm:text-xl font-bold text-rose-700">-৳{todaySummary.expense.toLocaleString()}</p>
                 </div>
               </div>
@@ -378,10 +391,7 @@ export function Dashboard() {
                   variant={typeFilter === "all" ? "default" : "outline"}
                   size="sm"
                   onClick={() => setTypeFilter("all")}
-                  className={cn(
-                    "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
-                    typeFilter === "all" ? "bg-slate-900" : "bg-transparent"
-                  )}
+                  className={cn("rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3", typeFilter === "all" ? "bg-slate-900" : "bg-transparent")}
                 >
                   All
                 </Button>
@@ -391,7 +401,9 @@ export function Dashboard() {
                   onClick={() => setTypeFilter("income")}
                   className={cn(
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
-                    typeFilter === "income" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-transparent text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                    typeFilter === "income"
+                      ? "bg-emerald-600 hover:bg-emerald-700"
+                      : "bg-transparent text-emerald-600 border-emerald-200 hover:bg-emerald-50"
                   )}
                 >
                   Income
@@ -402,7 +414,9 @@ export function Dashboard() {
                   onClick={() => setTypeFilter("expense")}
                   className={cn(
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
-                    typeFilter === "expense" ? "bg-rose-600 hover:bg-rose-700" : "bg-transparent text-rose-600 border-rose-200 hover:bg-rose-50"
+                    typeFilter === "expense"
+                      ? "bg-rose-600 hover:bg-rose-700"
+                      : "bg-transparent text-rose-600 border-rose-200 hover:bg-rose-50"
                   )}
                 >
                   Expense
@@ -413,7 +427,9 @@ export function Dashboard() {
                   onClick={() => setTypeFilter("transfer")}
                   className={cn(
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
-                    typeFilter === "transfer" ? "bg-blue-600 hover:bg-blue-700" : "bg-transparent text-blue-600 border-blue-200 hover:bg-blue-50"
+                    typeFilter === "transfer"
+                      ? "bg-blue-600 hover:bg-blue-700"
+                      : "bg-transparent text-blue-600 border-blue-200 hover:bg-blue-50"
                   )}
                 >
                   Transfer
@@ -425,15 +441,15 @@ export function Dashboard() {
             <section>
               <h2 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 sm:mb-3">
                 {viewMode === "daily"
-                  ? isToday(selectedDate) ? "Today's Activity" : `Activity on ${format(selectedDate, "MMM d")}`
-                  : `Activity in ${format(selectedMonth, "MMMM yyyy")}`
-                }
-                {filteredTransactions.length > 0 && (
-                  <span className="ml-2 text-foreground">({filteredTransactions.length})</span>
-                )}
+                  ? isToday(selectedDate)
+                    ? "Today's Activity"
+                    : `Activity on ${format(selectedDate, "MMM d")}`
+                  : `Activity in ${format(selectedMonth, "MMMM yyyy")}`}
+                {filteredTransactions.length > 0 && <span className="ml-2 text-foreground">({filteredTransactions.length})</span>}
               </h2>
-              <ActivityList 
-                transactions={filteredTransactions} 
+
+              <ActivityList
+                transactions={filteredTransactions}
                 getAccountName={getAccountName}
                 getPersonName={getPersonName}
                 onEdit={handleEditTransaction}
@@ -447,10 +463,8 @@ export function Dashboard() {
               <h2 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-2 sm:mb-3">
                 Loan & Borrow Ledger
               </h2>
-              <Ledger 
-                transactions={allTransactions}
-                people={people}
-              />
+
+              <Ledger transactions={allTransactions} people={people} onViewPerson={handleViewPerson} />
             </section>
           </TabsContent>
         </Tabs>
@@ -483,6 +497,15 @@ export function Dashboard() {
         </div>
       </div>
 
+      {/* ✅ Person drawer */}
+      <PersonLedgerSheet
+        open={personSheetOpen}
+        onOpenChange={setPersonSheetOpen}
+        person={selectedPerson}
+        transactions={allTransactions}
+        accounts={accounts}
+      />
+
       {/* Modals */}
       <TransactionModal
         open={moneyInOpen}
@@ -502,23 +525,9 @@ export function Dashboard() {
         onSuccess={fetchData}
         onAddPerson={() => setPersonOpen(true)}
       />
-      <TransferModal
-        open={transferOpen}
-        onOpenChange={setTransferOpen}
-        accounts={accounts}
-        onSuccess={fetchData}
-      />
-      <PersonModal
-        open={personOpen}
-        onOpenChange={setPersonOpen}
-        onSuccess={fetchData}
-      />
-      <EditAccountModal
-        open={editAccountOpen}
-        onOpenChange={setEditAccountOpen}
-        account={selectedAccount}
-        onSuccess={fetchData}
-      />
+      <TransferModal open={transferOpen} onOpenChange={setTransferOpen} accounts={accounts} onSuccess={fetchData} />
+      <PersonModal open={personOpen} onOpenChange={setPersonOpen} onSuccess={fetchData} />
+      <EditAccountModal open={editAccountOpen} onOpenChange={setEditAccountOpen} account={selectedAccount} onSuccess={fetchData} />
       <EditTransactionModal
         open={editTransactionOpen}
         onOpenChange={setEditTransactionOpen}
