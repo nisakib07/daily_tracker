@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,19 +20,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { 
-  ArrowDownLeft, 
-  ArrowUpRight, 
-  ArrowRightLeft, 
-  Inbox, 
-  MoreVertical, 
-  Pencil, 
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  ArrowRightLeft,
+  Inbox,
+  MoreVertical,
+  Pencil,
   Trash2,
   HandCoins,
   Handshake,
-  Loader2
+  Loader2,
+  Search,
+  X,
 } from "lucide-react";
-import { format } from "date-fns";
+import {
+  format,
+  parseISO,
+  startOfDay,
+  differenceInCalendarDays,
+} from "date-fns";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 
@@ -43,30 +51,41 @@ interface ActivityListProps {
   onDelete: () => void;
 }
 
-export function ActivityList({ 
-  transactions, 
-  getAccountName, 
+type Group = {
+  key: string;
+  title: string;
+  dateLabel: string;
+  items: Transaction[];
+};
+
+type QuickFilter = "all" | "in" | "out" | "transfer" | "loans";
+
+export function ActivityList({
+  transactions,
+  getAccountName,
   getPersonName,
   onEdit,
-  onDelete
+  onDelete,
 }: ActivityListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // ✅ NEW: search + quick filter
+  const [query, setQuery] = useState("");
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+
   const handleDelete = async () => {
     if (!deleteId) return;
-    
+
     setDeleting(true);
     const supabase = createClient();
-    
+
     try {
       const { error } = await supabase
         .from("transactions")
         .delete()
         .eq("id", deleteId);
-      
       if (error) throw error;
-      
       onDelete();
     } catch (error) {
       console.error("[v0] Error deleting transaction:", error);
@@ -75,20 +94,6 @@ export function ActivityList({
       setDeleteId(null);
     }
   };
-
-  if (transactions.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
-        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-slate-100 mb-4">
-          <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400" />
-        </div>
-        <p className="font-medium text-foreground mb-1">No transactions</p>
-        <p className="text-sm text-muted-foreground">
-          Add your first transaction to get started
-        </p>
-      </div>
-    );
-  }
 
   const getIcon = (type: string) => {
     switch (type) {
@@ -147,125 +152,391 @@ export function ActivityList({
     }
   };
 
-  const isMoneyIn = (type: string) => ["income", "borrow", "receive"].includes(type);
+  const isMoneyIn = (type: string) =>
+    ["income", "borrow", "receive"].includes(type);
+  const isLoan = (type: string) =>
+    ["lend", "borrow", "repay", "receive"].includes(type);
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case "income": return "Income";
-      case "expense": return "Expense";
-      case "transfer": return "Transfer";
-      case "lend": return "Loan Given";
-      case "borrow": return "Borrowed";
-      case "repay": return "Loan Repaid";
-      case "receive": return "Loan Received";
-      default: return type;
+      case "income":
+        return "Income";
+      case "expense":
+        return "Expense";
+      case "transfer":
+        return "Transfer";
+      case "lend":
+        return "Loan Given";
+      case "borrow":
+        return "Borrowed";
+      case "repay":
+        return "Loan Repaid";
+      case "receive":
+        return "Loan Received";
+      default:
+        return type;
     }
   };
 
+  // ✅ Filter first (search + chips), then group
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+
+    const matchesQuickFilter = (tx: Transaction) => {
+      if (quickFilter === "all") return true;
+      if (quickFilter === "in")
+        return ["income", "borrow", "receive"].includes(tx.type);
+      if (quickFilter === "out")
+        return ["expense", "lend", "repay"].includes(tx.type);
+      if (quickFilter === "transfer") return tx.type === "transfer";
+      if (quickFilter === "loans") return isLoan(tx.type);
+      return true;
+    };
+
+    const matchesSearch = (tx: Transaction) => {
+      if (!q) return true;
+
+      const isTransferTx = tx.type === "transfer";
+      const accountName = isTransferTx
+        ? `${getAccountName(tx.from_account_id)} → ${getAccountName(tx.to_account_id)}`
+        : getAccountName(
+            isMoneyIn(tx.type) ? tx.to_account_id : tx.from_account_id,
+          );
+
+      const personName = getPersonName(tx.person_id);
+
+      const haystack = [
+        tx.type,
+        getTypeLabel(tx.type),
+        tx.category ?? "",
+        tx.note ?? "",
+        accountName ?? "",
+        personName ?? "",
+        String(tx.amount ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return haystack.includes(q);
+    };
+
+    return (transactions ?? []).filter(
+      (tx) => matchesQuickFilter(tx) && matchesSearch(tx),
+    );
+  }, [transactions, query, quickFilter, getAccountName, getPersonName]);
+
+  // ✅ Group by date (timezone-safe Today/Yesterday)
+  const groups: Group[] = useMemo(() => {
+    if (!filtered.length) return [];
+
+    const nowStart = startOfDay(new Date());
+    const map = new Map<string, Transaction[]>();
+
+    for (const tx of filtered) {
+      const d = parseISO(String(tx.date));
+      const key = format(d, "yyyy-MM-dd");
+      const list = map.get(key) ?? [];
+      list.push(tx);
+      map.set(key, list);
+    }
+
+    const sortedKeys = Array.from(map.keys()).sort((a, b) => (a > b ? -1 : 1));
+
+    return sortedKeys.map((key) => {
+      const first = map.get(key)![0];
+      const dateObj = parseISO(String(first.date));
+      const dayStart = startOfDay(dateObj);
+
+      const diff = differenceInCalendarDays(nowStart, dayStart);
+
+      let title = format(dateObj, "EEEE");
+      if (diff === 0) title = "Today";
+      else if (diff === 1) title = "Yesterday";
+
+      const dateLabel = format(dateObj, "MMM d, yyyy");
+
+      return {
+        key,
+        title,
+        dateLabel,
+        items: map.get(key)!,
+      };
+    });
+  }, [filtered]);
+
+  if (!transactions || transactions.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
+        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-slate-100 mb-4">
+          <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400" />
+        </div>
+        <p className="font-medium text-foreground mb-1">No transactions</p>
+        <p className="text-sm text-muted-foreground">
+          Add your first transaction to get started
+        </p>
+      </div>
+    );
+  }
+
   return (
     <>
-      <div className="space-y-2">
-        {transactions.map((tx) => {
-          const isTransfer = tx.type === "transfer";
-          const accountName = isTransfer 
-            ? `${getAccountName(tx.from_account_id)} → ${getAccountName(tx.to_account_id)}`
-            : getAccountName(isMoneyIn(tx.type) ? tx.to_account_id : tx.from_account_id);
-          const personName = getPersonName(tx.person_id);
+      {/* ✅ Sticky search + quick filters (mobile-friendly) */}
+      <div className="sticky top-0 z-10 -mx-3 sm:mx-0 px-3 sm:px-0 py-2 bg-white/80 backdrop-blur-md border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search amount, note, person, account…"
+              className="pl-9 h-10 bg-white"
+            />
+            {query.trim() && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => setQuery("")}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-100"
+              >
+                <X className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
 
-          return (
-            <div
-              key={tx.id}
-              className="group flex items-center justify-between rounded-xl bg-white border border-slate-100 p-3 sm:p-4 transition-all hover:shadow-md hover:border-slate-200"
-            >
-              <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                <div
-                  className={cn(
-                    "flex h-9 w-9 sm:h-11 sm:w-11 flex-shrink-0 items-center justify-center rounded-lg sm:rounded-xl transition-transform group-hover:scale-110",
-                    getIconStyle(tx.type)
-                  )}
-                >
-                  {getIcon(tx.type)}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                    <p className="font-semibold text-foreground text-sm sm:text-base truncate">
-                      {tx.category || getTypeLabel(tx.type)}
-                    </p>
-                    {["lend", "borrow", "repay", "receive"].includes(tx.type) && (
-                      <span className={cn(
-                        "text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full font-medium flex-shrink-0",
-                        tx.type === "lend" || tx.type === "repay" 
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-emerald-100 text-emerald-700"
-                      )}>
-                        {getTypeLabel(tx.type)}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                    {accountName}
-                    {personName && <span className="text-slate-400"> • {personName}</span>}
-                  </p>
-                  {tx.note && (
-                    <p className="text-[10px] sm:text-xs text-muted-foreground/70 mt-0.5 line-clamp-1">
-                      {tx.note}
-                    </p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0 ml-2">
-                <div className="text-right">
-                  <p className={cn("text-base sm:text-lg font-bold", getAmountStyle(tx.type))}>
-                    {isMoneyIn(tx.type) ? "+" : "-"}৳{Number(tx.amount).toLocaleString()}
-                  </p>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    {format(new Date(tx.date), "h:mm a")}
-                  </p>
-                </div>
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+          <Chip
+            active={quickFilter === "all"}
+            onClick={() => setQuickFilter("all")}
+          >
+            All
+          </Chip>
+          <Chip
+            active={quickFilter === "in"}
+            onClick={() => setQuickFilter("in")}
+          >
+            In
+          </Chip>
+          <Chip
+            active={quickFilter === "out"}
+            onClick={() => setQuickFilter("out")}
+          >
+            Out
+          </Chip>
+          <Chip
+            active={quickFilter === "transfer"}
+            onClick={() => setQuickFilter("transfer")}
+          >
+            Transfer
+          </Chip>
+          <Chip
+            active={quickFilter === "loans"}
+            onClick={() => setQuickFilter("loans")}
+          >
+            Loans
+          </Chip>
+        </div>
 
-                {/* Actions Dropdown */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="h-8 w-8 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => onEdit(tx)}>
-                      <Pencil className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => setDeleteId(tx.id)}
-                      className="text-rose-600 focus:text-rose-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-          );
-        })}
+        {filtered.length !== transactions.length && (
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Showing {filtered.length} of {transactions.length}
+          </p>
+        )}
       </div>
 
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 mb-3">
+            <Inbox className="h-6 w-6 text-slate-400" />
+          </div>
+          <p className="font-medium text-foreground mb-1">No results</p>
+          <p className="text-sm text-muted-foreground">
+            Try a different search or filter
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-5 mt-3">
+          {groups.map((group) => (
+            <div key={group.key} className="space-y-2">
+              {/* Date Header */}
+              <div className="flex items-baseline justify-between px-1">
+                <div className="flex items-baseline gap-2">
+                  <p className="text-sm font-semibold text-foreground">
+                    {group.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {group.dateLabel}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {group.items.length}{" "}
+                  {group.items.length === 1 ? "item" : "items"}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {group.items.map((tx) => {
+                  const isTransferTx = tx.type === "transfer";
+                  const accountName = isTransferTx
+                    ? `${getAccountName(tx.from_account_id)} → ${getAccountName(tx.to_account_id)}`
+                    : getAccountName(
+                        isMoneyIn(tx.type)
+                          ? tx.to_account_id
+                          : tx.from_account_id,
+                      );
+
+                  const personName = getPersonName(tx.person_id);
+
+                  return (
+                    <div
+                      key={tx.id}
+                      className="group rounded-xl bg-white border border-slate-100 p-3 sm:p-4 transition-all hover:shadow-md hover:border-slate-200"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <div
+                            className={cn(
+                              "flex h-10 w-10 sm:h-11 sm:w-11 flex-shrink-0 items-center justify-center rounded-xl",
+                              getIconStyle(tx.type),
+                            )}
+                          >
+                            {getIcon(tx.type)}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-foreground text-sm sm:text-base truncate">
+                                {tx.category || getTypeLabel(tx.type)}
+                              </p>
+
+                              {isLoan(tx.type) && (
+                                <span
+                                  className={cn(
+                                    "text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0",
+                                    tx.type === "lend" || tx.type === "repay"
+                                      ? "bg-rose-100 text-rose-700"
+                                      : "bg-emerald-100 text-emerald-700",
+                                  )}
+                                >
+                                  {getTypeLabel(tx.type)}
+                                </span>
+                              )}
+                            </div>
+
+                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                              {accountName}
+                              {personName && (
+                                <span className="text-slate-400">
+                                  {" "}
+                                  • {personName}
+                                </span>
+                              )}
+                            </p>
+
+                            {tx.note && (
+                              <p className="text-[11px] sm:text-xs text-muted-foreground/70 mt-0.5 line-clamp-1">
+                                {tx.note}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="text-right flex-shrink-0">
+                          <p
+                            className={cn(
+                              "text-base sm:text-lg font-bold",
+                              getAmountStyle(tx.type),
+                            )}
+                          >
+                            {isMoneyIn(tx.type) ? "+" : "-"}৳
+                            {Number(tx.amount).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">
+                            {format(parseISO(String(tx.date)), "h:mm a")}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Actions row */}
+                      <div className="mt-3 flex items-center justify-end gap-2">
+                        {/* Mobile: direct action buttons */}
+                        <div className="flex gap-2 sm:hidden">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 bg-transparent"
+                            onClick={() => onEdit(tx)}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />
+                            Edit
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="h-9 bg-transparent text-rose-600 border-rose-200 hover:bg-rose-50"
+                            onClick={() => setDeleteId(tx.id)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </Button>
+                        </div>
+
+                        {/* Desktop: dropdown on hover */}
+                        <div className="hidden sm:block">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => onEdit(tx)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => setDeleteId(tx.id)}
+                                className="text-rose-600 focus:text-rose-600"
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!deleteId} onOpenChange={(open) => !open && setDeleteId(null)}>
+      <AlertDialog
+        open={!!deleteId}
+        onOpenChange={(open) => !open && setDeleteId(null)}
+      >
         <AlertDialogContent className="mx-4 sm:mx-auto max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Transaction</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transaction? This action cannot be undone and will affect your account balance.
+              Are you sure you want to delete this transaction? This action
+              cannot be undone and will affect your account balance.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel disabled={deleting} className="bg-transparent">Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting} className="bg-transparent">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               className="bg-rose-600 hover:bg-rose-700"
@@ -278,5 +549,30 @@ export function ActivityList({
         </AlertDialogContent>
       </AlertDialog>
     </>
+  );
+}
+
+function Chip({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "h-8 px-3 rounded-full text-xs font-medium border whitespace-nowrap",
+        active
+          ? "bg-slate-900 text-white border-slate-900"
+          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+      )}
+    >
+      {children}
+    </button>
   );
 }

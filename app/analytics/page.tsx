@@ -3,14 +3,24 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import type { Account, Transaction, Person } from "@/lib/types";
 import {
   ArrowLeft,
-  CalendarIcon,
   TrendingUp,
   TrendingDown,
   Wallet,
@@ -20,6 +30,8 @@ import {
   BarChart3,
   ArrowUpRight,
   ArrowDownLeft,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   format,
@@ -73,6 +85,21 @@ const INCOME_COLORS = [
   "#2563eb",
 ];
 
+const MONTHS = [
+  { value: "0", label: "January" },
+  { value: "1", label: "February" },
+  { value: "2", label: "March" },
+  { value: "3", label: "April" },
+  { value: "4", label: "May" },
+  { value: "5", label: "June" },
+  { value: "6", label: "July" },
+  { value: "7", label: "August" },
+  { value: "8", label: "September" },
+  { value: "9", label: "October" },
+  { value: "10", label: "November" },
+  { value: "11", label: "December" },
+];
+
 function exportTransactionsToCSV(params: {
   transactions: Transaction[];
   accounts: Account[];
@@ -87,7 +114,6 @@ function exportTransactionsToCSV(params: {
   const personMap: Record<string, string> = {};
   for (const p of people) personMap[p.id] = p.name;
 
-  // Note: your DB fields appear snake_case (from_account_id etc.)
   const headers = [
     "Date",
     "Type",
@@ -120,7 +146,7 @@ function exportTransactionsToCSV(params: {
     .map((row) =>
       row
         .map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`)
-        .join(",")
+        .join(","),
     )
     .join("\n");
 
@@ -146,11 +172,26 @@ export default function AnalyticsPage() {
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
   const [exporting, setExporting] = useState(false);
 
+  // ✅ NEW: Analytics mode (Cashflow includes loans; Profit excludes loans)
+  const [includeLoans, setIncludeLoans] = useState(true);
+
+  const incomeTypes = useMemo(() => {
+    return includeLoans ? ["income", "borrow", "receive"] : ["income"];
+  }, [includeLoans]);
+
+  const expenseTypes = useMemo(() => {
+    return includeLoans ? ["expense", "lend", "repay"] : ["expense"];
+  }, [includeLoans]);
+
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
     const [transactionsRes, accountsRes, peopleRes] = await Promise.all([
-      supabase.from("transactions").select("*").order("date", { ascending: false }).limit(2000),
+      supabase
+        .from("transactions")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(5000),
       supabase.from("accounts").select("*"),
       supabase.from("people").select("*"),
     ]);
@@ -166,6 +207,29 @@ export default function AnalyticsPage() {
     fetchData();
   }, [fetchData]);
 
+  // ✅ Month selector (dropdown) helpers
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    years.add(new Date().getFullYear());
+    for (const tx of transactions) {
+      const d = new Date(tx.date);
+      if (!isNaN(d.getTime())) years.add(d.getFullYear());
+    }
+    return Array.from(years).sort((a, b) => b - a);
+  }, [transactions]);
+
+  const selectedMonthValue = String(selectedMonth.getMonth());
+  const selectedYearValue = String(selectedMonth.getFullYear());
+
+  const setMonthYear = (monthIndex: number, year: number) => {
+    const next = new Date(year, monthIndex, 1);
+    setSelectedMonth(next);
+  };
+
+  const goToPreviousMonth = () => setSelectedMonth(subMonths(selectedMonth, 1));
+  const goToNextMonth = () => setSelectedMonth(addMonths(selectedMonth, 1));
+  const isCurrentMonth = isSameMonth(selectedMonth, new Date());
+
   // Filter transactions for selected month
   const monthTransactions = useMemo(() => {
     const start = startOfMonth(selectedMonth);
@@ -176,74 +240,86 @@ export default function AnalyticsPage() {
     });
   }, [transactions, selectedMonth]);
 
-  // Calculate monthly summary
+  // ✅ Monthly summary respects mode
   const monthlySummary = useMemo(() => {
     return monthTransactions.reduce(
       (acc, tx) => {
         const amount = Number(tx.amount);
-        if (["income", "borrow", "receive"].includes(tx.type)) {
-          acc.income += amount;
-        } else if (["expense", "lend", "repay"].includes(tx.type)) {
-          acc.expense += amount;
-        }
+        if (incomeTypes.includes(tx.type)) acc.income += amount;
+        else if (expenseTypes.includes(tx.type)) acc.expense += amount;
         return acc;
       },
-      { income: 0, expense: 0 }
+      { income: 0, expense: 0 },
     );
-  }, [monthTransactions]);
+  }, [monthTransactions, incomeTypes, expenseTypes]);
 
-  // Calculate expense by category
+  // ✅ Expense by category respects mode
   const expenseByCategory = useMemo(() => {
     const categoryMap = new Map<string, number>();
     monthTransactions
-      .filter((tx) => ["expense", "lend", "repay"].includes(tx.type))
+      .filter((tx) => expenseTypes.includes(tx.type))
       .forEach((tx) => {
         const category = tx.category || "Uncategorized";
-        const current = categoryMap.get(category) || 0;
-        categoryMap.set(category, current + Number(tx.amount));
+        categoryMap.set(
+          category,
+          (categoryMap.get(category) || 0) + Number(tx.amount),
+        );
       });
 
     return Array.from(categoryMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [monthTransactions]);
+  }, [monthTransactions, expenseTypes]);
 
-  // Calculate income by category
+  // ✅ Income by category respects mode
   const incomeByCategory = useMemo(() => {
     const categoryMap = new Map<string, number>();
     monthTransactions
-      .filter((tx) => ["income", "borrow", "receive"].includes(tx.type))
+      .filter((tx) => incomeTypes.includes(tx.type))
       .forEach((tx) => {
         const category = tx.category || "Uncategorized";
-        const current = categoryMap.get(category) || 0;
-        categoryMap.set(category, current + Number(tx.amount));
+        categoryMap.set(
+          category,
+          (categoryMap.get(category) || 0) + Number(tx.amount),
+        );
       });
 
     return Array.from(categoryMap.entries())
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
-  }, [monthTransactions]);
+  }, [monthTransactions, incomeTypes]);
 
-  // Get last 6 months data for trend chart
+  // ✅ Performance improvement: bucket transactions by month once
+  const monthBuckets = useMemo(() => {
+    // key => { income, expense }
+    const map = new Map<string, { income: number; expense: number }>();
+
+    for (const tx of transactions) {
+      const d = new Date(tx.date);
+      if (isNaN(d.getTime())) continue;
+      const key = format(d, "yyyy-MM");
+
+      const bucket = map.get(key) || { income: 0, expense: 0 };
+      const amt = Number(tx.amount);
+
+      if (incomeTypes.includes(tx.type)) bucket.income += amt;
+      else if (expenseTypes.includes(tx.type)) bucket.expense += amt;
+
+      map.set(key, bucket);
+    }
+
+    return map;
+  }, [transactions, incomeTypes, expenseTypes]);
+
+  // ✅ Last 6 months trend respects mode + uses buckets
   const monthlyTrend = useMemo(() => {
     const months = [];
     for (let i = 5; i >= 0; i--) {
       const month = subMonths(new Date(), i);
-      const start = startOfMonth(month);
-      const end = endOfMonth(month);
-
-      const monthData = transactions.filter((tx) => {
-        const txDate = new Date(tx.date);
-        return txDate >= start && txDate <= end;
-      });
-
-      const income = monthData
-        .filter((tx) => ["income", "borrow", "receive"].includes(tx.type))
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
-
-      const expense = monthData
-        .filter((tx) => ["expense", "lend", "repay"].includes(tx.type))
-        .reduce((sum, tx) => sum + Number(tx.amount), 0);
+      const key = format(month, "yyyy-MM");
+      const bucket = monthBuckets.get(key) || { income: 0, expense: 0 };
+      const income = bucket.income;
+      const expense = bucket.expense;
 
       months.push({
         month: format(month, "MMM"),
@@ -253,27 +329,23 @@ export default function AnalyticsPage() {
       });
     }
     return months;
-  }, [transactions]);
+  }, [monthBuckets]);
 
-  // Daily spending for the selected month
+  // ✅ Daily spending respects mode
   const dailySpending = useMemo(() => {
     const daysInMonth = endOfMonth(selectedMonth).getDate();
     const dailyMap = new Map<number, { income: number; expense: number }>();
 
-    for (let i = 1; i <= daysInMonth; i++) {
+    for (let i = 1; i <= daysInMonth; i++)
       dailyMap.set(i, { income: 0, expense: 0 });
-    }
 
     monthTransactions.forEach((tx) => {
       const day = new Date(tx.date).getDate();
       const current = dailyMap.get(day) || { income: 0, expense: 0 };
       const amount = Number(tx.amount);
 
-      if (["income", "borrow", "receive"].includes(tx.type)) {
-        current.income += amount;
-      } else if (["expense", "lend", "repay"].includes(tx.type)) {
-        current.expense += amount;
-      }
+      if (incomeTypes.includes(tx.type)) current.income += amount;
+      else if (expenseTypes.includes(tx.type)) current.expense += amount;
 
       dailyMap.set(day, current);
     });
@@ -282,21 +354,25 @@ export default function AnalyticsPage() {
       day: day.toString(),
       ...data,
     }));
-  }, [monthTransactions, selectedMonth]);
+  }, [monthTransactions, selectedMonth, incomeTypes, expenseTypes]);
 
-  // Calculate total balance (cashflow-style net across ALL time)
+  // ✅ FIXED: Total Balance matches Dashboard (account-based, from/to)
   const totalBalance = useMemo(() => {
-    return transactions.reduce((balance, tx) => {
-      const amount = Number(tx.amount);
-      if (["income", "borrow", "receive"].includes(tx.type)) {
-        return balance + amount;
-      }
-      if (["expense", "lend", "repay"].includes(tx.type)) {
-        return balance - amount;
-      }
-      return balance;
-    }, 0);
-  }, [transactions]);
+    const map = new Map<string, number>();
+    for (const acc of accounts) map.set(acc.id, 0);
+
+    for (const tx of transactions) {
+      const amt = Number(tx.amount);
+
+      const toId = (tx as any).to_account_id as string | null | undefined;
+      const fromId = (tx as any).from_account_id as string | null | undefined;
+
+      if (toId) map.set(toId, (map.get(toId) || 0) + amt);
+      if (fromId) map.set(fromId, (map.get(fromId) || 0) - amt);
+    }
+
+    return Array.from(map.values()).reduce((s, v) => s + v, 0);
+  }, [transactions, accounts]);
 
   const exportCSV = async () => {
     setExporting(true);
@@ -314,20 +390,20 @@ export default function AnalyticsPage() {
     }
   };
 
-  const goToPreviousMonth = () => setSelectedMonth(subMonths(selectedMonth, 1));
-  const goToNextMonth = () => setSelectedMonth(addMonths(selectedMonth, 1));
-  const isCurrentMonth = isSameMonth(selectedMonth, new Date());
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-primary" />
-          <p className="text-sm sm:text-base text-muted-foreground">Loading analytics...</p>
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Loading analytics...
+          </p>
         </div>
       </div>
     );
   }
+
+  const net = monthlySummary.income - monthlySummary.expense;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
@@ -337,7 +413,11 @@ export default function AnalyticsPage() {
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/">
-                <Button variant="ghost" size="icon" className="h-9 w-9 sm:h-10 sm:w-10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 sm:h-10 sm:w-10"
+                >
                   <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </Link>
@@ -345,19 +425,24 @@ export default function AnalyticsPage() {
                 <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div>
-                <h1 className="text-base sm:text-lg font-bold text-foreground">Analytics</h1>
+                <h1 className="text-base sm:text-lg font-bold text-foreground">
+                  Analytics
+                </h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                   Track your spending
                 </p>
               </div>
             </div>
 
-            {/* UPDATED BUTTON: CSV export */}
             <Button
               onClick={exportCSV}
               disabled={exporting || monthTransactions.length === 0}
               className="h-9 sm:h-10 text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-              title={monthTransactions.length === 0 ? "No transactions to export for this month" : "Export CSV"}
+              title={
+                monthTransactions.length === 0
+                  ? "No transactions to export for this month"
+                  : "Export CSV"
+              }
             >
               {exporting ? (
                 <Loader2 className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4 animate-spin" />
@@ -371,49 +456,102 @@ export default function AnalyticsPage() {
       </header>
 
       <main className="mx-auto max-w-4xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Month Selector */}
-        <div className="flex items-center justify-between gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToPreviousMonth}
-            className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        {/* Mode toggle + Month selector (month/year dropdown) */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          {/* Mode */}
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant={includeLoans ? "default" : "outline"}
+              onClick={() => setIncludeLoans(true)}
+              className={cn(
+                "h-9 text-xs sm:text-sm",
+                includeLoans ? "bg-slate-900" : "bg-transparent",
+              )}
+              title="Include borrow/lend/repay/receive (cash movement)"
+            >
+              Cashflow
+            </Button>
+            <Button
+              size="sm"
+              variant={!includeLoans ? "default" : "outline"}
+              onClick={() => setIncludeLoans(false)}
+              className={cn(
+                "h-9 text-xs sm:text-sm",
+                !includeLoans ? "bg-slate-900" : "bg-transparent",
+              )}
+              title="Only income/expense (exclude loans)"
+            >
+              Profit
+            </Button>
+          </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                className={cn(
-                  "min-w-[160px] sm:min-w-[200px] justify-center font-semibold bg-transparent text-sm sm:text-base h-9 sm:h-10",
-                  isCurrentMonth && "border-indigo-500 text-indigo-600"
-                )}
+          {/* Month navigation + dropdowns */}
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goToPreviousMonth}
+              className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Select
+                value={selectedMonthValue}
+                onValueChange={(v) =>
+                  setMonthYear(Number(v), selectedMonth.getFullYear())
+                }
               >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(selectedMonth, "MMMM yyyy")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="center">
-              <Calendar
-                mode="single"
-                selected={selectedMonth}
-                onSelect={(date) => date && setSelectedMonth(date)}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
+                <SelectTrigger className="h-9 sm:h-10 min-w-[150px] bg-transparent">
+                  <SelectValue placeholder="Month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MONTHS.map((m) => (
+                    <SelectItem key={m.value} value={m.value}>
+                      {m.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={goToNextMonth}
-            className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent"
-            disabled={isCurrentMonth}
-          >
-            <ArrowLeft className="h-4 w-4 rotate-180" />
-          </Button>
+              <Select
+                value={selectedYearValue}
+                onValueChange={(v) =>
+                  setMonthYear(selectedMonth.getMonth(), Number(v))
+                }
+              >
+                <SelectTrigger className="h-9 sm:h-10 w-[110px] bg-transparent">
+                  <SelectValue placeholder="Year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={goToNextMonth}
+              className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent"
+              disabled={isCurrentMonth}
+              aria-label="Next month"
+              title={
+                isCurrentMonth
+                  ? "You're viewing the current month"
+                  : "Next month"
+              }
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Summary Cards */}
@@ -429,6 +567,9 @@ export default function AnalyticsPage() {
               <p className="text-lg sm:text-2xl font-bold text-emerald-700">
                 ৳{monthlySummary.income.toLocaleString()}
               </p>
+              <p className="mt-1 text-[10px] sm:text-xs text-emerald-700/70">
+                {includeLoans ? "Incl. loans" : "Income only"}
+              </p>
             </CardContent>
           </Card>
 
@@ -443,20 +584,23 @@ export default function AnalyticsPage() {
               <p className="text-lg sm:text-2xl font-bold text-rose-700">
                 ৳{monthlySummary.expense.toLocaleString()}
               </p>
+              <p className="mt-1 text-[10px] sm:text-xs text-rose-700/70">
+                {includeLoans ? "Incl. loans" : "Expense only"}
+              </p>
             </CardContent>
           </Card>
 
           <Card
             className={cn(
               "bg-gradient-to-br border",
-              monthlySummary.income - monthlySummary.expense >= 0
+              net >= 0
                 ? "from-blue-50 to-blue-100/50 border-blue-200"
-                : "from-orange-50 to-orange-100/50 border-orange-200"
+                : "from-orange-50 to-orange-100/50 border-orange-200",
             )}
           >
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                {monthlySummary.income - monthlySummary.expense >= 0 ? (
+                {net >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-blue-600" />
                 ) : (
                   <TrendingDown className="h-4 w-4 text-orange-600" />
@@ -464,9 +608,7 @@ export default function AnalyticsPage() {
                 <span
                   className={cn(
                     "text-[10px] sm:text-xs font-medium uppercase tracking-wide",
-                    monthlySummary.income - monthlySummary.expense >= 0
-                      ? "text-blue-600"
-                      : "text-orange-600"
+                    net >= 0 ? "text-blue-600" : "text-orange-600",
                   )}
                 >
                   Net
@@ -475,12 +617,13 @@ export default function AnalyticsPage() {
               <p
                 className={cn(
                   "text-lg sm:text-2xl font-bold",
-                  monthlySummary.income - monthlySummary.expense >= 0
-                    ? "text-blue-700"
-                    : "text-orange-700"
+                  net >= 0 ? "text-blue-700" : "text-orange-700",
                 )}
               >
-                ৳{(monthlySummary.income - monthlySummary.expense).toLocaleString()}
+                ৳{net.toLocaleString()}
+              </p>
+              <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
+                {format(selectedMonth, "MMMM yyyy")}
               </p>
             </CardContent>
           </Card>
@@ -496,10 +639,13 @@ export default function AnalyticsPage() {
               <p
                 className={cn(
                   "text-lg sm:text-2xl font-bold",
-                  totalBalance >= 0 ? "text-emerald-700" : "text-rose-700"
+                  totalBalance >= 0 ? "text-emerald-700" : "text-rose-700",
                 )}
               >
                 ৳{totalBalance.toLocaleString()}
+              </p>
+              <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
+                Matches Dashboard
               </p>
             </CardContent>
           </Card>
@@ -514,32 +660,39 @@ export default function AnalyticsPage() {
                 <PieChartIcon className="h-4 w-4 text-rose-500" />
                 Expense Breakdown
               </CardTitle>
-              <CardDescription className="text-xs">Where your money goes</CardDescription>
+              <CardDescription className="text-xs">
+                Where your money goes
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {expenseByCategory.length > 0 ? (
                 <div className="h-[250px] sm:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
+                      {/* ✅ Removed labels to prevent mobile overflow */}
                       <Pie
                         data={expenseByCategory}
                         cx="50%"
                         cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
+                        innerRadius={55}
+                        outerRadius={90}
                         paddingAngle={2}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
                       >
                         {expenseByCategory.map((_, index) => (
                           <Cell
-                            key={`cell-${index}`}
+                            key={`cell-exp-${index}`}
                             fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
                           />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => [`৳${value.toLocaleString()}`, "Amount"]} />
+                      <Tooltip
+                        formatter={(value: number) => [
+                          `৳${value.toLocaleString()}`,
+                          "Amount",
+                        ]}
+                      />
+                      <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -558,32 +711,39 @@ export default function AnalyticsPage() {
                 <PieChartIcon className="h-4 w-4 text-emerald-500" />
                 Income Breakdown
               </CardTitle>
-              <CardDescription className="text-xs">Where your money comes from</CardDescription>
+              <CardDescription className="text-xs">
+                Where your money comes from
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {incomeByCategory.length > 0 ? (
                 <div className="h-[250px] sm:h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
+                      {/* ✅ Removed labels to prevent mobile overflow */}
                       <Pie
                         data={incomeByCategory}
                         cx="50%"
                         cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
+                        innerRadius={55}
+                        outerRadius={90}
                         paddingAngle={2}
                         dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                        labelLine={false}
                       >
                         {incomeByCategory.map((_, index) => (
                           <Cell
-                            key={`cell-${index}`}
+                            key={`cell-inc-${index}`}
                             fill={INCOME_COLORS[index % INCOME_COLORS.length]}
                           />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value: number) => [`৳${value.toLocaleString()}`, "Amount"]} />
+                      <Tooltip
+                        formatter={(value: number) => [
+                          `৳${value.toLocaleString()}`,
+                          "Amount",
+                        ]}
+                      />
+                      <Legend />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -603,7 +763,11 @@ export default function AnalyticsPage() {
               <TrendingUp className="h-4 w-4 text-indigo-500" />
               6-Month Trend
             </CardTitle>
-            <CardDescription className="text-xs">Income vs Expenses over time</CardDescription>
+            <CardDescription className="text-xs">
+              {includeLoans
+                ? "Cashflow (incl. loans)"
+                : "Profit (income/expense only)"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px] sm:h-[300px]">
@@ -611,14 +775,30 @@ export default function AnalyticsPage() {
                 <BarChart data={monthlyTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `৳${(value / 1000).toFixed(0)}k`} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `৳${(value / 1000).toFixed(0)}k`}
+                  />
                   <Tooltip
-                    formatter={(value: number) => [`৳${value.toLocaleString()}`, ""]}
+                    formatter={(value: number) => [
+                      `৳${value.toLocaleString()}`,
+                      "",
+                    ]}
                     labelStyle={{ fontWeight: 600 }}
                   />
                   <Legend />
-                  <Bar dataKey="income" name="Income" fill="#10b981" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expense" name="Expense" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                  <Bar
+                    dataKey="income"
+                    name="Income"
+                    fill="#10b981"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar
+                    dataKey="expense"
+                    name="Expense"
+                    fill="#ef4444"
+                    radius={[4, 4, 0, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -632,7 +812,9 @@ export default function AnalyticsPage() {
               <BarChart3 className="h-4 w-4 text-blue-500" />
               Daily Activity - {format(selectedMonth, "MMMM yyyy")}
             </CardTitle>
-            <CardDescription className="text-xs">Daily income and expenses</CardDescription>
+            <CardDescription className="text-xs">
+              Daily income and expenses
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="h-[250px] sm:h-[300px]">
@@ -640,9 +822,15 @@ export default function AnalyticsPage() {
                 <LineChart data={dailySpending}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis dataKey="day" tick={{ fontSize: 10 }} />
-                  <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `৳${value.toLocaleString()}`} />
+                  <YAxis
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => `৳${value.toLocaleString()}`}
+                  />
                   <Tooltip
-                    formatter={(value: number) => [`৳${value.toLocaleString()}`, ""]}
+                    formatter={(value: number) => [
+                      `৳${value.toLocaleString()}`,
+                      "",
+                    ]}
                     labelFormatter={(label) => `Day ${label}`}
                   />
                   <Legend />
@@ -673,7 +861,9 @@ export default function AnalyticsPage() {
           {/* Top Expenses */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base">Top Expenses</CardTitle>
+              <CardTitle className="text-sm sm:text-base">
+                Top Expenses
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {expenseByCategory.length > 0 ? (
@@ -683,12 +873,15 @@ export default function AnalyticsPage() {
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{
-                          backgroundColor: EXPENSE_COLORS[index % EXPENSE_COLORS.length],
+                          backgroundColor:
+                            EXPENSE_COLORS[index % EXPENSE_COLORS.length],
                         }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium truncate">{cat.name}</span>
+                          <span className="text-sm font-medium truncate">
+                            {cat.name}
+                          </span>
                           <span className="text-sm font-semibold text-rose-600 ml-2">
                             ৳{cat.value.toLocaleString()}
                           </span>
@@ -697,8 +890,9 @@ export default function AnalyticsPage() {
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
-                              width: `${(cat.value / monthlySummary.expense) * 100}%`,
-                              backgroundColor: EXPENSE_COLORS[index % EXPENSE_COLORS.length],
+                              width: `${monthlySummary.expense > 0 ? (cat.value / monthlySummary.expense) * 100 : 0}%`,
+                              backgroundColor:
+                                EXPENSE_COLORS[index % EXPENSE_COLORS.length],
                             }}
                           />
                         </div>
@@ -717,7 +911,9 @@ export default function AnalyticsPage() {
           {/* Top Income Sources */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm sm:text-base">Top Income Sources</CardTitle>
+              <CardTitle className="text-sm sm:text-base">
+                Top Income Sources
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {incomeByCategory.length > 0 ? (
@@ -727,12 +923,15 @@ export default function AnalyticsPage() {
                       <div
                         className="w-3 h-3 rounded-full flex-shrink-0"
                         style={{
-                          backgroundColor: INCOME_COLORS[index % INCOME_COLORS.length],
+                          backgroundColor:
+                            INCOME_COLORS[index % INCOME_COLORS.length],
                         }}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium truncate">{cat.name}</span>
+                          <span className="text-sm font-medium truncate">
+                            {cat.name}
+                          </span>
                           <span className="text-sm font-semibold text-emerald-600 ml-2">
                             ৳{cat.value.toLocaleString()}
                           </span>
@@ -741,8 +940,9 @@ export default function AnalyticsPage() {
                           <div
                             className="h-full rounded-full transition-all"
                             style={{
-                              width: `${(cat.value / monthlySummary.income) * 100}%`,
-                              backgroundColor: INCOME_COLORS[index % INCOME_COLORS.length],
+                              width: `${monthlySummary.income > 0 ? (cat.value / monthlySummary.income) * 100 : 0}%`,
+                              backgroundColor:
+                                INCOME_COLORS[index % INCOME_COLORS.length],
                             }}
                           />
                         </div>
