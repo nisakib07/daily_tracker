@@ -16,7 +16,14 @@ export interface Person {
 
 export interface Transaction {
   id: string;
-  type: "income" | "expense" | "transfer" | "lend" | "borrow" | "repay" | "receive";
+  type:
+    | "income"
+    | "expense"
+    | "transfer"
+    | "lend"
+    | "borrow"
+    | "repay"
+    | "receive";
   amount: number;
   from_account_id: string | null;
   to_account_id: string | null;
@@ -31,9 +38,9 @@ export interface Transaction {
 export interface LedgerEntry {
   personId: string;
   personName: string;
-  youOwe: number;      // Money you borrowed from them
-  theyOwe: number;     // Money they borrowed from you (loans given)
-  netBalance: number;  // Positive = they owe you, Negative = you owe them
+  youOwe: number; // Money you borrowed from them
+  theyOwe: number; // Money they borrowed from you (loans given)
+  netBalance: number; // Positive = they owe you, Negative = you owe them
 }
 
 export type TransactionType = "in" | "out" | "transfer";
@@ -75,8 +82,17 @@ export interface CustomCategory {
 
 // Loan/Borrow related transaction types
 export const LOAN_TYPES = {
-  LEND: "lend",           // You give loan to someone (money out)
-  BORROW: "borrow",       // You borrow from someone (money in)
-  REPAY: "repay",         // You repay borrowed money (money out)
-  RECEIVE: "receive",     // You receive loan repayment (money in)
+  LEND: "lend", // You give loan to someone (money out)
+  BORROW: "borrow", // You borrow from someone (money in)
+  REPAY: "repay", // You repay borrowed money (money out)
+  RECEIVE: "receive", // You receive loan repayment (money in)
 } as const;
+
+export interface Budget {
+  id: string;
+  month: string; // "2026-01-01"
+  category: string;
+  amount: number;
+  created_at: string;
+  updated_at: string;
+}

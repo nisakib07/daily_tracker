@@ -27,6 +27,7 @@ import { Ledger } from "@/components/ledger";
 import { MonthlyStats } from "@/components/monthly-stats";
 import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
 import { createClient } from "@/lib/supabase/client";
+import { BudgetPlanner } from "@/components/budget-planner";
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
   ArrowDownLeft,
@@ -67,7 +68,9 @@ export function Dashboard() {
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<"activity" | "ledger">("activity");
+  const [activeTab, setActiveTab] = useState<"activity" | "ledger" | "budget">(
+    "activity",
+  );
   const [viewMode, setViewMode] = useState<"daily" | "monthly">("daily");
   const [selectedMonth, setSelectedMonth] = useState<Date>(new Date());
 
@@ -382,9 +385,11 @@ export function Dashboard() {
         {/* Main Content Tabs */}
         <Tabs
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "activity" | "ledger")}
+          onValueChange={(v) =>
+            setActiveTab(v as "activity" | "ledger" | "budget")
+          }
         >
-          <TabsList className="grid w-full grid-cols-2 mb-4 h-auto p-1">
+          <TabsList className="grid w-full grid-cols-3 mb-4 h-auto p-1">
             <TabsTrigger
               value="activity"
               className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
@@ -398,6 +403,12 @@ export function Dashboard() {
             >
               <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               Loan Ledger
+            </TabsTrigger>
+            <TabsTrigger
+              value="budget"
+              className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+            >
+              Budget
             </TabsTrigger>
           </TabsList>
 
@@ -604,6 +615,12 @@ export function Dashboard() {
                 onViewPerson={handleViewPerson}
               />
             </section>
+          </TabsContent>
+          <TabsContent value="budget" className="space-y-4 mt-0">
+            <BudgetPlanner
+              selectedMonth={selectedMonth}
+              transactions={allTransactions}
+            />
           </TabsContent>
         </Tabs>
       </main>

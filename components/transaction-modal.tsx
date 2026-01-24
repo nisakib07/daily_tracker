@@ -301,7 +301,7 @@ function TransactionForm({
   const emphasizeRepay = subType === "loan" && defaultLoanAction === "repay";
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex flex-col min-h-0 h-full">
       <Tabs
         value={subType}
         onValueChange={(v) => setSubType(v as TransactionSubType)}
@@ -337,7 +337,7 @@ function TransactionForm({
         </TabsList>
 
         {/* ✅ Scrollable content area */}
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-3">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-24">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -793,8 +793,8 @@ export function TransactionModal({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[90vh] px-4 pb-2 overflow-hidden flex flex-col">
-        <DrawerHeader className="px-0">
+      <DrawerContent className="h-[90dvh] px-4 pb-2 flex flex-col">
+        <DrawerHeader className="px-0 shrink-0">
           <div className="flex items-center gap-3">
             <HeaderIcon />
             <DrawerTitle
@@ -808,7 +808,8 @@ export function TransactionModal({
           </div>
         </DrawerHeader>
 
-        <div className="flex-1 min-h-0 pb-2">
+        {/* IMPORTANT: min-h-0 allows inner scroll to work */}
+        <div className="flex-1 min-h-0">
           <TransactionForm
             open={open}
             type={type}
