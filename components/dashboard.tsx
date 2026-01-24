@@ -295,7 +295,7 @@ export function Dashboard() {
               </div>
               <div>
                 <h1 className="text-base sm:text-lg font-bold text-foreground group-hover:text-emerald-600 transition-colors">
-                  Daily Tracker
+                  Money Master
                 </h1>
                 <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
                   Tap for Analytics
@@ -408,6 +408,7 @@ export function Dashboard() {
               value="budget"
               className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
             >
+              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               Budget
             </TabsTrigger>
           </TabsList>
