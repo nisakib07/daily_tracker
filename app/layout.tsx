@@ -39,7 +39,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="manifest" href="/manifest.webmanifest" />
+        <link rel="manifest" href="./manifest.webmanifest" />
+
         <meta name="theme-color" content="#10b981" />
       </head>
       <body className={`${_geist.className} font-sans antialiased`}>
