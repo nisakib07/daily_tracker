@@ -214,6 +214,20 @@ export function Dashboard() {
     return people.find((p) => p.id === personId)?.name || null;
   };
 
+  // Helper to get last transaction for an account (most recent by occurred_at)
+  const getLastTransactionForAccount = (accountId: string) => {
+    const accountTxs = allTransactions.filter(
+      (tx) => tx.from_account_id === accountId || tx.to_account_id === accountId
+    );
+    if (accountTxs.length === 0) return null;
+    // Sort by occurred_at descending and return the first (most recent)
+    return accountTxs.sort((a, b) => {
+      const aTime = new Date(a.occurred_at || a.date).getTime();
+      const bTime = new Date(b.occurred_at || b.date).getTime();
+      return bTime - aTime;
+    })[0];
+  };
+
   // Handle edit account
   const handleEditAccount = (account: Account & { balance?: number }) => {
     setSelectedAccount(account);
@@ -392,6 +406,7 @@ export function Dashboard() {
               <AccountCard
                 key={account.id}
                 account={account}
+                lastTransaction={getLastTransactionForAccount(account.id)}
                 onEdit={handleEditAccount}
               />
             ))}
@@ -653,6 +668,10 @@ export function Dashboard() {
                 getPersonName={getPersonName}
                 onEdit={handleEditTransaction}
                 onDelete={fetchData}
+                onAddTransaction={() => {
+                  setMoneyInDefaults({});
+                  setMoneyInOpen(true);
+                }}
               />
             </section>
           </TabsContent>
@@ -679,9 +698,9 @@ export function Dashboard() {
         </Tabs>
       </main>
 
-      {/* ✅ MOBILE: Floating Action Button + Quick Actions Drawer */}
+      {/* MOBILE: Floating Action Button + Quick Actions Drawer */}
       <div className="sm:hidden">
-        {/* FAB */}
+        {/* FAB with pulse animation when no transactions */}
         <button
           type="button"
           onClick={() => setQuickActionsOpen(true)}
@@ -690,6 +709,7 @@ export function Dashboard() {
             "fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full",
             "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-lg shadow-black/20 dark:shadow-black/40",
             "active:scale-95 transition-transform",
+            allTransactions.length === 0 && "fab-pulse",
           )}
           style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
         >

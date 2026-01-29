@@ -146,33 +146,33 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
       {/* Monthly Stats Grid */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {/* Income Card */}
-        <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-3 sm:p-4 border border-emerald-100">
+        <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-900/30 p-3 sm:p-4 border border-emerald-100 dark:border-emerald-800/50">
           <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <p className="text-[10px] sm:text-xs font-medium text-emerald-600 uppercase tracking-wide">
+            <p className="text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
               Income
             </p>
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600" />
+            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <p className="text-lg sm:text-2xl font-bold text-emerald-700">
+          <p className="text-lg sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
             +৳{monthlySummary.income.toLocaleString()}
           </p>
-          <p className="text-[10px] sm:text-xs text-emerald-600 mt-0.5 sm:mt-1">
+          <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 mt-0.5 sm:mt-1">
             {monthlyTransactions.filter(tx => ["income", "borrow", "receive"].includes(tx.type)).length} txns
           </p>
         </div>
 
         {/* Expense Card */}
-        <div className="rounded-lg bg-gradient-to-br from-rose-50 to-rose-100/50 p-3 sm:p-4 border border-rose-100">
+        <div className="rounded-lg bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/50 dark:to-rose-900/30 p-3 sm:p-4 border border-rose-100 dark:border-rose-800/50">
           <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <p className="text-[10px] sm:text-xs font-medium text-rose-600 uppercase tracking-wide">
+            <p className="text-[10px] sm:text-xs font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wide">
               Expense
             </p>
-            <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-rose-600" />
+            <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400" />
           </div>
-          <p className="text-lg sm:text-2xl font-bold text-rose-700">
+          <p className="text-lg sm:text-2xl font-bold text-rose-700 dark:text-rose-300">
             -৳{monthlySummary.expense.toLocaleString()}
           </p>
-          <p className="text-[10px] sm:text-xs text-rose-600 mt-0.5 sm:mt-1">
+          <p className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400 mt-0.5 sm:mt-1">
             {monthlyTransactions.filter(tx => ["expense", "lend", "repay"].includes(tx.type)).length} txns
           </p>
         </div>
@@ -181,30 +181,30 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
         <div className={cn(
           "rounded-lg p-3 sm:p-4 border",
           netBalance >= 0 
-            ? "bg-gradient-to-br from-blue-50 to-indigo-100/50 border-blue-100"
-            : "bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-100"
+            ? "bg-gradient-to-br from-blue-50 to-indigo-100/50 dark:from-blue-950/50 dark:to-indigo-900/30 border-blue-100 dark:border-blue-800/50"
+            : "bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/50 dark:to-amber-900/30 border-amber-100 dark:border-amber-800/50"
         )}>
           <div className="flex items-center justify-between mb-1 sm:mb-2">
             <p className={cn(
               "text-[10px] sm:text-xs font-medium uppercase tracking-wide",
-              netBalance >= 0 ? "text-blue-600" : "text-amber-600"
+              netBalance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
             )}>
               Net
             </p>
             <CreditCard className={cn(
               "h-3 w-3 sm:h-4 sm:w-4",
-              netBalance >= 0 ? "text-blue-600" : "text-amber-600"
+              netBalance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
             )} />
           </div>
           <p className={cn(
             "text-lg sm:text-2xl font-bold",
-            netBalance >= 0 ? "text-blue-700" : "text-amber-700"
+            netBalance >= 0 ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300"
           )}>
             {netBalance >= 0 ? "+" : ""}৳{netBalance.toLocaleString()}
           </p>
           <p className={cn(
             "text-[10px] sm:text-xs mt-0.5 sm:mt-1",
-            netBalance >= 0 ? "text-blue-600" : "text-amber-600"
+            netBalance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
           )}>
             {netBalance >= 0 ? "Surplus" : "Deficit"}
           </p>
@@ -213,7 +213,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
 
       {/* Top Expense Categories */}
       {sortedCategories.length > 0 && (
-        <div className="pt-2 sm:pt-4 border-t">
+        <div className="pt-2 sm:pt-4 border-t border-border">
           <h4 className="text-xs font-medium text-muted-foreground mb-2 sm:mb-3">
             Top Expenses This Month
           </h4>
@@ -226,9 +226,9 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
                     <span className="text-foreground font-medium truncate">{category}</span>
                     <span className="text-muted-foreground ml-2">৳{amount.toLocaleString()}</span>
                   </div>
-                  <div className="h-1.5 sm:h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-rose-400 to-rose-500 rounded-full transition-all duration-500"
+                      className="h-full bg-gradient-to-r from-rose-400 to-rose-500 dark:from-rose-500 dark:to-rose-600 rounded-full transition-all duration-500"
                       style={{ width: `${percentage}%` }}
                     />
                   </div>

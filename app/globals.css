@@ -142,3 +142,30 @@
 ::-webkit-scrollbar-thumb:hover {
   background: oklch(0.7 0 0);
 }
+
+/* FAB pulse animation */
+@keyframes fab-pulse {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 0 0 12px rgba(16, 185, 129, 0);
+  }
+}
+
+.fab-pulse {
+  animation: fab-pulse 2s ease-in-out infinite;
+}
+
+.dark .fab-pulse {
+  animation: fab-pulse-dark 2s ease-in-out infinite;
+}
+
+@keyframes fab-pulse-dark {
+  0%, 100% {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(167, 243, 208, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 0 12px rgba(167, 243, 208, 0);
+  }
+}

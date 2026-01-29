@@ -33,12 +33,24 @@ import {
   Loader2,
   Search,
   X,
+  CalendarIcon,
+  Plus,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   format,
   parseISO,
   startOfDay,
+  endOfDay,
   differenceInCalendarDays,
+  subDays,
+  isAfter,
+  isBefore,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -49,6 +61,7 @@ interface ActivityListProps {
   getPersonName: (id: string | null) => string | null;
   onEdit: (transaction: Transaction) => void;
   onDelete: () => void;
+  onAddTransaction?: () => void;
 }
 
 type Group = {
@@ -66,13 +79,19 @@ export function ActivityList({
   getPersonName,
   onEdit,
   onDelete,
+  onAddTransaction,
 }: ActivityListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // ✅ NEW: search + quick filter
+  // Search + quick filter + date range
   const [query, setQuery] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -120,18 +139,18 @@ export function ActivityList({
     switch (type) {
       case "income":
       case "receive":
-        return "bg-gradient-to-br from-emerald-100 to-emerald-200 text-emerald-600";
+        return "bg-gradient-to-br from-emerald-100 to-emerald-200 dark:from-emerald-900/50 dark:to-emerald-800/50 text-emerald-600 dark:text-emerald-400";
       case "expense":
       case "repay":
-        return "bg-gradient-to-br from-rose-100 to-rose-200 text-rose-600";
+        return "bg-gradient-to-br from-rose-100 to-rose-200 dark:from-rose-900/50 dark:to-rose-800/50 text-rose-600 dark:text-rose-400";
       case "transfer":
-        return "bg-gradient-to-br from-blue-100 to-blue-200 text-blue-600";
+        return "bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900/50 dark:to-blue-800/50 text-blue-600 dark:text-blue-400";
       case "lend":
-        return "bg-gradient-to-br from-indigo-100 to-indigo-200 text-indigo-600";
+        return "bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/50 dark:to-indigo-800/50 text-indigo-600 dark:text-indigo-400";
       case "borrow":
-        return "bg-gradient-to-br from-amber-100 to-amber-200 text-amber-600";
+        return "bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/50 dark:to-amber-800/50 text-amber-600 dark:text-amber-400";
       default:
-        return "bg-gradient-to-br from-slate-100 to-slate-200 text-slate-600";
+        return "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 text-slate-600 dark:text-slate-400";
     }
   };
 
@@ -140,15 +159,15 @@ export function ActivityList({
       case "income":
       case "borrow":
       case "receive":
-        return "text-emerald-600";
+        return "text-emerald-600 dark:text-emerald-400";
       case "expense":
       case "lend":
       case "repay":
-        return "text-rose-600";
+        return "text-rose-600 dark:text-rose-400";
       case "transfer":
-        return "text-blue-600";
+        return "text-blue-600 dark:text-blue-400";
       default:
-        return "text-slate-600";
+        return "text-muted-foreground";
     }
   };
 
@@ -178,7 +197,7 @@ export function ActivityList({
     }
   };
 
-  // ✅ Filter first (search + chips), then group
+  // Filter first (search + chips + date range), then group
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
@@ -190,6 +209,14 @@ export function ActivityList({
         return ["expense", "lend", "repay"].includes(tx.type);
       if (quickFilter === "transfer") return tx.type === "transfer";
       if (quickFilter === "loans") return isLoan(tx.type);
+      return true;
+    };
+
+    const matchesDateRange = (tx: Transaction) => {
+      if (!dateRange.from && !dateRange.to) return true;
+      const txDate = startOfDay(parseISO(String(tx.date)));
+      if (dateRange.from && isBefore(txDate, startOfDay(dateRange.from))) return false;
+      if (dateRange.to && isAfter(txDate, endOfDay(dateRange.to))) return false;
       return true;
     };
 
@@ -221,9 +248,9 @@ export function ActivityList({
     };
 
     return (transactions ?? []).filter(
-      (tx) => matchesQuickFilter(tx) && matchesSearch(tx),
+      (tx) => matchesQuickFilter(tx) && matchesSearch(tx) && matchesDateRange(tx),
     );
-  }, [transactions, query, quickFilter, getAccountName, getPersonName]);
+  }, [transactions, query, quickFilter, dateRange, getAccountName, getPersonName]);
 
   // ✅ Group by date (timezone-safe Today/Yesterday)
   const groups: Group[] = useMemo(() => {
@@ -243,7 +270,15 @@ export function ActivityList({
     const sortedKeys = Array.from(map.keys()).sort((a, b) => (a > b ? -1 : 1));
 
     return sortedKeys.map((key) => {
-      const first = map.get(key)![0];
+      const items = map.get(key)!;
+      // Sort items within each day by occurred_at descending (most recent first)
+      items.sort((a, b) => {
+        const aTime = new Date(a.occurred_at || a.date).getTime();
+        const bTime = new Date(b.occurred_at || b.date).getTime();
+        return bTime - aTime;
+      });
+      
+      const first = items[0];
       const dateObj = parseISO(String(first.date));
       const dayStart = startOfDay(dateObj);
 
@@ -259,7 +294,7 @@ export function ActivityList({
         key,
         title,
         dateLabel,
-        items: map.get(key)!,
+        items,
       };
     });
   }, [filtered]);
@@ -267,21 +302,30 @@ export function ActivityList({
   if (!transactions || transactions.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
-        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-slate-100 mb-4">
-          <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400" />
+        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-muted mb-4">
+          <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
         </div>
         <p className="font-medium text-foreground mb-1">No transactions</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mb-4">
           Add your first transaction to get started
         </p>
+        {onAddTransaction && (
+          <Button
+            onClick={onAddTransaction}
+            className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
     <>
-      {/* ✅ Sticky search + quick filters (mobile-friendly) */}
-      <div className="sticky top-0 z-10 -mx-3 sm:mx-0 px-3 sm:px-0 py-2 bg-white/80 backdrop-blur-md border-b border-slate-100">
+      {/* Sticky search + quick filters + date range (mobile-friendly) */}
+      <div className="sticky top-0 z-10 -mx-3 sm:mx-0 px-3 sm:px-0 py-2 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -289,20 +333,125 @@ export function ActivityList({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search amount, note, person, account…"
-              className="pl-9 h-10 bg-white"
+              className="pl-9 h-10 bg-background"
             />
             {query.trim() && (
               <button
                 type="button"
                 aria-label="Clear search"
                 onClick={() => setQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-slate-100"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-muted"
               >
                 <X className="h-4 w-4 text-muted-foreground" />
               </button>
             )}
           </div>
+          
+          {/* Date Range Picker */}
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-10 w-10 shrink-0 bg-background",
+                  (dateRange.from || dateRange.to) && "border-emerald-500 text-emerald-600"
+                )}
+              >
+                <CalendarIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Date Range</p>
+                  {(dateRange.from || dateRange.to) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDateRange({ from: undefined, to: undefined });
+                        setDatePickerOpen(false);
+                      }}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Quick presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs bg-transparent"
+                    onClick={() => {
+                      setDateRange({ from: subDays(new Date(), 7), to: new Date() });
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Last 7 days
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs bg-transparent"
+                    onClick={() => {
+                      setDateRange({ from: subDays(new Date(), 30), to: new Date() });
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Last 30 days
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs bg-transparent"
+                    onClick={() => {
+                      setDateRange({ from: subDays(new Date(), 90), to: new Date() });
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Last 90 days
+                  </Button>
+                </div>
+                
+                <Calendar
+                  mode="range"
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range) => {
+                    setDateRange({ from: range?.from, to: range?.to });
+                    if (range?.from && range?.to) {
+                      setDatePickerOpen(false);
+                    }
+                  }}
+                  numberOfMonths={1}
+                  initialFocus
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
+
+        {/* Active date range indicator */}
+        {(dateRange.from || dateRange.to) && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+            <CalendarIcon className="h-3 w-3" />
+            <span>
+              {dateRange.from ? format(dateRange.from, "MMM d, yyyy") : "Start"} 
+              {" - "}
+              {dateRange.to ? format(dateRange.to, "MMM d, yyyy") : "End"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDateRange({ from: undefined, to: undefined })}
+              className="ml-auto p-0.5 rounded hover:bg-muted"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
 
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           <Chip
@@ -346,8 +495,8 @@ export function ActivityList({
 
       {filtered.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 mb-3">
-            <Inbox className="h-6 w-6 text-slate-400" />
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
+            <Inbox className="h-6 w-6 text-muted-foreground" />
           </div>
           <p className="font-medium text-foreground mb-1">No results</p>
           <p className="text-sm text-muted-foreground">
@@ -390,7 +539,7 @@ export function ActivityList({
                   return (
                     <div
                       key={tx.id}
-                      className="group rounded-xl bg-white border border-slate-100 p-3 sm:p-4 transition-all hover:shadow-md hover:border-slate-200"
+                      className="group rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
@@ -414,8 +563,8 @@ export function ActivityList({
                                   className={cn(
                                     "text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0",
                                     tx.type === "lend" || tx.type === "repay"
-                                      ? "bg-rose-100 text-rose-700"
-                                      : "bg-emerald-100 text-emerald-700",
+                                      ? "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
+                                      : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
                                   )}
                                 >
                                   {getTypeLabel(tx.type)}
@@ -426,7 +575,7 @@ export function ActivityList({
                             <p className="text-xs sm:text-sm text-muted-foreground truncate">
                               {accountName}
                               {personName && (
-                                <span className="text-slate-400">
+                                <span className="opacity-60">
                                   {" "}
                                   • {personName}
                                 </span>
@@ -434,7 +583,7 @@ export function ActivityList({
                             </p>
 
                             {tx.note && (
-                              <p className="text-[11px] sm:text-xs text-muted-foreground/70 mt-0.5 line-clamp-1">
+                              <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1 opacity-70">
                                 {tx.note}
                               </p>
                             )}
@@ -475,7 +624,7 @@ export function ActivityList({
                             type="button"
                             variant="outline"
                             size="sm"
-                            className="h-9 bg-transparent text-rose-600 border-rose-200 hover:bg-rose-50"
+                            className="h-9 bg-transparent text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950"
                             onClick={() => setDeleteId(tx.id)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
@@ -502,7 +651,7 @@ export function ActivityList({
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 onClick={() => setDeleteId(tx.id)}
-                                className="text-rose-600 focus:text-rose-600"
+                                className="text-rose-600 dark:text-rose-400 focus:text-rose-600 dark:focus:text-rose-400"
                               >
                                 <Trash2 className="mr-2 h-4 w-4" />
                                 Delete
@@ -566,10 +715,10 @@ function Chip({
       type="button"
       onClick={onClick}
       className={cn(
-        "h-8 px-3 rounded-full text-xs font-medium border whitespace-nowrap",
+        "h-8 px-3 rounded-full text-xs font-medium border whitespace-nowrap transition-colors",
         active
-          ? "bg-slate-900 text-white border-slate-900"
-          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+          ? "bg-foreground text-background border-foreground"
+          : "bg-card text-foreground border-border hover:bg-muted",
       )}
     >
       {children}
