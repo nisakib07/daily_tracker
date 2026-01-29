@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 
 type Props = {
   open: boolean;
@@ -28,6 +29,7 @@ export function BudgetModal({
   existingBudgets,
   onSaved,
 }: Props) {
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
 
@@ -69,6 +71,7 @@ export function BudgetModal({
           month: monthKey,
           category,
           amount,
+          user_id: user?.id,
         };
       })
       .filter(Boolean);
@@ -82,7 +85,7 @@ export function BudgetModal({
 
     const { error } = await supabase
       .from("budgets")
-      .upsert(rows as any, { onConflict: "month,category" });
+      .upsert(rows as any, { onConflict: "user_id,month,category" });
 
     if (error) {
       console.error("Save budgets error:", error.message);

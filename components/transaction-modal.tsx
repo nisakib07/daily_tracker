@@ -28,6 +28,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Account, Person, TransactionType } from "@/lib/types";
 import { DEFAULT_CATEGORIES_IN, DEFAULT_CATEGORIES_OUT } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import {
   Loader2,
   Plus,
@@ -76,6 +77,7 @@ function TransactionForm({
   defaultPersonId,
   defaultLoanAction,
 }: Omit<TransactionModalProps, "open"> & { open: boolean }) {
+  const { user } = useAuth();
   const [subType, setSubType] = useState<TransactionSubType>("regular");
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState("");
@@ -219,6 +221,7 @@ function TransactionForm({
         person_id: personId || null,
         category: transactionCategory,
         note: note || null,
+        user_id: user?.id,
         occurred_at: (() => {
           const now = new Date();
           const [year, month, day] = date.split('-').map(Number);
@@ -259,6 +262,7 @@ function TransactionForm({
         category:
           actionType === "repay" ? "Loan Repayment" : "Loan Received Back",
         note: note || null,
+        user_id: user?.id,
         occurred_at: (() => {
           const now = new Date();
           const [year, month, day] = date.split('-').map(Number);

@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { PwaUpdateToast } from "@/components/pwa-update-toast";
+import { AuthProvider } from "@/lib/auth-context";
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -45,9 +46,11 @@ export default function RootLayout({
         <meta name="theme-color" content="#10b981" />
       </head>
       <body className={`${_geist.className} font-sans antialiased`}>
-        {children}
-        <Analytics />
-        <PwaUpdateToast />
+        <AuthProvider>
+          {children}
+          <Analytics />
+          <PwaUpdateToast />
+        </AuthProvider>
       </body>
     </html>
   );
