@@ -33,12 +33,24 @@ import {
   Loader2,
   Search,
   X,
+  CalendarIcon,
+  Plus,
 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   format,
   parseISO,
   startOfDay,
+  endOfDay,
   differenceInCalendarDays,
+  subDays,
+  isAfter,
+  isBefore,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -49,6 +61,7 @@ interface ActivityListProps {
   getPersonName: (id: string | null) => string | null;
   onEdit: (transaction: Transaction) => void;
   onDelete: () => void;
+  onAddTransaction?: () => void;
 }
 
 type Group = {
@@ -66,13 +79,19 @@ export function ActivityList({
   getPersonName,
   onEdit,
   onDelete,
+  onAddTransaction,
 }: ActivityListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // ✅ NEW: search + quick filter
+  // Search + quick filter + date range
   const [query, setQuery] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined,
+  });
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const handleDelete = async () => {
     if (!deleteId) return;
@@ -178,7 +197,7 @@ export function ActivityList({
     }
   };
 
-  // ✅ Filter first (search + chips), then group
+  // Filter first (search + chips + date range), then group
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
 
@@ -190,6 +209,14 @@ export function ActivityList({
         return ["expense", "lend", "repay"].includes(tx.type);
       if (quickFilter === "transfer") return tx.type === "transfer";
       if (quickFilter === "loans") return isLoan(tx.type);
+      return true;
+    };
+
+    const matchesDateRange = (tx: Transaction) => {
+      if (!dateRange.from && !dateRange.to) return true;
+      const txDate = startOfDay(parseISO(String(tx.date)));
+      if (dateRange.from && isBefore(txDate, startOfDay(dateRange.from))) return false;
+      if (dateRange.to && isAfter(txDate, endOfDay(dateRange.to))) return false;
       return true;
     };
 
@@ -221,9 +248,9 @@ export function ActivityList({
     };
 
     return (transactions ?? []).filter(
-      (tx) => matchesQuickFilter(tx) && matchesSearch(tx),
+      (tx) => matchesQuickFilter(tx) && matchesSearch(tx) && matchesDateRange(tx),
     );
-  }, [transactions, query, quickFilter, getAccountName, getPersonName]);
+  }, [transactions, query, quickFilter, dateRange, getAccountName, getPersonName]);
 
   // ✅ Group by date (timezone-safe Today/Yesterday)
   const groups: Group[] = useMemo(() => {
@@ -271,16 +298,25 @@ export function ActivityList({
           <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
         </div>
         <p className="font-medium text-foreground mb-1">No transactions</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground mb-4">
           Add your first transaction to get started
         </p>
+        {onAddTransaction && (
+          <Button
+            onClick={onAddTransaction}
+            className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Transaction
+          </Button>
+        )}
       </div>
     );
   }
 
   return (
     <>
-      {/* ✅ Sticky search + quick filters (mobile-friendly) */}
+      {/* Sticky search + quick filters + date range (mobile-friendly) */}
       <div className="sticky top-0 z-10 -mx-3 sm:mx-0 px-3 sm:px-0 py-2 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
@@ -302,7 +338,112 @@ export function ActivityList({
               </button>
             )}
           </div>
+          
+          {/* Date Range Picker */}
+          <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-10 w-10 shrink-0 bg-background",
+                  (dateRange.from || dateRange.to) && "border-emerald-500 text-emerald-600"
+                )}
+              >
+                <CalendarIcon className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <div className="p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium">Date Range</p>
+                  {(dateRange.from || dateRange.to) && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setDateRange({ from: undefined, to: undefined });
+                        setDatePickerOpen(false);
+                      }}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+                
+                {/* Quick presets */}
+                <div className="flex flex-wrap gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs bg-transparent"
+                    onClick={() => {
+                      setDateRange({ from: subDays(new Date(), 7), to: new Date() });
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Last 7 days
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs bg-transparent"
+                    onClick={() => {
+                      setDateRange({ from: subDays(new Date(), 30), to: new Date() });
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Last 30 days
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs bg-transparent"
+                    onClick={() => {
+                      setDateRange({ from: subDays(new Date(), 90), to: new Date() });
+                      setDatePickerOpen(false);
+                    }}
+                  >
+                    Last 90 days
+                  </Button>
+                </div>
+                
+                <Calendar
+                  mode="range"
+                  selected={{ from: dateRange.from, to: dateRange.to }}
+                  onSelect={(range) => {
+                    setDateRange({ from: range?.from, to: range?.to });
+                    if (range?.from && range?.to) {
+                      setDatePickerOpen(false);
+                    }
+                  }}
+                  numberOfMonths={1}
+                  initialFocus
+                />
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
+
+        {/* Active date range indicator */}
+        {(dateRange.from || dateRange.to) && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+            <CalendarIcon className="h-3 w-3" />
+            <span>
+              {dateRange.from ? format(dateRange.from, "MMM d, yyyy") : "Start"} 
+              {" - "}
+              {dateRange.to ? format(dateRange.to, "MMM d, yyyy") : "End"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setDateRange({ from: undefined, to: undefined })}
+              className="ml-auto p-0.5 rounded hover:bg-muted"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
 
         <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
           <Chip

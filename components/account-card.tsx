@@ -3,12 +3,14 @@
 import React from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import type { Account } from "@/lib/types";
-import { Banknote, CreditCard, Smartphone, Settings } from "lucide-react";
+import type { Account, Transaction } from "@/lib/types";
+import { Banknote, CreditCard, Smartphone, Settings, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format, parseISO } from "date-fns";
 
 interface AccountCardProps {
   account: Account & { balance?: number };
+  lastTransaction?: Transaction | null;
   onEdit?: (account: Account & { balance?: number }) => void;
 }
 
@@ -33,9 +35,15 @@ const accountStyles: Record<string, { icon: React.ReactNode; gradient: string; i
   },
 };
 
-export function AccountCard({ account, onEdit }: AccountCardProps) {
+export function AccountCard({ account, lastTransaction, onEdit }: AccountCardProps) {
   const style = accountStyles[account.type] || accountStyles.cash;
   const balance = account.balance || 0;
+
+  // Determine if last transaction was money in or out for this account
+  const isMoneyIn = lastTransaction && (
+    lastTransaction.to_account_id === account.id &&
+    ["income", "borrow", "receive", "transfer"].includes(lastTransaction.type)
+  );
 
   return (
     <Card className="group relative overflow-hidden border-0 bg-white dark:bg-slate-800 shadow-md hover:shadow-xl transition-all duration-300">
@@ -73,6 +81,31 @@ export function AccountCard({ account, onEdit }: AccountCardProps) {
             ৳{balance.toLocaleString()}
           </p>
         </div>
+        
+        {/* Last Transaction Preview */}
+        {lastTransaction && (
+          <div className="mt-2 pt-2 border-t border-border/50">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
+              {isMoneyIn ? (
+                <ArrowDownLeft className="h-3 w-3 text-emerald-500" />
+              ) : (
+                <ArrowUpRight className="h-3 w-3 text-rose-500" />
+              )}
+              <span className={cn(
+                "font-medium",
+                isMoneyIn ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+              )}>
+                {isMoneyIn ? "+" : "-"}৳{Number(lastTransaction.amount).toLocaleString()}
+              </span>
+              <span className="truncate opacity-70">
+                {lastTransaction.category || lastTransaction.type}
+              </span>
+            </div>
+            <p className="text-[9px] sm:text-[10px] text-muted-foreground/60 mt-0.5">
+              {format(parseISO(String(lastTransaction.occurred_at)), "MMM d, h:mm a")}
+            </p>
+          </div>
+        )}
       </div>
     </Card>
   );
