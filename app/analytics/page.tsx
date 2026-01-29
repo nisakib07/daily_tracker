@@ -19,6 +19,8 @@ import {
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AnalyticsSkeleton } from "@/components/skeleton-loader";
+import { AnimatedCounter } from "@/components/animated-counter";
 import type { Account, Transaction, Person } from "@/lib/types";
 import {
   ArrowLeft,
@@ -26,7 +28,6 @@ import {
   TrendingDown,
   Wallet,
   Download,
-  Loader2,
   PieChart as PieChartIcon,
   BarChart3,
   ArrowUpRight,
@@ -392,16 +393,7 @@ export default function AnalyticsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-primary" />
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Loading analytics...
-          </p>
-        </div>
-      </div>
-    );
+    return <AnalyticsSkeleton />;
   }
 
   const net = monthlySummary.income - monthlySummary.expense;
@@ -409,7 +401,7 @@ export default function AnalyticsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md glass">
         <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -560,35 +552,35 @@ export default function AnalyticsPage() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200">
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 dark:from-emerald-950/50 dark:to-emerald-900/30 dark:border-emerald-800/50 animate-fade-in-up">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <ArrowDownLeft className="h-4 w-4 text-emerald-600" />
-                <span className="text-[10px] sm:text-xs font-medium text-emerald-600 uppercase tracking-wide">
+                <ArrowDownLeft className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
                   Income
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-emerald-700">
-                ৳{monthlySummary.income.toLocaleString()}
+              <p className="text-lg sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
+                <AnimatedCounter value={monthlySummary.income} prefix="৳" duration={800} />
               </p>
-              <p className="mt-1 text-[10px] sm:text-xs text-emerald-700/70">
+              <p className="mt-1 text-[10px] sm:text-xs text-emerald-700/70 dark:text-emerald-400/70">
                 {includeLoans ? "Incl. loans" : "Income only"}
               </p>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200">
+          <Card className="bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200 dark:from-rose-950/50 dark:to-rose-900/30 dark:border-rose-800/50 animate-fade-in-up animation-delay-100">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <ArrowUpRight className="h-4 w-4 text-rose-600" />
-                <span className="text-[10px] sm:text-xs font-medium text-rose-600 uppercase tracking-wide">
+                <ArrowUpRight className="h-4 w-4 text-rose-600 dark:text-rose-400" />
+                <span className="text-[10px] sm:text-xs font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wide">
                   Expenses
                 </span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-rose-700">
-                ৳{monthlySummary.expense.toLocaleString()}
+              <p className="text-lg sm:text-2xl font-bold text-rose-700 dark:text-rose-300">
+                <AnimatedCounter value={monthlySummary.expense} prefix="৳" duration={800} />
               </p>
-              <p className="mt-1 text-[10px] sm:text-xs text-rose-700/70">
+              <p className="mt-1 text-[10px] sm:text-xs text-rose-700/70 dark:text-rose-400/70">
                 {includeLoans ? "Incl. loans" : "Expense only"}
               </p>
             </CardContent>
@@ -596,23 +588,23 @@ export default function AnalyticsPage() {
 
           <Card
             className={cn(
-              "bg-gradient-to-br border",
+              "bg-gradient-to-br border animate-fade-in-up animation-delay-200",
               net >= 0
-                ? "from-blue-50 to-blue-100/50 border-blue-200"
-                : "from-orange-50 to-orange-100/50 border-orange-200",
+                ? "from-blue-50 to-blue-100/50 border-blue-200 dark:from-blue-950/50 dark:to-blue-900/30 dark:border-blue-800/50"
+                : "from-orange-50 to-orange-100/50 border-orange-200 dark:from-orange-950/50 dark:to-orange-900/30 dark:border-orange-800/50",
             )}
           >
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
                 {net >= 0 ? (
-                  <TrendingUp className="h-4 w-4 text-blue-600" />
+                  <TrendingUp className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 ) : (
-                  <TrendingDown className="h-4 w-4 text-orange-600" />
+                  <TrendingDown className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                 )}
                 <span
                   className={cn(
                     "text-[10px] sm:text-xs font-medium uppercase tracking-wide",
-                    net >= 0 ? "text-blue-600" : "text-orange-600",
+                    net >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400",
                   )}
                 >
                   Net
@@ -621,10 +613,10 @@ export default function AnalyticsPage() {
               <p
                 className={cn(
                   "text-lg sm:text-2xl font-bold",
-                  net >= 0 ? "text-blue-700" : "text-orange-700",
+                  net >= 0 ? "text-blue-700 dark:text-blue-300" : "text-orange-700 dark:text-orange-300",
                 )}
               >
-                ৳{net.toLocaleString()}
+                <AnimatedCounter value={net} prefix="৳" duration={800} />
               </p>
               <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
                 {format(selectedMonth, "MMMM yyyy")}
@@ -632,21 +624,21 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800 dark:to-slate-900/50 border-slate-200 dark:border-slate-700">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800 dark:to-slate-900/50 border-slate-200 dark:border-slate-700 animate-fade-in-up animation-delay-300">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
-                <Wallet className="h-4 w-4 text-slate-600" />
-                <span className="text-[10px] sm:text-xs font-medium text-slate-600 uppercase tracking-wide">
+                <Wallet className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                <span className="text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
                   Total
                 </span>
               </div>
               <p
                 className={cn(
                   "text-lg sm:text-2xl font-bold",
-                  totalBalance >= 0 ? "text-emerald-700" : "text-rose-700",
+                  totalBalance >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400",
                 )}
               >
-                ৳{totalBalance.toLocaleString()}
+                <AnimatedCounter value={totalBalance} prefix="৳" duration={800} />
               </p>
               <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
                 Matches Dashboard
@@ -658,7 +650,7 @@ export default function AnalyticsPage() {
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Expense Pie Chart */}
-          <Card>
+          <Card className="animate-fade-in-up animation-delay-400">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm sm:text-base flex items-center gap-2">
                 <PieChartIcon className="h-4 w-4 text-rose-500" />
@@ -709,7 +701,7 @@ export default function AnalyticsPage() {
           </Card>
 
           {/* Income Pie Chart */}
-          <Card>
+          <Card className="animate-fade-in-up animation-delay-500">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm sm:text-base flex items-center gap-2">
                 <PieChartIcon className="h-4 w-4 text-emerald-500" />

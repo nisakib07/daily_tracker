@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -9,13 +9,88 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import type { Transaction } from "@/lib/types";
-import { CalendarIcon, TrendingUp, TrendingDown, CreditCard, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarIcon, TrendingUp, TrendingDown, CreditCard, ChevronLeft, ChevronRight, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface MonthlyStatsProps {
   transactions: Transaction[];
   onMonthChange?: (month: Date) => void;
+}
+
+// Animated ring chart component
+function RingChart({ 
+  percentage, 
+  color, 
+  size = 60,
+  strokeWidth = 6,
+  showPulse = false 
+}: { 
+  percentage: number; 
+  color: string; 
+  size?: number;
+  strokeWidth?: number;
+  showPulse?: boolean;
+}) {
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+  
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg 
+        width={size} 
+        height={size} 
+        className="transform -rotate-90"
+      >
+        {/* Background ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-muted/30"
+        />
+        {/* Animated foreground ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth={strokeWidth}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="animate-ring transition-all duration-1000"
+          style={{ 
+            strokeDashoffset: offset,
+            filter: showPulse ? `drop-shadow(0 0 6px ${color})` : undefined
+          }}
+        />
+      </svg>
+      {/* Center percentage */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span 
+          className="text-xs font-bold tabular-nums"
+          style={{ color }}
+        >
+          {Math.round(percentage)}%
+        </span>
+      </div>
+      {/* Pulse ring for near-limit */}
+      {showPulse && (
+        <div 
+          className="absolute inset-0 rounded-full animate-pulse-ring opacity-30"
+          style={{ 
+            boxShadow: `0 0 0 2px ${color}`,
+          }}
+        />
+      )}
+    </div>
+  );
 }
 
 export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps) {
@@ -59,21 +134,68 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
 
   const netBalance = monthlySummary.income - monthlySummary.expense;
 
-  // Calculate category-wise expenses for the month
-  const categoryExpenses = monthlyTransactions
-    .filter(tx => tx.type === "expense" && tx.category)
-    .reduce((acc, tx) => {
-      const category = tx.category || "Other";
-      acc[category] = (acc[category] || 0) + Number(tx.amount);
-      return acc;
-    }, {} as Record<string, number>);
+  // Calculate previous month for comparison
+  const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
+  const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
+  
+  const prevMonthSummary = useMemo(() => {
+    const prevTxs = transactions.filter((tx) => {
+      const txDate = new Date(tx.date);
+      return txDate >= prevMonthStart && txDate <= prevMonthEnd;
+    });
+    
+    return prevTxs.reduce(
+      (acc, tx) => {
+        const amount = Number(tx.amount);
+        if (["income", "borrow", "receive"].includes(tx.type)) {
+          acc.income += amount;
+        } else if (["expense", "lend", "repay"].includes(tx.type)) {
+          acc.expense += amount;
+        }
+        return acc;
+      },
+      { income: 0, expense: 0 }
+    );
+  }, [transactions, prevMonthStart, prevMonthEnd]);
 
-  const sortedCategories = Object.entries(categoryExpenses)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5);
+  // Calculate percentage changes
+  const incomeChange = prevMonthSummary.income > 0 
+    ? ((monthlySummary.income - prevMonthSummary.income) / prevMonthSummary.income) * 100 
+    : 0;
+  const expenseChange = prevMonthSummary.expense > 0 
+    ? ((monthlySummary.expense - prevMonthSummary.expense) / prevMonthSummary.expense) * 100 
+    : 0;
+
+  // Calculate category-wise expenses for the month with ring chart data
+  const categoryData = useMemo(() => {
+    const categoryExpenses = monthlyTransactions
+      .filter(tx => tx.type === "expense" && tx.category)
+      .reduce((acc, tx) => {
+        const category = tx.category || "Other";
+        acc[category] = (acc[category] || 0) + Number(tx.amount);
+        return acc;
+      }, {} as Record<string, number>);
+
+    const total = monthlySummary.expense || 1;
+    
+    return Object.entries(categoryExpenses)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 4)
+      .map(([name, value], index) => ({
+        name,
+        value,
+        percentage: (value / total) * 100,
+        color: ["#10b981", "#3b82f6", "#f59e0b", "#ec4899"][index % 4],
+      }));
+  }, [monthlyTransactions, monthlySummary.expense]);
+
+  // Calculate savings rate
+  const savingsRate = monthlySummary.income > 0 
+    ? ((monthlySummary.income - monthlySummary.expense) / monthlySummary.income) * 100 
+    : 0;
 
   return (
-    <div className="rounded-xl border bg-card p-4 sm:p-6 space-y-4">
+    <div className="rounded-xl border bg-card p-4 sm:p-6 space-y-4 animate-fade-in-up glass">
       {/* Header with Month Selector */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-xs sm:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
@@ -143,7 +265,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
         </div>
       </div>
 
-      {/* Monthly Stats Grid */}
+      {/* Monthly Stats Grid with Comparison */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         {/* Income Card */}
         <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-900/30 p-3 sm:p-4 border border-emerald-100 dark:border-emerald-800/50">
@@ -156,9 +278,20 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
           <p className="text-lg sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
             +৳{monthlySummary.income.toLocaleString()}
           </p>
-          <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 mt-0.5 sm:mt-1">
-            {monthlyTransactions.filter(tx => ["income", "borrow", "receive"].includes(tx.type)).length} txns
-          </p>
+          <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
+            <span className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400">
+              {monthlyTransactions.filter(tx => ["income", "borrow", "receive"].includes(tx.type)).length} txns
+            </span>
+            {incomeChange !== 0 && (
+              <span className={cn(
+                "flex items-center text-[9px] sm:text-[10px] font-medium",
+                incomeChange > 0 ? "text-emerald-600" : "text-rose-600"
+              )}>
+                {incomeChange > 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {Math.abs(incomeChange).toFixed(0)}%
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Expense Card */}
@@ -172,9 +305,20 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
           <p className="text-lg sm:text-2xl font-bold text-rose-700 dark:text-rose-300">
             -৳{monthlySummary.expense.toLocaleString()}
           </p>
-          <p className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400 mt-0.5 sm:mt-1">
-            {monthlyTransactions.filter(tx => ["expense", "lend", "repay"].includes(tx.type)).length} txns
-          </p>
+          <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
+            <span className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400">
+              {monthlyTransactions.filter(tx => ["expense", "lend", "repay"].includes(tx.type)).length} txns
+            </span>
+            {expenseChange !== 0 && (
+              <span className={cn(
+                "flex items-center text-[9px] sm:text-[10px] font-medium",
+                expenseChange < 0 ? "text-emerald-600" : "text-rose-600"
+              )}>
+                {expenseChange > 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {Math.abs(expenseChange).toFixed(0)}%
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Net Balance Card */}
@@ -211,30 +355,45 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
         </div>
       </div>
 
-      {/* Top Expense Categories */}
-      {sortedCategories.length > 0 && (
+      {/* Category Ring Charts */}
+      {categoryData.length > 0 && (
         <div className="pt-2 sm:pt-4 border-t border-border">
-          <h4 className="text-xs font-medium text-muted-foreground mb-2 sm:mb-3">
-            Top Expenses This Month
-          </h4>
-          <div className="space-y-2">
-            {sortedCategories.map(([category, amount]) => {
-              const percentage = (amount / monthlySummary.expense) * 100;
-              return (
-                <div key={category} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs sm:text-sm">
-                    <span className="text-foreground font-medium truncate">{category}</span>
-                    <span className="text-muted-foreground ml-2">৳{amount.toLocaleString()}</span>
-                  </div>
-                  <div className="h-1.5 sm:h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-rose-400 to-rose-500 dark:from-rose-500 dark:to-rose-600 rounded-full transition-all duration-500"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-medium text-muted-foreground">
+              Top Expenses
+            </h4>
+            {savingsRate > 0 && (
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                <span>Savings Rate:</span>
+                <span className="font-bold">{savingsRate.toFixed(0)}%</span>
+              </div>
+            )}
+          </div>
+          
+          <div className="grid grid-cols-4 gap-2 sm:gap-3">
+            {categoryData.map((category, index) => (
+              <div 
+                key={category.name} 
+                className={cn(
+                  "flex flex-col items-center gap-1 opacity-0 animate-scale-in"
+                )}
+                style={{ animationDelay: `${index * 100}ms`, animationFillMode: "forwards" }}
+              >
+                <RingChart 
+                  percentage={category.percentage} 
+                  color={category.color}
+                  size={48}
+                  strokeWidth={5}
+                  showPulse={category.percentage > 30}
+                />
+                <p className="text-[9px] sm:text-[10px] text-muted-foreground text-center truncate w-full">
+                  {category.name}
+                </p>
+                <p className="text-[9px] sm:text-[10px] font-medium text-foreground">
+                  ৳{category.value.toLocaleString()}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
       )}

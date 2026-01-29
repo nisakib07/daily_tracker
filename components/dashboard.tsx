@@ -38,6 +38,10 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 import { BudgetPlanner } from "@/components/budget-planner";
 import { useAuth } from "@/lib/auth-context";
+import { DashboardSkeleton } from "@/components/skeleton-loader";
+import { WelcomeSection } from "@/components/welcome-section";
+import { Confetti } from "@/components/confetti";
+import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
   ArrowDownLeft,
@@ -115,6 +119,12 @@ export function Dashboard() {
   const [moneyOutDefaults, setMoneyOutDefaults] = useState<LoanQuickDefaults>(
     {},
   );
+
+  // Confetti state for celebrations
+  const [showConfetti, setShowConfetti] = useState(false);
+
+  // Track previous balance for comparison
+  const [previousBalance, setPreviousBalance] = useState<number | undefined>(undefined);
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
@@ -296,20 +306,14 @@ export function Dashboard() {
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-primary" />
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Loading your finances...
-          </p>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      {/* Confetti celebration */}
+      {showConfetti && <Confetti />}
+      
       {/* Header */}
       <header className="sticky top-0 z-20 border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-3 sm:px-4 py-3 sm:py-4">
@@ -399,16 +403,29 @@ export function Dashboard() {
       </header>
 
       <main className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-6">
+        {/* Welcome Section with Animated Balance */}
+        <WelcomeSection 
+          userName={user?.email}
+          totalBalance={totalBalance}
+          previousBalance={previousBalance}
+        />
+
         {/* Account Cards */}
         <section>
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
-            {accountsWithBalance.map((account) => (
-              <AccountCard
+            {accountsWithBalance.map((account, index) => (
+              <div 
                 key={account.id}
-                account={account}
-                lastTransaction={getLastTransactionForAccount(account.id)}
-                onEdit={handleEditAccount}
-              />
+                className="opacity-0 animate-fade-in-up"
+                style={{ animationDelay: `${index * 100}ms`, animationFillMode: "forwards" }}
+              >
+                <AccountCard
+                  account={account}
+                  lastTransaction={getLastTransactionForAccount(account.id)}
+                  recentTransactions={allTransactions}
+                  onEdit={handleEditAccount}
+                />
+              </div>
             ))}
           </div>
         </section>

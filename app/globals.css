@@ -169,3 +169,209 @@
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4), 0 0 0 12px rgba(167, 243, 208, 0);
   }
 }
+
+/* Animated counter */
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-count-up {
+  animation: count-up 0.6s ease-out forwards;
+}
+
+/* Fade in up animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+}
+
+/* Staggered animation delay utilities */
+.animation-delay-100 { animation-delay: 100ms; }
+.animation-delay-200 { animation-delay: 200ms; }
+.animation-delay-300 { animation-delay: 300ms; }
+.animation-delay-400 { animation-delay: 400ms; }
+.animation-delay-500 { animation-delay: 500ms; }
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .glass {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+/* Glow effect for dark mode */
+.dark .glow-emerald {
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.15), 0 0 40px rgba(16, 185, 129, 0.1);
+}
+
+.dark .glow-rose {
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.15), 0 0 40px rgba(244, 63, 94, 0.1);
+}
+
+.dark .glow-blue {
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.15), 0 0 40px rgba(59, 130, 246, 0.1);
+}
+
+/* Ring chart animation */
+@keyframes ring-fill {
+  from {
+    stroke-dashoffset: 251.2;
+  }
+}
+
+.animate-ring {
+  animation: ring-fill 1s ease-out forwards;
+}
+
+/* Shimmer for skeleton loading */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.92 0 0) 25%,
+    oklch(0.95 0 0) 50%,
+    oklch(0.92 0 0) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.dark .skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.25 0.01 286) 25%,
+    oklch(0.3 0.01 286) 50%,
+    oklch(0.25 0.01 286) 75%
+  );
+  background-size: 200% 100%;
+}
+
+/* Confetti animation */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-100%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.confetti-piece {
+  position: fixed;
+  width: 10px;
+  height: 10px;
+  top: 0;
+  animation: confetti-fall 3s ease-in-out forwards;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Slide in from right for timeline items */
+@keyframes slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.4s ease-out forwards;
+}
+
+/* Scale in animation */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s ease-out forwards;
+}
+
+/* Pulse ring animation for stats */
+@keyframes pulse-ring {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+
+/* Chart bar grow animation */
+@keyframes bar-grow {
+  from {
+    transform: scaleY(0);
+    transform-origin: bottom;
+  }
+  to {
+    transform: scaleY(1);
+    transform-origin: bottom;
+  }
+}
+
+.animate-bar-grow {
+  animation: bar-grow 0.6s ease-out forwards;
+}
+
+/* Sparkline animation */
+@keyframes draw-line {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.animate-sparkline {
+  stroke-dasharray: 1000;
+  animation: draw-line 1.5s ease-out forwards;
+}

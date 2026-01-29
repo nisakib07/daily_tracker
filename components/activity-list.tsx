@@ -20,11 +20,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/empty-state";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRightLeft,
-  Inbox,
   MoreVertical,
   Pencil,
   Trash2,
@@ -34,7 +34,6 @@ import {
   Search,
   X,
   CalendarIcon,
-  Plus,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -215,8 +214,11 @@ export function ActivityList({
     const matchesDateRange = (tx: Transaction) => {
       if (!dateRange.from && !dateRange.to) return true;
       const txDate = startOfDay(parseISO(String(tx.date)));
-      if (dateRange.from && isBefore(txDate, startOfDay(dateRange.from))) return false;
-      if (dateRange.to && isAfter(txDate, endOfDay(dateRange.to))) return false;
+      const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
+      const toDate = dateRange.to ? endOfDay(dateRange.to) : null;
+      
+      if (fromDate && isBefore(txDate, fromDate)) return false;
+      if (toDate && isAfter(txDate, toDate)) return false;
       return true;
     };
 
@@ -301,24 +303,11 @@ export function ActivityList({
 
   if (!transactions || transactions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
-        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-muted mb-4">
-          <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
-        </div>
-        <p className="font-medium text-foreground mb-1">No transactions</p>
-        <p className="text-sm text-muted-foreground mb-4">
-          Add your first transaction to get started
-        </p>
-        {onAddTransaction && (
-          <Button
-            onClick={onAddTransaction}
-            className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Transaction
-          </Button>
-        )}
-      </div>
+      <EmptyState 
+        type="transactions"
+        onAction={onAddTransaction}
+        actionLabel="Add Transaction"
+      />
     );
   }
 
@@ -385,7 +374,7 @@ export function ActivityList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs bg-transparent"
+                    className="h-8 text-xs"
                     onClick={() => {
                       setDateRange({ from: subDays(new Date(), 7), to: new Date() });
                       setDatePickerOpen(false);
@@ -396,7 +385,7 @@ export function ActivityList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs bg-transparent"
+                    className="h-8 text-xs"
                     onClick={() => {
                       setDateRange({ from: subDays(new Date(), 30), to: new Date() });
                       setDatePickerOpen(false);
@@ -407,7 +396,7 @@ export function ActivityList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs bg-transparent"
+                    className="h-8 text-xs"
                     onClick={() => {
                       setDateRange({ from: subDays(new Date(), 90), to: new Date() });
                       setDatePickerOpen(false);
@@ -434,21 +423,22 @@ export function ActivityList({
           </Popover>
         </div>
 
-        {/* Active date range indicator */}
+        {/* Active date range indicator - mobile optimized */}
         {(dateRange.from || dateRange.to) && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-            <CalendarIcon className="h-3 w-3" />
-            <span>
-              {dateRange.from ? format(dateRange.from, "MMM d, yyyy") : "Start"} 
+          <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800">
+            <CalendarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300 flex-1">
+              {dateRange.from ? format(dateRange.from, "MMM d") : "Start"} 
               {" - "}
               {dateRange.to ? format(dateRange.to, "MMM d, yyyy") : "End"}
             </span>
             <button
               type="button"
               onClick={() => setDateRange({ from: undefined, to: undefined })}
-              className="ml-auto p-0.5 rounded hover:bg-muted"
+              className="p-1.5 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900 active:scale-95 transition-transform"
+              aria-label="Clear date filter"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </button>
           </div>
         )}
@@ -494,37 +484,35 @@ export function ActivityList({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
-            <Inbox className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="font-medium text-foreground mb-1">No results</p>
-          <p className="text-sm text-muted-foreground">
-            Try a different search or filter
-          </p>
-        </div>
+        <EmptyState 
+          type="transactions"
+          onAction={onAddTransaction}
+          actionLabel="Add Transaction"
+        />
       ) : (
         <div className="space-y-5 mt-3">
-          {groups.map((group) => (
-            <div key={group.key} className="space-y-2">
-              {/* Date Header */}
-              <div className="flex items-baseline justify-between px-1">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-sm font-semibold text-foreground">
-                    {group.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {group.dateLabel}
-                  </p>
+          {groups.map((group, groupIndex) => (
+            <div key={group.key} className="space-y-2 animate-fade-in-up" style={{ animationDelay: `${groupIndex * 50}ms` }}>
+              {/* Date Header with timeline connector */}
+              <div className="flex items-center gap-3 px-1">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold">
+                  {group.items.length}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {group.items.length}{" "}
-                  {group.items.length === 1 ? "item" : "items"}
-                </p>
+                <div className="flex-1 flex items-baseline justify-between">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-sm font-semibold text-foreground">
+                      {group.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {group.dateLabel}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                {group.items.map((tx) => {
+              {/* Timeline connector and items */}
+              <div className="relative ml-4 border-l-2 border-border pl-6 space-y-2">
+                {group.items.map((tx, txIndex) => {
                   const isTransferTx = tx.type === "transfer";
                   const accountName = isTransferTx
                     ? `${getAccountName(tx.from_account_id)} → ${getAccountName(tx.to_account_id)}`
@@ -539,8 +527,14 @@ export function ActivityList({
                   return (
                     <div
                       key={tx.id}
-                      className="group rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20"
+                      className="group relative rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20 animate-slide-in-right"
+                      style={{ animationDelay: `${txIndex * 50}ms` }}
                     >
+                      {/* Timeline dot */}
+                      <div className={cn(
+                        "absolute -left-[30px] top-4 h-3 w-3 rounded-full border-2 border-background",
+                        isMoneyIn(tx.type) ? "bg-emerald-500" : tx.type === "transfer" ? "bg-blue-500" : "bg-rose-500"
+                      )} />
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div
@@ -715,10 +709,10 @@ function Chip({
       type="button"
       onClick={onClick}
       className={cn(
-        "h-8 px-3 rounded-full text-xs font-medium border whitespace-nowrap transition-colors",
+        "h-9 px-4 rounded-full text-sm font-medium border whitespace-nowrap transition-all active:scale-95",
         active
-          ? "bg-foreground text-background border-foreground"
-          : "bg-card text-foreground border-border hover:bg-muted",
+          ? "bg-foreground text-background border-foreground shadow-sm"
+          : "bg-card text-foreground border-border hover:bg-muted active:bg-muted",
       )}
     >
       {children}
