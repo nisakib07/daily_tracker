@@ -34,6 +34,7 @@ import { ActivityList } from "@/components/activity-list";
 import { Ledger } from "@/components/ledger";
 import { MonthlyStats } from "@/components/monthly-stats";
 import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 import { BudgetPlanner } from "@/components/budget-planner";
 import { useAuth } from "@/lib/auth-context";
@@ -294,9 +295,9 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <Link
@@ -317,11 +318,12 @@ export function Dashboard() {
             </Link>
 
             <div className="flex items-center gap-2 sm:gap-3">
+              <ThemeToggle />
               <Link href="/analytics">
                 <Button
                   variant="outline"
                   size="icon"
-                  className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-indigo-200 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300"
+                  className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-indigo-200 dark:border-indigo-800 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950 hover:border-indigo-300 dark:hover:border-indigo-700"
                 >
                   <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
@@ -346,7 +348,7 @@ export function Dashboard() {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                    className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600"
                   >
                     <User className="h-4 w-4 sm:h-5 sm:w-5" />
                   </Button>
@@ -473,7 +475,7 @@ export function Dashboard() {
                 onClick={() => setViewMode("daily")}
                 className={cn(
                   "text-xs h-8",
-                  viewMode === "daily" ? "bg-slate-900" : "bg-transparent",
+                  viewMode === "daily" ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-transparent",
                 )}
               >
                 Daily
@@ -484,7 +486,7 @@ export function Dashboard() {
                 onClick={() => setViewMode("monthly")}
                 className={cn(
                   "text-xs h-8",
-                  viewMode === "monthly" ? "bg-slate-900" : "bg-transparent",
+                  viewMode === "monthly" ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-transparent",
                 )}
               >
                 Monthly
@@ -546,7 +548,7 @@ export function Dashboard() {
                         variant="ghost"
                         size="sm"
                         onClick={goToToday}
-                        className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 text-xs h-8"
+                        className="text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950 text-xs h-8"
                       >
                         Today
                       </Button>
@@ -557,19 +559,19 @@ export function Dashboard() {
 
               {/* Day/Month Summary */}
               <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 p-3 sm:p-4 border border-emerald-100">
-                  <p className="text-[10px] sm:text-xs font-medium text-emerald-600 uppercase tracking-wide mb-0.5 sm:mb-1">
+                <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-900/30 p-3 sm:p-4 border border-emerald-100 dark:border-emerald-800/50">
+                  <p className="text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide mb-0.5 sm:mb-1">
                     Money In
                   </p>
-                  <p className="text-lg sm:text-xl font-bold text-emerald-700">
+                  <p className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-300">
                     +৳{todaySummary.income.toLocaleString()}
                   </p>
                 </div>
-                <div className="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100/50 p-3 sm:p-4 border border-rose-100">
-                  <p className="text-[10px] sm:text-xs font-medium text-rose-600 uppercase tracking-wide mb-0.5 sm:mb-1">
+                <div className="rounded-xl bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/50 dark:to-rose-900/30 p-3 sm:p-4 border border-rose-100 dark:border-rose-800/50">
+                  <p className="text-[10px] sm:text-xs font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wide mb-0.5 sm:mb-1">
                     Money Out
                   </p>
-                  <p className="text-lg sm:text-xl font-bold text-rose-700">
+                  <p className="text-lg sm:text-xl font-bold text-rose-700 dark:text-rose-300">
                     -৳{todaySummary.expense.toLocaleString()}
                   </p>
                 </div>
@@ -583,7 +585,7 @@ export function Dashboard() {
                   onClick={() => setTypeFilter("all")}
                   className={cn(
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
-                    typeFilter === "all" ? "bg-slate-900" : "bg-transparent",
+                    typeFilter === "all" ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-transparent",
                   )}
                 >
                   All
@@ -596,7 +598,7 @@ export function Dashboard() {
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
                     typeFilter === "income"
                       ? "bg-emerald-600 hover:bg-emerald-700"
-                      : "bg-transparent text-emerald-600 border-emerald-200 hover:bg-emerald-50",
+                      : "bg-transparent text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 hover:bg-emerald-50 dark:hover:bg-emerald-950",
                   )}
                 >
                   Income
@@ -609,7 +611,7 @@ export function Dashboard() {
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
                     typeFilter === "expense"
                       ? "bg-rose-600 hover:bg-rose-700"
-                      : "bg-transparent text-rose-600 border-rose-200 hover:bg-rose-50",
+                      : "bg-transparent text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950",
                   )}
                 >
                   Expense
@@ -622,7 +624,7 @@ export function Dashboard() {
                     "rounded-full text-xs h-7 sm:h-8 px-2.5 sm:px-3",
                     typeFilter === "transfer"
                       ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-transparent text-blue-600 border-blue-200 hover:bg-blue-50",
+                      : "bg-transparent text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 hover:bg-blue-50 dark:hover:bg-blue-950",
                   )}
                 >
                   Transfer
@@ -686,7 +688,7 @@ export function Dashboard() {
           aria-label="Quick actions"
           className={cn(
             "fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full",
-            "bg-slate-900 text-white shadow-lg shadow-black/20",
+            "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-lg shadow-black/20 dark:shadow-black/40",
             "active:scale-95 transition-transform",
           )}
           style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
