@@ -53,6 +53,7 @@ import {
   Plus,
   LogOut,
   User,
+  Settings,
 } from "lucide-react";
 import {
   format,
@@ -359,6 +360,13 @@ export function Dashboard() {
                       </p>
                     </div>
                   </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild className="cursor-pointer">
+                    <Link href="/settings">
+                      <Settings className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={signOut}

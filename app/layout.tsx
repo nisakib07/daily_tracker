@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import { PwaUpdateToast } from "@/components/pwa-update-toast";
 import { AuthProvider } from "@/lib/auth-context";
+import { ThemeProvider } from "@/components/theme-provider";
 
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
@@ -46,11 +47,18 @@ export default function RootLayout({
         <meta name="theme-color" content="#10b981" />
       </head>
       <body className={`${_geist.className} font-sans antialiased`}>
-        <AuthProvider>
-          {children}
-          <Analytics />
-          <PwaUpdateToast />
-        </AuthProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            {children}
+            <Analytics />
+            <PwaUpdateToast />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
