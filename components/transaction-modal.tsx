@@ -219,7 +219,12 @@ function TransactionForm({
         person_id: personId || null,
         category: transactionCategory,
         note: note || null,
-        occurred_at: new Date(date).toISOString(),
+        occurred_at: (() => {
+          const now = new Date();
+          const [year, month, day] = date.split('-').map(Number);
+          now.setFullYear(year, month - 1, day);
+          return now.toISOString();
+        })(),
       });
 
       if (txError) throw txError;
@@ -254,7 +259,12 @@ function TransactionForm({
         category:
           actionType === "repay" ? "Loan Repayment" : "Loan Received Back",
         note: note || null,
-        occurred_at: new Date(date).toISOString(),
+        occurred_at: (() => {
+          const now = new Date();
+          const [year, month, day] = date.split('-').map(Number);
+          now.setFullYear(year, month - 1, day);
+          return now.toISOString();
+        })(),
       });
 
       if (error) throw error;

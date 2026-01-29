@@ -64,7 +64,12 @@ function TransferForm({
         to_account_id: toAccountId,
         category: "Transfer",
         note: note || null,
-        occurred_at: new Date(date).toISOString(),
+        occurred_at: (() => {
+          const now = new Date();
+          const [year, month, day] = date.split('-').map(Number);
+          now.setFullYear(year, month - 1, day);
+          return now.toISOString();
+        })(),
       });
 
       if (error) throw error;
