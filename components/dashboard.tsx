@@ -104,6 +104,7 @@ export function Dashboard() {
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
+    console.log("[v0] Supabase client created, fetching data...");
 
     const [accountsRes, peopleRes, transactionsRes] = await Promise.all([
       supabase.from("accounts").select("*").order("created_at"),
@@ -114,6 +115,14 @@ export function Dashboard() {
         .order("date", { ascending: false })
         .limit(1000),
     ]);
+
+    console.log("[v0] Accounts response:", accountsRes);
+    console.log("[v0] People response:", peopleRes);
+    console.log("[v0] Transactions response:", transactionsRes);
+
+    if (accountsRes.error) console.log("[v0] Accounts error:", accountsRes.error);
+    if (peopleRes.error) console.log("[v0] People error:", peopleRes.error);
+    if (transactionsRes.error) console.log("[v0] Transactions error:", transactionsRes.error);
 
     if (accountsRes.data) setAccounts(accountsRes.data);
     if (peopleRes.data) setPeople(peopleRes.data);
