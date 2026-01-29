@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { ThemeToggle } from "@/components/theme-toggle";
 import type { Account, Transaction, Person } from "@/lib/types";
 import {
   ArrowLeft,
@@ -406,9 +407,9 @@ export default function AnalyticsPage() {
   const net = monthlySummary.income - monthlySummary.expense;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       {/* Header */}
-      <header className="sticky top-0 z-20 border-b bg-white/90 backdrop-blur-md">
+      <header className="sticky top-0 z-20 border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
         <div className="mx-auto max-w-4xl px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -434,23 +435,26 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <Button
-              onClick={exportCSV}
-              disabled={exporting || monthTransactions.length === 0}
-              className="h-9 sm:h-10 text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
-              title={
-                monthTransactions.length === 0
-                  ? "No transactions to export for this month"
-                  : "Export CSV"
-              }
-            >
-              {exporting ? (
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4 animate-spin" />
-              ) : (
-                <Download className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
-              )}
-              <span className="hidden sm:inline">Export</span> CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button
+                onClick={exportCSV}
+                disabled={exporting || monthTransactions.length === 0}
+                className="h-9 sm:h-10 text-xs sm:text-sm bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
+                title={
+                  monthTransactions.length === 0
+                    ? "No transactions to export for this month"
+                    : "Export CSV"
+                }
+              >
+                {exporting ? (
+                  <Loader2 className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" />
+                )}
+                <span className="hidden sm:inline">Export</span> CSV
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -466,7 +470,7 @@ export default function AnalyticsPage() {
               onClick={() => setIncludeLoans(true)}
               className={cn(
                 "h-9 text-xs sm:text-sm",
-                includeLoans ? "bg-slate-900" : "bg-transparent",
+                includeLoans ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-transparent",
               )}
               title="Include borrow/lend/repay/receive (cash movement)"
             >
@@ -478,7 +482,7 @@ export default function AnalyticsPage() {
               onClick={() => setIncludeLoans(false)}
               className={cn(
                 "h-9 text-xs sm:text-sm",
-                !includeLoans ? "bg-slate-900" : "bg-transparent",
+                !includeLoans ? "bg-slate-900 dark:bg-slate-100 dark:text-slate-900" : "bg-transparent",
               )}
               title="Only income/expense (exclude loans)"
             >
@@ -628,7 +632,7 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-800 dark:to-slate-900/50 border-slate-200 dark:border-slate-700">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Wallet className="h-4 w-4 text-slate-600" />

@@ -17,19 +17,19 @@ const accountStyles: Record<string, { icon: React.ReactNode; gradient: string; i
     icon: <Banknote className="h-5 w-5" />,
     gradient: "from-emerald-500 to-teal-600",
     iconBg: "bg-emerald-500",
-    textColor: "text-emerald-700",
+    textColor: "text-emerald-700 dark:text-emerald-400",
   },
   wallet: {
     icon: <Smartphone className="h-5 w-5" />,
     gradient: "from-pink-500 to-rose-600",
     iconBg: "bg-pink-500",
-    textColor: "text-pink-700",
+    textColor: "text-pink-700 dark:text-pink-400",
   },
   card: {
     icon: <CreditCard className="h-5 w-5" />,
     gradient: "from-violet-500 to-purple-600",
     iconBg: "bg-violet-500",
-    textColor: "text-violet-700",
+    textColor: "text-violet-700 dark:text-violet-400",
   },
 };
 
@@ -38,7 +38,7 @@ export function AccountCard({ account, onEdit }: AccountCardProps) {
   const balance = account.balance || 0;
 
   return (
-    <Card className="group relative overflow-hidden border-0 bg-white shadow-md hover:shadow-xl transition-all duration-300">
+    <Card className="group relative overflow-hidden border-0 bg-white dark:bg-slate-800 shadow-md hover:shadow-xl transition-all duration-300">
       {/* Gradient top bar */}
       <div className={cn("absolute top-0 left-0 right-0 h-1 bg-gradient-to-r", style.gradient)} />
       
@@ -47,10 +47,10 @@ export function AccountCard({ account, onEdit }: AccountCardProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 hover:bg-white shadow-sm"
+          className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity bg-white/80 dark:bg-slate-700/80 hover:bg-white dark:hover:bg-slate-700 shadow-sm"
           onClick={() => onEdit(account)}
         >
-          <Settings className="h-4 w-4 text-slate-500" />
+          <Settings className="h-4 w-4 text-slate-500 dark:text-slate-300" />
         </Button>
       )}
       
