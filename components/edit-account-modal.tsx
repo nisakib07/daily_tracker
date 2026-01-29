@@ -79,7 +79,7 @@ function EditAccountForm({
           to_account_id: isAdding ? account.id : null,
           category: "Balance Adjustment",
           note: note || `Manual balance ${isAdding ? "increase" : "decrease"}`,
-          date: new Date().toISOString(),
+          occurred_at: new Date().toISOString(),
         });
 
         if (error) throw error;
