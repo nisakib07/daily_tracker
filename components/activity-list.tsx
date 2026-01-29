@@ -217,17 +217,8 @@ export function ActivityList({
       const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
       const toDate = dateRange.to ? endOfDay(dateRange.to) : null;
       
-      console.log("[v0] Filtering tx:", tx.date, "txDate:", txDate, "from:", fromDate, "to:", toDate);
-      
-      if (fromDate && isBefore(txDate, fromDate)) {
-        console.log("[v0] Excluded - before from date");
-        return false;
-      }
-      if (toDate && isAfter(txDate, toDate)) {
-        console.log("[v0] Excluded - after to date");
-        return false;
-      }
-      console.log("[v0] Included");
+      if (fromDate && isBefore(txDate, fromDate)) return false;
+      if (toDate && isAfter(txDate, toDate)) return false;
       return true;
     };
 
@@ -383,12 +374,9 @@ export function ActivityList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs bg-transparent"
+                    className="h-8 text-xs"
                     onClick={() => {
-                      const from = subDays(new Date(), 7);
-                      const to = new Date();
-                      console.log("[v0] Setting 7 days filter - from:", from, "to:", to);
-                      setDateRange({ from, to });
+                      setDateRange({ from: subDays(new Date(), 7), to: new Date() });
                       setDatePickerOpen(false);
                     }}
                   >
@@ -397,12 +385,9 @@ export function ActivityList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs bg-transparent"
+                    className="h-8 text-xs"
                     onClick={() => {
-                      const from = subDays(new Date(), 30);
-                      const to = new Date();
-                      console.log("[v0] Setting 30 days filter - from:", from, "to:", to);
-                      setDateRange({ from, to });
+                      setDateRange({ from: subDays(new Date(), 30), to: new Date() });
                       setDatePickerOpen(false);
                     }}
                   >
@@ -411,12 +396,9 @@ export function ActivityList({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs bg-transparent"
+                    className="h-8 text-xs"
                     onClick={() => {
-                      const from = subDays(new Date(), 90);
-                      const to = new Date();
-                      console.log("[v0] Setting 90 days filter - from:", from, "to:", to);
-                      setDateRange({ from, to });
+                      setDateRange({ from: subDays(new Date(), 90), to: new Date() });
                       setDatePickerOpen(false);
                     }}
                   >
@@ -441,21 +423,22 @@ export function ActivityList({
           </Popover>
         </div>
 
-        {/* Active date range indicator */}
+        {/* Active date range indicator - mobile optimized */}
         {(dateRange.from || dateRange.to) && (
-          <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-            <CalendarIcon className="h-3 w-3" />
-            <span>
-              {dateRange.from ? format(dateRange.from, "MMM d, yyyy") : "Start"} 
+          <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800">
+            <CalendarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300 flex-1">
+              {dateRange.from ? format(dateRange.from, "MMM d") : "Start"} 
               {" - "}
               {dateRange.to ? format(dateRange.to, "MMM d, yyyy") : "End"}
             </span>
             <button
               type="button"
               onClick={() => setDateRange({ from: undefined, to: undefined })}
-              className="ml-auto p-0.5 rounded hover:bg-muted"
+              className="p-1.5 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900 active:scale-95 transition-transform"
+              aria-label="Clear date filter"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
             </button>
           </div>
         )}
@@ -726,10 +709,10 @@ function Chip({
       type="button"
       onClick={onClick}
       className={cn(
-        "h-8 px-3 rounded-full text-xs font-medium border whitespace-nowrap transition-colors",
+        "h-9 px-4 rounded-full text-sm font-medium border whitespace-nowrap transition-all active:scale-95",
         active
-          ? "bg-foreground text-background border-foreground"
-          : "bg-card text-foreground border-border hover:bg-muted",
+          ? "bg-foreground text-background border-foreground shadow-sm"
+          : "bg-card text-foreground border-border hover:bg-muted active:bg-muted",
       )}
     >
       {children}
