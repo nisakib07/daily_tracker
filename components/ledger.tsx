@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/empty-state";
 import type { Transaction, Person, LedgerEntry } from "@/lib/types";
 import {
-  Users,
   ArrowUpRight,
   ArrowDownLeft,
   ChevronRight,
@@ -120,19 +120,8 @@ export function Ledger({ transactions, people, onViewPerson }: LedgerProps) {
 
   if (ledgerEntries.length === 0) {
     return (
-      <Card className="p-6 border-dashed border-2 border-slate-200 bg-slate-50/50">
-        <div className="flex flex-col items-center justify-center py-6 text-center">
-          <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-slate-100 mb-4">
-            <Users className="h-6 w-6 sm:h-7 sm:w-7 text-slate-400" />
-          </div>
-          <p className="font-medium text-foreground mb-1">
-            No loans or borrows
-          </p>
-          <p className="text-xs sm:text-sm text-muted-foreground max-w-xs">
-            When you lend or borrow money, it will appear here to help you track
-            balances
-          </p>
-        </div>
+      <Card className="p-6 border-dashed border-2 border-border/50 glass">
+        <EmptyState type="loans" />
       </Card>
     );
   }

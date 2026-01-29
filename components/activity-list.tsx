@@ -20,11 +20,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { EmptyState } from "@/components/empty-state";
 import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRightLeft,
-  Inbox,
   MoreVertical,
   Pencil,
   Trash2,
@@ -34,7 +34,6 @@ import {
   Search,
   X,
   CalendarIcon,
-  Plus,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -301,24 +300,11 @@ export function ActivityList({
 
   if (!transactions || transactions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 sm:py-16 text-center">
-        <div className="flex h-14 w-14 sm:h-16 sm:w-16 items-center justify-center rounded-full bg-muted mb-4">
-          <Inbox className="h-7 w-7 sm:h-8 sm:w-8 text-muted-foreground" />
-        </div>
-        <p className="font-medium text-foreground mb-1">No transactions</p>
-        <p className="text-sm text-muted-foreground mb-4">
-          Add your first transaction to get started
-        </p>
-        {onAddTransaction && (
-          <Button
-            onClick={onAddTransaction}
-            className="bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700"
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Transaction
-          </Button>
-        )}
-      </div>
+      <EmptyState 
+        type="transactions"
+        onAction={onAddTransaction}
+        actionLabel="Add Transaction"
+      />
     );
   }
 
@@ -494,37 +480,35 @@ export function ActivityList({
       </div>
 
       {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-10 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted mb-3">
-            <Inbox className="h-6 w-6 text-muted-foreground" />
-          </div>
-          <p className="font-medium text-foreground mb-1">No results</p>
-          <p className="text-sm text-muted-foreground">
-            Try a different search or filter
-          </p>
-        </div>
+        <EmptyState 
+          type="transactions"
+          onAction={onAddTransaction}
+          actionLabel="Add Transaction"
+        />
       ) : (
         <div className="space-y-5 mt-3">
-          {groups.map((group) => (
-            <div key={group.key} className="space-y-2">
-              {/* Date Header */}
-              <div className="flex items-baseline justify-between px-1">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-sm font-semibold text-foreground">
-                    {group.title}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {group.dateLabel}
-                  </p>
+          {groups.map((group, groupIndex) => (
+            <div key={group.key} className="space-y-2 animate-fade-in-up" style={{ animationDelay: `${groupIndex * 50}ms` }}>
+              {/* Date Header with timeline connector */}
+              <div className="flex items-center gap-3 px-1">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground text-xs font-semibold">
+                  {group.items.length}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {group.items.length}{" "}
-                  {group.items.length === 1 ? "item" : "items"}
-                </p>
+                <div className="flex-1 flex items-baseline justify-between">
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-sm font-semibold text-foreground">
+                      {group.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {group.dateLabel}
+                    </p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                {group.items.map((tx) => {
+              {/* Timeline connector and items */}
+              <div className="relative ml-4 border-l-2 border-border pl-6 space-y-2">
+                {group.items.map((tx, txIndex) => {
                   const isTransferTx = tx.type === "transfer";
                   const accountName = isTransferTx
                     ? `${getAccountName(tx.from_account_id)} → ${getAccountName(tx.to_account_id)}`
@@ -539,8 +523,14 @@ export function ActivityList({
                   return (
                     <div
                       key={tx.id}
-                      className="group rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20"
+                      className="group relative rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20 animate-slide-in-right"
+                      style={{ animationDelay: `${txIndex * 50}ms` }}
                     >
+                      {/* Timeline dot */}
+                      <div className={cn(
+                        "absolute -left-[30px] top-4 h-3 w-3 rounded-full border-2 border-background",
+                        isMoneyIn(tx.type) ? "bg-emerald-500" : tx.type === "transfer" ? "bg-blue-500" : "bg-rose-500"
+                      )} />
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <div

@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
 
 type TransactionSubType = "regular" | "loan";
 type DefaultLoanAction = "borrow" | "lend" | "repay" | "receive";
@@ -406,6 +407,18 @@ function TransactionForm({
             </div>
 
             <TabsContent value="regular" className="space-y-4 mt-0">
+              {/* Quick Add Shortcuts for expenses */}
+              {!isIncome && (
+                <QuickAddShortcuts 
+                  onSelect={({ category: cat, defaultAmount }) => {
+                    setCategory(cat);
+                    if (defaultAmount && !amount) {
+                      setAmount(defaultAmount.toString());
+                    }
+                  }}
+                />
+              )}
+              
               {/* Category */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
