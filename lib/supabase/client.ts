@@ -9,8 +9,10 @@ export function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('[v0] Missing Supabase environment variables');
-    throw new Error('Missing Supabase environment variables. Please check NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+    // Return a placeholder that will fail gracefully
+    // This allows the app to render while env vars are being loaded
+    console.warn('[v0] Supabase environment variables not yet available, waiting...');
+    throw new Error('Supabase is not configured. Please add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to environment variables.');
   }
   
   client = createBrowserClient(supabaseUrl, supabaseAnonKey);
