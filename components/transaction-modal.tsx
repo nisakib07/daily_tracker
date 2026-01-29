@@ -219,7 +219,7 @@ function TransactionForm({
         person_id: personId || null,
         category: transactionCategory,
         note: note || null,
-        date: new Date(date).toISOString(),
+        occurred_at: new Date(date).toISOString(),
       });
 
       if (txError) throw txError;
@@ -254,7 +254,7 @@ function TransactionForm({
         category:
           actionType === "repay" ? "Loan Repayment" : "Loan Received Back",
         note: note || null,
-        date: new Date(date).toISOString(),
+        occurred_at: new Date(date).toISOString(),
       });
 
       if (error) throw error;

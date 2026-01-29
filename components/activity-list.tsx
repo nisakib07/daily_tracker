@@ -452,7 +452,7 @@ export function ActivityList({
                             {Number(tx.amount).toLocaleString()}
                           </p>
                           <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            {format(parseISO(String(tx.date)), "h:mm a")}
+                            {format(parseISO(String(tx.occurred_at)), "h:mm a")}
                           </p>
                         </div>
                       </div>

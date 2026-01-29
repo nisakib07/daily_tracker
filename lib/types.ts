@@ -31,6 +31,7 @@ export interface Transaction {
   category: string | null;
   note: string | null;
   date: string;
+  occurred_at: string; // Full timestamp with time
   created_at: string;
 }
 

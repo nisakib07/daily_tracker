@@ -64,7 +64,7 @@ function TransferForm({
         to_account_id: toAccountId,
         category: "Transfer",
         note: note || null,
-        date: new Date(date).toISOString(),
+        occurred_at: new Date(date).toISOString(),
       });
 
       if (error) throw error;
