@@ -270,7 +270,15 @@ export function ActivityList({
     const sortedKeys = Array.from(map.keys()).sort((a, b) => (a > b ? -1 : 1));
 
     return sortedKeys.map((key) => {
-      const first = map.get(key)![0];
+      const items = map.get(key)!;
+      // Sort items within each day by occurred_at descending (most recent first)
+      items.sort((a, b) => {
+        const aTime = new Date(a.occurred_at || a.date).getTime();
+        const bTime = new Date(b.occurred_at || b.date).getTime();
+        return bTime - aTime;
+      });
+      
+      const first = items[0];
       const dateObj = parseISO(String(first.date));
       const dayStart = startOfDay(dateObj);
 
@@ -286,7 +294,7 @@ export function ActivityList({
         key,
         title,
         dateLabel,
-        items: map.get(key)!,
+        items,
       };
     });
   }, [filtered]);

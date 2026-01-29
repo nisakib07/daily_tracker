@@ -214,11 +214,18 @@ export function Dashboard() {
     return people.find((p) => p.id === personId)?.name || null;
   };
 
-  // Helper to get last transaction for an account
+  // Helper to get last transaction for an account (most recent by occurred_at)
   const getLastTransactionForAccount = (accountId: string) => {
-    return allTransactions.find(
+    const accountTxs = allTransactions.filter(
       (tx) => tx.from_account_id === accountId || tx.to_account_id === accountId
-    ) || null;
+    );
+    if (accountTxs.length === 0) return null;
+    // Sort by occurred_at descending and return the first (most recent)
+    return accountTxs.sort((a, b) => {
+      const aTime = new Date(a.occurred_at || a.date).getTime();
+      const bTime = new Date(b.occurred_at || b.date).getTime();
+      return bTime - aTime;
+    })[0];
   };
 
   // Handle edit account
