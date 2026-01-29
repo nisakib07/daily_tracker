@@ -131,12 +131,17 @@ function EditTransactionForm({
     const supabase = createClient();
 
     try {
-      const updateData: Partial<Transaction> & { date?: string } = {
+      const updateData: Partial<Transaction> & { occurred_at?: string } = {
         amount: parseFloat(amount),
         category,
         note: note || null,
         person_id: personId || null,
-        date: new Date(date).toISOString(),
+        occurred_at: (() => {
+          const now = new Date();
+          const [year, month, day] = date.split('-').map(Number);
+          now.setFullYear(year, month - 1, day);
+          return now.toISOString();
+        })(),
       };
 
       if (isTransfer) {
