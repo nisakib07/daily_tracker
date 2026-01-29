@@ -214,8 +214,20 @@ export function ActivityList({
     const matchesDateRange = (tx: Transaction) => {
       if (!dateRange.from && !dateRange.to) return true;
       const txDate = startOfDay(parseISO(String(tx.date)));
-      if (dateRange.from && isBefore(txDate, startOfDay(dateRange.from))) return false;
-      if (dateRange.to && isAfter(txDate, endOfDay(dateRange.to))) return false;
+      const fromDate = dateRange.from ? startOfDay(dateRange.from) : null;
+      const toDate = dateRange.to ? endOfDay(dateRange.to) : null;
+      
+      console.log("[v0] Filtering tx:", tx.date, "txDate:", txDate, "from:", fromDate, "to:", toDate);
+      
+      if (fromDate && isBefore(txDate, fromDate)) {
+        console.log("[v0] Excluded - before from date");
+        return false;
+      }
+      if (toDate && isAfter(txDate, toDate)) {
+        console.log("[v0] Excluded - after to date");
+        return false;
+      }
+      console.log("[v0] Included");
       return true;
     };
 
@@ -373,7 +385,10 @@ export function ActivityList({
                     size="sm"
                     className="h-7 text-xs bg-transparent"
                     onClick={() => {
-                      setDateRange({ from: subDays(new Date(), 7), to: new Date() });
+                      const from = subDays(new Date(), 7);
+                      const to = new Date();
+                      console.log("[v0] Setting 7 days filter - from:", from, "to:", to);
+                      setDateRange({ from, to });
                       setDatePickerOpen(false);
                     }}
                   >
@@ -384,7 +399,10 @@ export function ActivityList({
                     size="sm"
                     className="h-7 text-xs bg-transparent"
                     onClick={() => {
-                      setDateRange({ from: subDays(new Date(), 30), to: new Date() });
+                      const from = subDays(new Date(), 30);
+                      const to = new Date();
+                      console.log("[v0] Setting 30 days filter - from:", from, "to:", to);
+                      setDateRange({ from, to });
                       setDatePickerOpen(false);
                     }}
                   >
@@ -395,7 +413,10 @@ export function ActivityList({
                     size="sm"
                     className="h-7 text-xs bg-transparent"
                     onClick={() => {
-                      setDateRange({ from: subDays(new Date(), 90), to: new Date() });
+                      const from = subDays(new Date(), 90);
+                      const to = new Date();
+                      console.log("[v0] Setting 90 days filter - from:", from, "to:", to);
+                      setDateRange({ from, to });
                       setDatePickerOpen(false);
                     }}
                   >
