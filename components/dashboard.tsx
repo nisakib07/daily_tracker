@@ -16,6 +16,14 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { AccountCard } from "@/components/account-card";
 import { TransactionModal } from "@/components/transaction-modal";
 import { TransferModal } from "@/components/transfer-modal";
@@ -28,6 +36,7 @@ import { MonthlyStats } from "@/components/monthly-stats";
 import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
 import { createClient } from "@/lib/supabase/client";
 import { BudgetPlanner } from "@/components/budget-planner";
+import { useAuth } from "@/lib/auth-context";
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
   ArrowDownLeft,
@@ -42,6 +51,8 @@ import {
   Activity,
   BarChart3,
   Plus,
+  LogOut,
+  User,
 } from "lucide-react";
 import {
   format,
@@ -62,6 +73,7 @@ type LoanQuickDefaults = {
 };
 
 export function Dashboard() {
+  const { user, signOut } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -326,6 +338,37 @@ export function Dashboard() {
                   ৳{totalBalance.toLocaleString()}
                 </p>
               </div>
+              
+              {/* User Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300"
+                  >
+                    <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">Account</p>
+                      <p className="text-xs leading-none text-muted-foreground truncate">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={signOut}
+                    className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer"
+                  >
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sign out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>

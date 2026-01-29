@@ -27,6 +27,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import type { Account } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
+import { useAuth } from "@/lib/auth-context";
 import { Loader2, ArrowRightLeft } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
@@ -42,6 +43,7 @@ function TransferForm({
   onSuccess,
   onOpenChange,
 }: Omit<TransferModalProps, 'open'>) {
+  const { user } = useAuth();
   const [amount, setAmount] = useState("");
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
@@ -64,6 +66,7 @@ function TransferForm({
         to_account_id: toAccountId,
         category: "Transfer",
         note: note || null,
+        user_id: user?.id,
         occurred_at: (() => {
           const now = new Date();
           const [year, month, day] = date.split('-').map(Number);
