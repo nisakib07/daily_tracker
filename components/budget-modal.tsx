@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { createClient } from "@/lib/supabase/client";
+import { useUser } from "@/hooks/use-user";
 
 type Props = {
   open: boolean;
@@ -28,6 +29,7 @@ export function BudgetModal({
   existingBudgets,
   onSaved,
 }: Props) {
+  const { user } = useUser();
   const [saving, setSaving] = useState(false);
   const [values, setValues] = useState<Record<string, string>>({});
 
@@ -69,6 +71,7 @@ export function BudgetModal({
           month: monthKey,
           category,
           amount,
+          user_id: user?.id,
         };
       })
       .filter(Boolean);

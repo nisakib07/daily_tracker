@@ -29,6 +29,7 @@ import type { Account } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, ArrowRightLeft } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useUser } from "@/hooks/use-user";
 
 interface TransferModalProps {
   open: boolean;
@@ -42,6 +43,7 @@ function TransferForm({
   onSuccess,
   onOpenChange,
 }: Omit<TransferModalProps, 'open'>) {
+  const { user } = useUser();
   const [amount, setAmount] = useState("");
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
@@ -70,6 +72,7 @@ function TransferForm({
           now.setFullYear(year, month - 1, day);
           return now.toISOString();
         })(),
+        user_id: user?.id,
       });
 
       if (error) throw error;

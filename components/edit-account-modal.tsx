@@ -23,6 +23,7 @@ import type { Account } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, Settings, AlertTriangle } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useUser } from "@/hooks/use-user";
 
 interface EditAccountModalProps {
   open: boolean;
@@ -36,6 +37,7 @@ function EditAccountForm({
   onOpenChange,
   onSuccess,
 }: Omit<EditAccountModalProps, 'open'>) {
+  const { user } = useUser();
   const [name, setName] = useState("");
   const [adjustmentAmount, setAdjustmentAmount] = useState("");
   const [adjustmentType, setAdjustmentType] = useState<"add" | "subtract">("add");
@@ -80,6 +82,7 @@ function EditAccountForm({
           category: "Balance Adjustment",
           note: note || `Manual balance ${isAdding ? "increase" : "decrease"}`,
           occurred_at: new Date().toISOString(),
+          user_id: user?.id,
         });
 
         if (error) throw error;

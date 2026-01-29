@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { Loader2, UserPlus } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useUser } from "@/hooks/use-user";
 
 interface PersonModalProps {
   open: boolean;
@@ -28,6 +29,7 @@ interface PersonModalProps {
 }
 
 function PersonForm({ onOpenChange, onSuccess }: Omit<PersonModalProps, 'open'>) {
+  const { user } = useUser();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,6 +45,7 @@ function PersonForm({ onOpenChange, onSuccess }: Omit<PersonModalProps, 'open'>)
       const { error } = await supabase.from("people").insert({ 
         name: name.trim(),
         phone: phone.trim() || null,
+        user_id: user?.id,
       });
 
       if (error) throw error;

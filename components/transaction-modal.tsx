@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { useUser } from "@/hooks/use-user";
 
 type TransactionSubType = "regular" | "loan";
 type DefaultLoanAction = "borrow" | "lend" | "repay" | "receive";
@@ -76,6 +77,7 @@ function TransactionForm({
   defaultPersonId,
   defaultLoanAction,
 }: Omit<TransactionModalProps, "open"> & { open: boolean }) {
+  const { user } = useUser();
   const [subType, setSubType] = useState<TransactionSubType>("regular");
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState("");
@@ -225,6 +227,7 @@ function TransactionForm({
           now.setFullYear(year, month - 1, day);
           return now.toISOString();
         })(),
+        user_id: user?.id,
       });
 
       if (txError) throw txError;
@@ -265,6 +268,7 @@ function TransactionForm({
           now.setFullYear(year, month - 1, day);
           return now.toISOString();
         })(),
+        user_id: user?.id,
       });
 
       if (error) throw error;
