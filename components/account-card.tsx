@@ -149,7 +149,8 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
       "group relative overflow-hidden border-0 shadow-md hover:shadow-xl transition-all duration-300",
       "glass",
       style.glowClass,
-      "animate-fade-in-up"
+      "animate-fade-in-up",
+      "min-h-[160px] sm:min-h-[180px] flex flex-col"
     )}>
       {/* Gradient top bar */}
       <div className={cn("absolute top-0 left-0 right-0 h-1 bg-gradient-to-r", style.gradient)} />
@@ -172,7 +173,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
         </Button>
       )}
       
-      <div className="relative p-3 sm:p-4 pt-4 sm:pt-5">
+      <div className="relative p-3 sm:p-4 pt-4 sm:pt-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
           <div className={cn(
             "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl text-white shadow-lg transition-transform group-hover:scale-110 group-hover:rotate-3",
@@ -183,7 +184,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
           <span className="font-semibold text-foreground text-sm sm:text-base truncate">{account.name}</span>
         </div>
         
-        <div className="flex items-end justify-between gap-2">
+        <div className="flex items-end justify-between gap-2 flex-grow-0">
           <div>
             <p className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Balance</p>
             <p className={cn(
@@ -200,9 +201,9 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
           </div>
         </div>
         
-        {/* Last Transaction Preview */}
+        {/* Last Transaction Preview - takes remaining space */}
         {lastTransaction && (
-          <div className="mt-2 pt-2 border-t border-border/50">
+          <div className="mt-auto pt-2 border-t border-border/50">
             <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
               {isMoneyIn ? (
                 <ArrowDownLeft className="h-3 w-3 text-emerald-500" />
