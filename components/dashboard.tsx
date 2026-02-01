@@ -46,7 +46,7 @@ import { WelcomeSection } from "@/components/welcome-section";
 import { Confetti } from "@/components/confetti";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
 import { StreakBadge } from "@/components/streak-badge";
-import { useSwipe } from "@/hooks/use-swipe";
+
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
   ArrowDownLeft,
@@ -310,24 +310,7 @@ export function Dashboard() {
     setMoneyOutOpen(true);
   };
 
-  // Tab order for swipe navigation
-  const tabOrder: ("activity" | "ledger" | "budget")[] = ["activity", "ledger", "budget"];
-  
-  // Swipe gesture handlers for tab navigation
-  const { handlers: swipeHandlers } = useSwipe({
-    onSwipeLeft: () => {
-      const currentIndex = tabOrder.indexOf(activeTab);
-      if (currentIndex < tabOrder.length - 1) {
-        setActiveTab(tabOrder[currentIndex + 1]);
-      }
-    },
-    onSwipeRight: () => {
-      const currentIndex = tabOrder.indexOf(activeTab);
-      if (currentIndex > 0) {
-        setActiveTab(tabOrder[currentIndex - 1]);
-      }
-    },
-  }, { threshold: 80 });
+
 
   if (loading) {
     return <DashboardSkeleton />;
@@ -481,8 +464,8 @@ export function Dashboard() {
           onMonthChange={handleMonthChange}
         />
 
-        {/* Main Content Tabs - Swipeable on mobile */}
-        <div {...swipeHandlers} className="swipe-container">
+        {/* Main Content Tabs */}
+        <div className="swipe-container">
           {/* Mobile Streak Badge */}
           <div className="flex justify-center mb-3 sm:hidden">
             <StreakBadge transactions={allTransactions} />
