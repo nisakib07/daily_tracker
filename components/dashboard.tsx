@@ -408,11 +408,11 @@ export function Dashboard() {
 
         {/* Account Cards */}
         <section>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 auto-rows-fr">
             {accountsWithBalance.map((account, index) => (
               <div 
                 key={account.id}
-                className="opacity-0 animate-fade-in-up"
+                className="opacity-0 animate-fade-in-up h-full"
                 style={{ animationDelay: `${index * 100}ms`, animationFillMode: "forwards" }}
               >
                 <AccountCard

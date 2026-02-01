@@ -150,7 +150,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
       "glass",
       style.glowClass,
       "animate-fade-in-up",
-      "h-[160px] sm:h-[180px] flex flex-col"
+      "h-full min-h-[160px] sm:min-h-[180px] flex flex-col"
     )}>
       {/* Gradient top bar */}
       <div className={cn("absolute top-0 left-0 right-0 h-1 bg-gradient-to-r", style.gradient)} />
@@ -173,7 +173,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
         </Button>
       )}
       
-      <div className="relative p-3 sm:p-4 pt-4 sm:pt-5 flex-1 flex flex-col overflow-hidden">
+      <div className="relative p-3 sm:p-4 pt-4 sm:pt-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
           <div className={cn(
             "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl text-white shadow-lg transition-transform group-hover:scale-110 group-hover:rotate-3",
