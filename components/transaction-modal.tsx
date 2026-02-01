@@ -80,10 +80,11 @@ function TransactionForm({
   defaultLoanAction,
 }: Omit<TransactionModalProps, "open"> & { open: boolean }) {
   const { user } = useAuth();
-  const [subType, setSubType] = useState<TransactionSubType>("regular");
+  // Initialize state directly from defaults
+  const [subType, setSubType] = useState<TransactionSubType>(defaultSubType || "regular");
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState("");
-  const [personId, setPersonId] = useState("");
+  const [personId, setPersonId] = useState(defaultPersonId || "");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
@@ -95,9 +96,6 @@ function TransactionForm({
   const [customCategories, setCustomCategories] = useState<string[]>([]);
 
   const amountRef = useRef<HTMLInputElement | null>(null);
-
-  // prevent multiple auto-actions per open
-  const autoAppliedRef = useRef(false);
 
   const isIncome = type === "in";
   const defaultCategories = isIncome
@@ -134,22 +132,6 @@ function TransactionForm({
     }
   }, [isIncome]);
 
-  // ✅ Apply defaults each time modal opens
-  useEffect(() => {
-    if (!open) {
-      autoAppliedRef.current = false;
-      return;
-    }
-    if (autoAppliedRef.current) return;
-
-    // Set tab first
-    if (defaultSubType) setSubType(defaultSubType);
-
-    // Default person (works for regular and loan)
-    if (defaultPersonId) setPersonId(defaultPersonId);
-
-    autoAppliedRef.current = true;
-  }, [open, defaultSubType, defaultPersonId]);
 
   // Save custom category
   const handleAddCategory = () => {
@@ -826,6 +808,7 @@ export function TransactionModal({
 
           <div className="px-4 pb-4 max-h-[80vh] flex flex-col">
             <TransactionForm
+              key={`${defaultSubType}-${defaultPersonId}-${defaultLoanAction}`}
               open={open}
               type={type}
               accounts={accounts}
@@ -863,6 +846,7 @@ export function TransactionModal({
         {/* IMPORTANT: min-h-0 allows inner scroll to work */}
         <div className="flex-1 min-h-0">
           <TransactionForm
+            key={`${defaultSubType}-${defaultPersonId}-${defaultLoanAction}`}
             open={open}
             type={type}
             accounts={accounts}

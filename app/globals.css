@@ -645,79 +645,9 @@
 }
 
 /* ==========================================
-   STREAK BADGE & GAMIFICATION
-   ========================================== */
-
-/* Fire streak animation */
-@keyframes flame-flicker {
-  0%, 100% {
-    transform: scale(1) rotate(-2deg);
-    filter: brightness(1);
-  }
-  25% {
-    transform: scale(1.05) rotate(1deg);
-    filter: brightness(1.1);
-  }
-  50% {
-    transform: scale(1) rotate(2deg);
-    filter: brightness(1);
-  }
-  75% {
-    transform: scale(1.03) rotate(-1deg);
-    filter: brightness(1.05);
-  }
-}
-
-.animate-flame {
-  animation: flame-flicker 0.8s ease-in-out infinite;
-}
-
-/* Streak badge glow */
-.streak-glow {
-  box-shadow: 
-    0 0 10px rgba(251, 146, 60, 0.5),
-    0 0 20px rgba(251, 146, 60, 0.3),
-    0 0 30px rgba(251, 146, 60, 0.1);
-}
-
-/* Achievement unlock animation */
-@keyframes achievement-unlock {
-  0% {
-    transform: scale(0) rotate(-180deg);
-    opacity: 0;
-  }
-  50% {
-    transform: scale(1.2) rotate(10deg);
-  }
-  100% {
-    transform: scale(1) rotate(0deg);
-    opacity: 1;
-  }
-}
-
-.animate-achievement {
-  animation: achievement-unlock 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-}
-
-/* Counter number animation */
-@keyframes count-number {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-count {
-  animation: count-number 0.4s ease-out forwards;
-}
-
-/* ==========================================
    TRANSACTION LIST IMPROVEMENTS
    ========================================== */
+
 
 /* Category avatar */
 .category-avatar {

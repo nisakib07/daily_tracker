@@ -52,13 +52,20 @@ function EditTransactionForm({
   onOpenChange,
   onSuccess,
 }: Omit<EditTransactionModalProps, 'open'>) {
-  const [amount, setAmount] = useState("");
-  const [accountId, setAccountId] = useState("");
-  const [toAccountId, setToAccountId] = useState("");
-  const [personId, setPersonId] = useState("");
-  const [category, setCategory] = useState("");
-  const [note, setNote] = useState("");
-  const [date, setDate] = useState("");
+  // Initialize state directly from transaction to ensure proper prefilling
+  const [amount, setAmount] = useState(transaction ? String(transaction.amount) : "");
+  const [accountId, setAccountId] = useState(
+    transaction 
+      ? (transaction.from_account_id || transaction.to_account_id || "") 
+      : ""
+  );
+  const [toAccountId, setToAccountId] = useState(transaction?.to_account_id || "");
+  const [personId, setPersonId] = useState(transaction?.person_id || "");
+  const [category, setCategory] = useState(transaction?.category || "");
+  const [note, setNote] = useState(transaction?.note || "");
+  const [date, setDate] = useState(
+    transaction ? new Date(transaction.date).toISOString().split('T')[0] : ""
+  );
   const [loading, setLoading] = useState(false);
   
   // Custom category state
@@ -86,17 +93,6 @@ function EditTransactionForm({
     }
   }, [isIncome]);
 
-  useEffect(() => {
-    if (transaction) {
-      setAmount(String(transaction.amount));
-      setAccountId(transaction.from_account_id || transaction.to_account_id || "");
-      setToAccountId(transaction.to_account_id || "");
-      setPersonId(transaction.person_id || "");
-      setCategory(transaction.category || "");
-      setNote(transaction.note || "");
-      setDate(new Date(transaction.date).toISOString().split('T')[0]);
-    }
-  }, [transaction]);
 
   if (!transaction) return null;
 
@@ -429,6 +425,7 @@ export function EditTransactionModal({
             </div>
           </DialogHeader>
           <EditTransactionForm
+            key={transaction.id}
             transaction={transaction}
             accounts={accounts}
             people={people}
@@ -453,6 +450,7 @@ export function EditTransactionModal({
         </DrawerHeader>
         <div className="overflow-y-auto">
           <EditTransactionForm
+            key={transaction.id}
             transaction={transaction}
             accounts={accounts}
             people={people}

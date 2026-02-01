@@ -45,7 +45,7 @@ import { DashboardSkeleton } from "@/components/skeleton-loader";
 import { WelcomeSection } from "@/components/welcome-section";
 import { Confetti } from "@/components/confetti";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
-import { StreakBadge } from "@/components/streak-badge";
+
 
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
@@ -342,8 +342,7 @@ export function Dashboard() {
               </div>
             </Link>
 
-            {/* Streak Badge */}
-            <StreakBadge transactions={allTransactions} className="hidden sm:flex" />
+
 
             <div className="flex items-center gap-2 sm:gap-3">
               <ThemeToggle />
@@ -466,10 +465,7 @@ export function Dashboard() {
 
         {/* Main Content Tabs */}
         <div className="swipe-container">
-          {/* Mobile Streak Badge */}
-          <div className="flex justify-center mb-3 sm:hidden">
-            <StreakBadge transactions={allTransactions} />
-          </div>
+
           
           <Tabs
             value={activeTab}
