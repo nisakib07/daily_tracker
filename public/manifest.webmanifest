@@ -3,7 +3,7 @@
   "name": "Money Master",
   "short_name": "Money Master",
   "description": "Track your daily income and expenses across Cash, bKash, and Card accounts with ease",
-  "start_url": ".",
+  "start_url": "/",
   "scope": ".",
   "display": "standalone",
   "background_color": "#ffffff",

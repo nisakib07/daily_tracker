@@ -11,52 +11,55 @@ declare global {
 }
 
 export function PwaUpdateToast() {
-  const [show, setShow] = useState(false);
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [showInstall, setShowInstall] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   useEffect(() => {
-    // next-pwa uses Workbox in production
-    if (typeof window === "undefined") return;
+    // Handle SW updates
+    if (typeof window !== "undefined" && window.workbox) {
+      const wb = window.workbox;
+      const onWaiting = () => setShowUpdate(true);
+      wb.addEventListener("waiting", onWaiting);
+      wb.addEventListener("installed", (event: any) => {
+        if (event?.isUpdate) setShowUpdate(true);
+      });
+    }
 
-    const wb = window.workbox;
-    if (!wb) return;
-
-    const onWaiting = () => {
-      // A new SW is installed and waiting to activate
-      setShow(true);
+    // Handle PWA Install Prompt
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstall(true);
     };
 
-    wb.addEventListener("waiting", onWaiting);
-
-    // Also catch some cases where SW updates but goes into waiting quickly
-    wb.addEventListener("installed", (event: any) => {
-      if (event?.isUpdate) setShow(true);
-    });
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
 
     return () => {
-      try {
-        wb.removeEventListener("waiting", onWaiting);
-      } catch {}
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
     };
   }, []);
 
   const refreshToUpdate = async () => {
     const wb = window.workbox;
-    if (!wb) {
-      // fallback
-      window.location.reload();
-      return;
-    }
-
-    // Tell SW to skip waiting and take control, then reload
-    setShow(false);
-    try {
+    if (wb) {
+      setShowUpdate(false);
       await wb.messageSkipWaiting();
-    } finally {
-      window.location.reload();
+    }
+    window.location.reload();
+  };
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === "accepted") {
+      setDeferredPrompt(null);
+      setShowInstall(false);
     }
   };
 
-  if (!show) return null;
+  if (!showUpdate && !showInstall) return null;
 
   return (
     <div
@@ -67,23 +70,45 @@ export function PwaUpdateToast() {
       role="status"
       aria-live="polite"
     >
-      <div className="rounded-2xl border bg-background shadow-lg px-4 py-3 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold">Update available</p>
-          <p className="text-xs text-muted-foreground truncate">
-            A newer version of Money Master is ready.
-          </p>
+      {/* Update Available Toast */}
+      {showUpdate && (
+        <div className="rounded-2xl border bg-background shadow-lg px-4 py-3 flex items-center justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Update available</p>
+            <p className="text-xs text-muted-foreground truncate">
+              A newer version is ready.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowUpdate(false)}>
+              Later
+            </Button>
+            <Button size="sm" onClick={refreshToUpdate}>
+              Refresh
+            </Button>
+          </div>
         </div>
+      )}
 
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" onClick={() => setShow(false)}>
-            Later
-          </Button>
-          <Button size="sm" onClick={refreshToUpdate}>
-            Refresh
-          </Button>
+      {/* Install App Toast */}
+      {showInstall && !showUpdate && (
+        <div className="rounded-2xl border bg-background shadow-lg px-4 py-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">Install App</p>
+            <p className="text-xs text-muted-foreground truncate">
+              Add to home screen for better experience
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => setShowInstall(false)}>
+              Close
+            </Button>
+            <Button size="sm" onClick={handleInstallClick} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              Install
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
