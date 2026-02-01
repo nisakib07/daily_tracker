@@ -325,22 +325,14 @@ export function Dashboard() {
       <header className="sticky top-0 z-20 border-b bg-white/90 dark:bg-slate-900/90 backdrop-blur-md">
         <div className="mx-auto max-w-2xl px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-2">
-            <Link
-              href="/analytics"
-              className="flex items-center gap-2 sm:gap-3 group"
-            >
-              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-shadow">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg shadow-emerald-500/20">
                 <Wallet className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-bold text-foreground group-hover:text-emerald-600 transition-colors">
-                  Money Master
-                </h1>
-                <p className="text-[10px] sm:text-xs text-muted-foreground hidden sm:block">
-                  Tap for Analytics
-                </p>
-              </div>
-            </Link>
+              <h1 className="text-base sm:text-lg font-bold text-foreground">
+                Money Master
+              </h1>
+            </div>
 
 
 
