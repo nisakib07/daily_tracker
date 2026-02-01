@@ -31,6 +31,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Loader2, Pencil, Plus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { format, parseISO } from "date-fns";
 
 // Local storage keys for custom categories
 const CUSTOM_INCOME_CATEGORIES_KEY = "dmt_custom_income_categories";
@@ -64,7 +65,7 @@ function EditTransactionForm({
   const [category, setCategory] = useState(transaction?.category || "");
   const [note, setNote] = useState(transaction?.note || "");
   const [date, setDate] = useState(
-    transaction ? new Date(transaction.date).toISOString().split('T')[0] : ""
+    transaction ? format(parseISO(transaction.date), "yyyy-MM-dd") : ""
   );
   const [loading, setLoading] = useState(false);
   
@@ -330,7 +331,7 @@ function EditTransactionForm({
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
-          max={new Date().toISOString().split('T')[0]}
+          max={format(new Date(), "yyyy-MM-dd")}
           className="h-11 sm:h-12"
         />
       </div>

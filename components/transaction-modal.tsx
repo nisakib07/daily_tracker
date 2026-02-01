@@ -42,6 +42,7 @@ import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
 import { suggestCategory } from "@/lib/smart-insights";
+import { format } from "date-fns";
 
 type TransactionSubType = "regular" | "loan";
 type DefaultLoanAction = "borrow" | "lend" | "repay" | "receive";
@@ -87,7 +88,7 @@ function TransactionForm({
   const [personId, setPersonId] = useState(defaultPersonId || "");
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [loading, setLoading] = useState(false);
 
   // Custom category state
@@ -165,7 +166,7 @@ function TransactionForm({
     setPersonId("");
     setCategory("");
     setNote("");
-    setDate(new Date().toISOString().split("T")[0]);
+    setDate(format(new Date(), "yyyy-MM-dd"));
     setShowAddCategory(false);
     setNewCategoryName("");
   };
@@ -586,7 +587,7 @@ function TransactionForm({
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
                 required
-                max={new Date().toISOString().split("T")[0]}
+                max={format(new Date(), "yyyy-MM-dd")}
                 className="h-11 sm:h-12"
               />
             </div>

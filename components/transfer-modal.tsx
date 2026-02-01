@@ -30,6 +30,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, ArrowRightLeft } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { format } from "date-fns";
 
 interface TransferModalProps {
   open: boolean;
@@ -48,7 +49,7 @@ function TransferForm({
   const [fromAccountId, setFromAccountId] = useState("");
   const [toAccountId, setToAccountId] = useState("");
   const [note, setNote] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,7 +93,7 @@ function TransferForm({
     setFromAccountId("");
     setToAccountId("");
     setNote("");
-    setDate(new Date().toISOString().split('T')[0]);
+    setDate(format(new Date(), "yyyy-MM-dd"));
   };
 
   const fromAccount = accounts.find(a => a.id === fromAccountId);
@@ -173,7 +174,7 @@ function TransferForm({
           value={date}
           onChange={(e) => setDate(e.target.value)}
           required
-          max={new Date().toISOString().split('T')[0]}
+          max={format(new Date(), "yyyy-MM-dd")}
           className="h-11 sm:h-12"
         />
       </div>
