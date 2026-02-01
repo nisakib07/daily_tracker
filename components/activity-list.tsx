@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useCallback, useEffect } from "react";
 import type { Transaction } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,9 +50,11 @@ import {
   subDays,
   isAfter,
   isBefore,
+  isSameDay,
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { getCategoryIcon } from "@/lib/category-icons";
 
 interface ActivityListProps {
   transactions: Transaction[];
@@ -61,6 +63,7 @@ interface ActivityListProps {
   onEdit: (transaction: Transaction) => void;
   onDelete: () => void;
   onAddTransaction?: () => void;
+  defaultDateRange?: { from: Date | undefined; to: Date | undefined };
 }
 
 type Group = {
@@ -72,6 +75,147 @@ type Group = {
 
 type QuickFilter = "all" | "in" | "out" | "transfer" | "loans";
 
+// Swipeable card component for mobile touch gestures
+interface SwipeableCardProps {
+  children: React.ReactNode;
+  onSwipeLeft: () => void;
+  onSwipeRight: () => void;
+  leftLabel?: string;
+  rightLabel?: string;
+}
+
+function SwipeableCard({
+  children,
+  onSwipeLeft,
+  onSwipeRight,
+  leftLabel = "Delete",
+  rightLabel = "Edit",
+}: SwipeableCardProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [translateX, setTranslateX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const startXRef = useRef(0);
+  const startYRef = useRef(0);
+  const currentXRef = useRef(0);
+  const isHorizontalSwipeRef = useRef<boolean | null>(null);
+
+  const SWIPE_THRESHOLD = 80;
+  const MAX_SWIPE = 100;
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    startXRef.current = e.touches[0].clientX;
+    startYRef.current = e.touches[0].clientY;
+    currentXRef.current = translateX;
+    isHorizontalSwipeRef.current = null;
+    setIsDragging(true);
+  }, [translateX]);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging) return;
+
+    const currentX = e.touches[0].clientX;
+    const currentY = e.touches[0].clientY;
+    const diffX = currentX - startXRef.current;
+    const diffY = currentY - startYRef.current;
+
+    // Determine if this is a horizontal or vertical swipe (only once per gesture)
+    if (isHorizontalSwipeRef.current === null) {
+      if (Math.abs(diffX) > 10 || Math.abs(diffY) > 10) {
+        isHorizontalSwipeRef.current = Math.abs(diffX) > Math.abs(diffY);
+      }
+      return;
+    }
+
+    // If it's a vertical swipe, don't interfere with scrolling
+    if (!isHorizontalSwipeRef.current) {
+      return;
+    }
+
+    // Prevent page scroll during horizontal swipe
+    e.preventDefault();
+
+    let newTranslate = currentXRef.current + diffX;
+    
+    // Add resistance at the edges
+    if (newTranslate > MAX_SWIPE) {
+      newTranslate = MAX_SWIPE + (newTranslate - MAX_SWIPE) * 0.2;
+    } else if (newTranslate < -MAX_SWIPE) {
+      newTranslate = -MAX_SWIPE + (newTranslate + MAX_SWIPE) * 0.2;
+    }
+
+    setTranslateX(newTranslate);
+  }, [isDragging]);
+
+  const handleTouchEnd = useCallback(() => {
+    setIsDragging(false);
+    isHorizontalSwipeRef.current = null;
+
+    if (translateX > SWIPE_THRESHOLD) {
+      // Swiped right - Edit
+      setTranslateX(MAX_SWIPE);
+      setTimeout(() => {
+        onSwipeRight();
+        setTranslateX(0);
+      }, 150);
+    } else if (translateX < -SWIPE_THRESHOLD) {
+      // Swiped left - Delete
+      setTranslateX(-MAX_SWIPE);
+      setTimeout(() => {
+        onSwipeLeft();
+        setTranslateX(0);
+      }, 150);
+    } else {
+      // Snap back
+      setTranslateX(0);
+    }
+  }, [translateX, onSwipeLeft, onSwipeRight]);
+
+  // Calculate action opacity based on swipe distance
+  const leftOpacity = Math.min(1, Math.abs(Math.min(0, translateX)) / SWIPE_THRESHOLD);
+  const rightOpacity = Math.min(1, Math.max(0, translateX) / SWIPE_THRESHOLD);
+
+  return (
+    <div className="relative overflow-hidden rounded-xl sm:overflow-visible">
+      {/* Left action (Delete) - revealed when swiping left */}
+      <div 
+        className="absolute inset-y-0 right-0 w-24 flex items-center justify-center bg-gradient-to-l from-rose-500 to-rose-600 rounded-r-xl sm:hidden"
+        style={{ opacity: leftOpacity }}
+      >
+        <div className="flex flex-col items-center text-white">
+          <Trash2 className="h-5 w-5 mb-1" />
+          <span className="text-xs font-medium">{leftLabel}</span>
+        </div>
+      </div>
+
+      {/* Right action (Edit) - revealed when swiping right */}
+      <div 
+        className="absolute inset-y-0 left-0 w-24 flex items-center justify-center bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-l-xl sm:hidden"
+        style={{ opacity: rightOpacity }}
+      >
+        <div className="flex flex-col items-center text-white">
+          <Pencil className="h-5 w-5 mb-1" />
+          <span className="text-xs font-medium">{rightLabel}</span>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div
+        ref={containerRef}
+        className="relative bg-card touch-pan-y"
+        style={{
+          transform: `translateX(${translateX}px)`,
+          transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function ActivityList({
   transactions,
   getAccountName,
@@ -79,6 +223,7 @@ export function ActivityList({
   onEdit,
   onDelete,
   onAddTransaction,
+  defaultDateRange,
 }: ActivityListProps) {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -86,10 +231,22 @@ export function ActivityList({
   // Search + quick filter + date range
   const [query, setQuery] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("all");
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined,
-  });
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>(
+    defaultDateRange || { from: undefined, to: undefined }
+  );
+  
+  // Sync with defaultDateRange when it changes
+  useEffect(() => {
+    if (defaultDateRange) {
+      setDateRange(defaultDateRange);
+    }
+  }, [defaultDateRange]);
+
+  const isDefaultRange = useMemo(() => {
+    if (!defaultDateRange || !defaultDateRange.from || !defaultDateRange.to || !dateRange.from || !dateRange.to) return false;
+    return isSameDay(dateRange.from, defaultDateRange.from) && isSameDay(dateRange.to, defaultDateRange.to);
+  }, [dateRange, defaultDateRange]);
+
   const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const handleDelete = async () => {
@@ -423,8 +580,8 @@ export function ActivityList({
           </Popover>
         </div>
 
-        {/* Active date range indicator - mobile optimized */}
-        {(dateRange.from || dateRange.to) && (
+        {/* Active date range indicator - only show if customized from default */}
+        {(dateRange.from || dateRange.to) && !isDefaultRange && (
           <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800">
             <CalendarIcon className="h-4 w-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
             <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300 flex-1">
@@ -525,115 +682,105 @@ export function ActivityList({
                   const personName = getPersonName(tx.person_id);
 
                   return (
-                    <div
+                    <SwipeableCard
                       key={tx.id}
-                      className="group relative rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20 animate-slide-in-right"
-                      style={{ animationDelay: `${txIndex * 50}ms` }}
+                      onSwipeLeft={() => setDeleteId(tx.id)}
+                      onSwipeRight={() => onEdit(tx)}
                     >
-                      {/* Timeline dot */}
-                      <div className={cn(
-                        "absolute -left-[30px] top-4 h-3 w-3 rounded-full border-2 border-background",
-                        isMoneyIn(tx.type) ? "bg-emerald-500" : tx.type === "transfer" ? "bg-blue-500" : "bg-rose-500"
-                      )} />
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 flex-1 min-w-0">
-                          <div
-                            className={cn(
-                              "flex h-10 w-10 sm:h-11 sm:w-11 flex-shrink-0 items-center justify-center rounded-xl",
-                              getIconStyle(tx.type),
+                      <div
+                        className="group relative rounded-xl bg-card border border-border p-3 sm:p-4 transition-all hover:shadow-md hover:border-muted-foreground/20 animate-slide-in-right"
+                        style={{ animationDelay: `${txIndex * 50}ms` }}
+                      >
+                        {/* Timeline dot */}
+                        <div className={cn(
+                          "absolute -left-[30px] top-4 h-3 w-3 rounded-full border-2 border-background hidden sm:block",
+                          isMoneyIn(tx.type) ? "bg-emerald-500" : tx.type === "transfer" ? "bg-blue-500" : "bg-rose-500"
+                        )} />
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            {/* Category emoji avatar or type icon */}
+                            {tx.category && tx.type !== "transfer" ? (
+                              <div
+                                className={cn(
+                                  "category-avatar flex-shrink-0",
+                                  getCategoryIcon(tx.category).bg,
+                                )}
+                              >
+                                <span className="text-xl">{getCategoryIcon(tx.category).emoji}</span>
+                              </div>
+                            ) : (
+                              <div
+                                className={cn(
+                                  "flex h-10 w-10 sm:h-11 sm:w-11 flex-shrink-0 items-center justify-center rounded-xl",
+                                  getIconStyle(tx.type),
+                                )}
+                              >
+                                {getIcon(tx.type)}
+                              </div>
                             )}
-                          >
-                            {getIcon(tx.type)}
-                          </div>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="font-semibold text-foreground text-sm sm:text-base truncate">
-                                {tx.category || getTypeLabel(tx.type)}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="font-semibold text-foreground text-sm sm:text-base truncate">
+                                  {tx.category || getTypeLabel(tx.type)}
+                                </p>
+
+                                {isLoan(tx.type) && (
+                                  <span
+                                    className={cn(
+                                      "text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0",
+                                      tx.type === "lend" || tx.type === "repay"
+                                        ? "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
+                                        : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
+                                    )}
+                                  >
+                                    {getTypeLabel(tx.type)}
+                                  </span>
+                                )}
+                              </div>
+
+                              <p className="text-xs sm:text-sm text-muted-foreground truncate">
+                                {accountName}
+                                {personName && (
+                                  <span className="opacity-60">
+                                    {" "}
+                                    • {personName}
+                                  </span>
+                                )}
                               </p>
 
-                              {isLoan(tx.type) && (
-                                <span
-                                  className={cn(
-                                    "text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0",
-                                    tx.type === "lend" || tx.type === "repay"
-                                      ? "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
-                                      : "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300",
-                                  )}
-                                >
-                                  {getTypeLabel(tx.type)}
-                                </span>
+                              {tx.note && (
+                                <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1 opacity-70">
+                                  {tx.note}
+                                </p>
                               )}
                             </div>
+                          </div>
 
-                            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                              {accountName}
-                              {personName && (
-                                <span className="opacity-60">
-                                  {" "}
-                                  • {personName}
-                                </span>
+                          <div className="text-right flex-shrink-0">
+                            <p
+                              className={cn(
+                                "text-base sm:text-lg font-bold",
+                                getAmountStyle(tx.type),
                               )}
+                            >
+                              {isMoneyIn(tx.type) ? "+" : "-"}৳
+                              {Number(tx.amount).toLocaleString()}
                             </p>
-
-                            {tx.note && (
-                              <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 line-clamp-1 opacity-70">
-                                {tx.note}
-                              </p>
-                            )}
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">
+                              {format(parseISO(String(tx.occurred_at)), "h:mm a")}
+                            </p>
                           </div>
                         </div>
 
-                        <div className="text-right flex-shrink-0">
-                          <p
-                            className={cn(
-                              "text-base sm:text-lg font-bold",
-                              getAmountStyle(tx.type),
-                            )}
-                          >
-                            {isMoneyIn(tx.type) ? "+" : "-"}৳
-                            {Number(tx.amount).toLocaleString()}
-                          </p>
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            {format(parseISO(String(tx.occurred_at)), "h:mm a")}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Actions row */}
-                      <div className="mt-3 flex items-center justify-end gap-2">
-                        {/* Mobile: direct action buttons */}
-                        <div className="flex gap-2 sm:hidden">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-9 bg-transparent"
-                            onClick={() => onEdit(tx)}
-                          >
-                            <Pencil className="mr-2 h-4 w-4" />
-                            Edit
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="h-9 bg-transparent text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950"
-                            onClick={() => setDeleteId(tx.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                          </Button>
-                        </div>
-
-                        {/* Desktop: dropdown on hover */}
-                        <div className="hidden sm:block">
+                        {/* Desktop only: dropdown on hover */}
+                        <div className="hidden sm:block absolute top-3 right-3">
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                               >
                                 <MoreVertical className="h-4 w-4" />
                               </Button>
@@ -653,8 +800,15 @@ export function ActivityList({
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
+
+                        {/* Mobile: swipe hint on first item */}
+                        {txIndex === 0 && groupIndex === 0 && (
+                          <div className="sm:hidden absolute -bottom-1 left-1/2 -translate-x-1/2 text-[10px] text-muted-foreground opacity-50">
+                            ← swipe →
+                          </div>
+                        )}
                       </div>
-                    </div>
+                    </SwipeableCard>
                   );
                 })}
               </div>

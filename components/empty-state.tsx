@@ -74,22 +74,29 @@ export function EmptyState({ type, onAction, actionLabel, className }: EmptyStat
       "flex flex-col items-center justify-center py-10 sm:py-16 text-center animate-fade-in-up",
       className
     )}>
-      {/* Illustrated Icon Container */}
+      {/* Illustrated Icon Container with floating animation */}
       <div className={cn(
-        "relative flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center rounded-full mb-5",
+        "relative flex h-24 w-24 sm:h-28 sm:w-28 items-center justify-center rounded-full mb-6 animate-float",
         "bg-gradient-to-br",
         config.gradient
       )}>
-        {/* Decorative rings */}
+        {/* Outer decorative ring - slow spin */}
         <div className="absolute inset-0 rounded-full border-2 border-dashed border-current opacity-20 animate-[spin_20s_linear_infinite]" />
-        <div className="absolute inset-2 rounded-full border border-current opacity-10" />
         
-        {/* Main icon */}
-        <Icon className={cn("h-8 w-8 sm:h-10 sm:w-10", config.iconColor)} />
+        {/* Inner decorative ring */}
+        <div className="absolute inset-3 rounded-full border border-current opacity-10 animate-[spin_15s_linear_infinite_reverse]" />
         
-        {/* Floating decorative dots */}
-        <div className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-current opacity-30 animate-pulse" />
-        <div className="absolute -bottom-2 -left-1 h-2 w-2 rounded-full bg-current opacity-20 animate-pulse animation-delay-300" />
+        {/* Main icon with bounce */}
+        <Icon className={cn("h-10 w-10 sm:h-12 sm:w-12 animate-bounce-in", config.iconColor)} />
+        
+        {/* Floating sparkle dots */}
+        <div className="absolute -top-2 -right-2 h-4 w-4 rounded-full bg-gradient-to-br from-yellow-300 to-amber-400 dark:from-yellow-400 dark:to-amber-500 animate-sparkle shadow-lg" />
+        <div className="absolute -bottom-1 -left-3 h-3 w-3 rounded-full bg-gradient-to-br from-blue-300 to-indigo-400 dark:from-blue-400 dark:to-indigo-500 animate-sparkle shadow-lg" style={{ animationDelay: "0.5s" }} />
+        <div className="absolute top-1/2 -right-4 h-2 w-2 rounded-full bg-gradient-to-br from-pink-300 to-rose-400 dark:from-pink-400 dark:to-rose-500 animate-sparkle shadow-lg" style={{ animationDelay: "1s" }} />
+        
+        {/* Floating decorative elements */}
+        <div className="absolute -top-4 left-1/4 text-lg animate-float-delayed opacity-60">✨</div>
+        <div className="absolute -bottom-3 right-1/4 text-sm animate-float-slow opacity-50">💫</div>
       </div>
 
       {/* Text Content */}

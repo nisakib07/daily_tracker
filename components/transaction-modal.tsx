@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
+import { suggestCategory } from "@/lib/smart-insights";
 
 type TransactionSubType = "regular" | "loan";
 type DefaultLoanAction = "borrow" | "lend" | "repay" | "receive";
@@ -608,19 +609,42 @@ function TransactionForm({
               />
             </div>
 
-            {/* Note */}
+            {/* Note with Smart Category Suggestion */}
             <div className="space-y-2">
               <Label htmlFor="note" className="text-sm font-medium">
                 Note (Optional)
               </Label>
               <Textarea
                 id="note"
-                placeholder="Add a note..."
+                placeholder={isIncome 
+                  ? "Add a note... (e.g., 'salary' or 'upwork' auto-suggests category)"
+                  : "Add a note... (e.g., 'uber ride' auto-suggests Transport)"
+                }
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={(e) => {
+                  const newNote = e.target.value;
+                  setNote(newNote);
+                  
+                  // Smart category suggestion (for regular transactions)
+                  if (subType === "regular") {
+                    const suggested = suggestCategory(newNote);
+                    if (suggested && allCategories.includes(suggested)) {
+                      setCategory(suggested);
+                    }
+                  }
+                }}
                 rows={2}
                 className="resize-none"
               />
+              {subType === "regular" && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-medium bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white">AI</span>
+                  {isIncome 
+                    ? 'Type "salary", "freelance", "upwork" to auto-fill category'
+                    : 'Type "uber", "agora", "restaurant" to auto-fill category'
+                  }
+                </p>
+              )}
             </div>
           </form>
         </div>

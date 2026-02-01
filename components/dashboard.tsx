@@ -37,11 +37,16 @@ import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
 import { BudgetPlanner } from "@/components/budget-planner";
+import { SpendingHeatmap } from "@/components/spending-heatmap";
+import { FinancialHealthScore } from "@/components/financial-health-score";
+import { AIInsights } from "@/components/ai-insights";
 import { useAuth } from "@/lib/auth-context";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
 import { WelcomeSection } from "@/components/welcome-section";
 import { Confetti } from "@/components/confetti";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
+import { StreakBadge } from "@/components/streak-badge";
+import { useSwipe } from "@/hooks/use-swipe";
 import type { Account, Person, Transaction } from "@/lib/types";
 import {
   ArrowDownLeft,
@@ -305,6 +310,25 @@ export function Dashboard() {
     setMoneyOutOpen(true);
   };
 
+  // Tab order for swipe navigation
+  const tabOrder: ("activity" | "ledger" | "budget")[] = ["activity", "ledger", "budget"];
+  
+  // Swipe gesture handlers for tab navigation
+  const { handlers: swipeHandlers } = useSwipe({
+    onSwipeLeft: () => {
+      const currentIndex = tabOrder.indexOf(activeTab);
+      if (currentIndex < tabOrder.length - 1) {
+        setActiveTab(tabOrder[currentIndex + 1]);
+      }
+    },
+    onSwipeRight: () => {
+      const currentIndex = tabOrder.indexOf(activeTab);
+      if (currentIndex > 0) {
+        setActiveTab(tabOrder[currentIndex - 1]);
+      }
+    },
+  }, { threshold: 80 });
+
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -334,6 +358,9 @@ export function Dashboard() {
                 </p>
               </div>
             </Link>
+
+            {/* Streak Badge */}
+            <StreakBadge transactions={allTransactions} className="hidden sm:flex" />
 
             <div className="flex items-center gap-2 sm:gap-3">
               <ThemeToggle />
@@ -454,36 +481,42 @@ export function Dashboard() {
           onMonthChange={handleMonthChange}
         />
 
-        {/* Main Content Tabs */}
-        <Tabs
-          value={activeTab}
-          onValueChange={(v) =>
-            setActiveTab(v as "activity" | "ledger" | "budget")
-          }
-        >
-          <TabsList className="grid w-full grid-cols-3 mb-4 h-auto p-1">
-            <TabsTrigger
-              value="activity"
-              className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
-            >
-              <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              Activity
-            </TabsTrigger>
-            <TabsTrigger
-              value="ledger"
-              className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
-            >
-              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              Loan Ledger
-            </TabsTrigger>
-            <TabsTrigger
-              value="budget"
-              className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
-            >
-              <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              Budget
-            </TabsTrigger>
-          </TabsList>
+        {/* Main Content Tabs - Swipeable on mobile */}
+        <div {...swipeHandlers} className="swipe-container">
+          {/* Mobile Streak Badge */}
+          <div className="flex justify-center mb-3 sm:hidden">
+            <StreakBadge transactions={allTransactions} />
+          </div>
+          
+          <Tabs
+            value={activeTab}
+            onValueChange={(v) =>
+              setActiveTab(v as "activity" | "ledger" | "budget")
+            }
+          >
+            <TabsList className="grid w-full grid-cols-3 mb-4 h-auto p-1">
+              <TabsTrigger
+                value="activity"
+                className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+              >
+                <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Activity
+              </TabsTrigger>
+              <TabsTrigger
+                value="ledger"
+                className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+              >
+                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Loan Ledger
+              </TabsTrigger>
+              <TabsTrigger
+                value="budget"
+                className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+              >
+                <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Budget
+              </TabsTrigger>
+            </TabsList>
 
           <TabsContent value="activity" className="space-y-4 mt-0">
             {/* View Mode Toggle */}
@@ -667,7 +700,7 @@ export function Dashboard() {
               </h2>
 
               <ActivityList
-                transactions={filteredTransactions}
+                transactions={allTransactions}
                 getAccountName={getAccountName}
                 getPersonName={getPersonName}
                 onEdit={handleEditTransaction}
@@ -676,6 +709,11 @@ export function Dashboard() {
                   setMoneyInDefaults({});
                   setMoneyInOpen(true);
                 }}
+                defaultDateRange={
+                  viewMode === "daily"
+                    ? { from: startOfDay(selectedDate), to: endOfDay(selectedDate) }
+                    : { from: startOfMonth(selectedMonth), to: endOfMonth(selectedMonth) }
+                }
               />
             </section>
           </TabsContent>
@@ -694,12 +732,26 @@ export function Dashboard() {
             </section>
           </TabsContent>
           <TabsContent value="budget" className="space-y-4 mt-0">
+            {/* AI Features Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <FinancialHealthScore
+                transactions={allTransactions}
+              />
+              <AIInsights
+                transactions={allTransactions}
+              />
+            </div>
+            
             <BudgetPlanner
               selectedMonth={selectedMonth}
               transactions={allTransactions}
             />
+            <SpendingHeatmap
+              transactions={allTransactions}
+            />
           </TabsContent>
         </Tabs>
+        </div>
       </main>
 
       {/* MOBILE: Floating Action Button + Quick Actions Drawer */}

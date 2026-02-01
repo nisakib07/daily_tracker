@@ -78,6 +78,7 @@ export default function SettingsPage() {
 
   // Backup/Restore state
   const [exportLoading, setExportLoading] = useState(false);
+  const [exportCSVLoading, setExportCSVLoading] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [importError, setImportError] = useState("");
@@ -255,6 +256,109 @@ export default function SettingsPage() {
       setExportLoading(false);
     }
   }, [incomeCategories, expenseCategories]);
+
+  // Export transactions as CSV
+  const handleExportCSV = useCallback(async () => {
+    setExportCSVLoading(true);
+
+    try {
+      const supabase = createClient();
+
+      // Fetch all user data
+      const [accountsRes, peopleRes, transactionsRes] = await Promise.all([
+        supabase.from("accounts").select("*"),
+        supabase.from("people").select("*"),
+        supabase.from("transactions").select("*").order("date", { ascending: false }),
+      ]);
+
+      const accounts = accountsRes.data || [];
+      const people = peopleRes.data || [];
+      const transactions = transactionsRes.data || [];
+
+      // Helper to get account name
+      const getAccountName = (id: string | null) => {
+        if (!id) return "";
+        return accounts.find((a: { id: string; name: string }) => a.id === id)?.name || "";
+      };
+
+      // Helper to get person name
+      const getPersonName = (id: string | null) => {
+        if (!id) return "";
+        return people.find((p: { id: string; name: string }) => p.id === id)?.name || "";
+      };
+
+      // CSV header
+      const headers = [
+        "Date",
+        "Type",
+        "Amount",
+        "Category",
+        "From Account",
+        "To Account",
+        "Person",
+        "Note",
+      ];
+
+      // Build CSV rows
+      const rows = transactions.map((tx: {
+        date: string;
+        type: string;
+        amount: number;
+        category: string | null;
+        from_account_id: string | null;
+        to_account_id: string | null;
+        person_id: string | null;
+        note: string | null;
+      }) => {
+        const date = new Date(tx.date).toLocaleDateString();
+        const type = tx.type.charAt(0).toUpperCase() + tx.type.slice(1);
+        const amount = tx.amount.toString();
+        const category = tx.category || "";
+        const fromAccount = getAccountName(tx.from_account_id);
+        const toAccount = getAccountName(tx.to_account_id);
+        const person = getPersonName(tx.person_id);
+        const note = tx.note || "";
+
+        // Escape fields that may contain commas or quotes
+        const escapeField = (field: string) => {
+          if (field.includes(',') || field.includes('"') || field.includes('\n')) {
+            return `"${field.replace(/"/g, '""')}"`;
+          }
+          return field;
+        };
+
+        return [
+          escapeField(date),
+          escapeField(type),
+          escapeField(amount),
+          escapeField(category),
+          escapeField(fromAccount),
+          escapeField(toAccount),
+          escapeField(person),
+          escapeField(note),
+        ].join(",");
+      });
+
+      // Combine header and rows
+      const csvContent = [headers.join(","), ...rows].join("\n");
+
+      // Download as CSV file
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `money-master-transactions-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      alert("Failed to export CSV. Please try again.");
+    } finally {
+      setExportCSVLoading(false);
+    }
+  }, []);
 
   // Import data from JSON
   const handleImportData = useCallback(
@@ -796,31 +900,61 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={handleExportData}
-                disabled={exportLoading}
-                variant="outline"
-                className="flex-1 h-11 bg-transparent"
-              >
-                {exportLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Exporting...
-                  </>
-                ) : (
-                  <>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Data
-                  </>
-                )}
-              </Button>
+            {/* Export Options */}
+            <div className="space-y-3">
+              <Label className="text-sm font-medium">Export Options</Label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Button
+                  onClick={handleExportData}
+                  disabled={exportLoading}
+                  variant="outline"
+                  className="flex-1 h-11 bg-transparent"
+                >
+                  {exportLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export JSON (Full Backup)
+                    </>
+                  )}
+                </Button>
 
+                <Button
+                  onClick={handleExportCSV}
+                  disabled={exportCSVLoading}
+                  variant="outline"
+                  className="flex-1 h-11 bg-transparent"
+                >
+                  {exportCSVLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="mr-2 h-4 w-4" />
+                      Export CSV (Spreadsheet)
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                JSON includes all data for backup/restore. CSV is for viewing transactions in Excel or Google Sheets.
+              </p>
+            </div>
+
+            {/* Import Option */}
+            <div className="space-y-3 pt-2 border-t">
+              <Label className="text-sm font-medium">Import Data</Label>
               <Button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={importLoading}
                 variant="outline"
-                className="flex-1 h-11 bg-transparent"
+                className="w-full sm:w-auto h-11 bg-transparent"
               >
                 {importLoading ? (
                   <>
@@ -830,7 +964,7 @@ export default function SettingsPage() {
                 ) : (
                   <>
                     <Upload className="mr-2 h-4 w-4" />
-                    Import Data
+                    Import from JSON Backup
                   </>
                 )}
               </Button>
@@ -858,10 +992,7 @@ export default function SettingsPage() {
               </div>
             )}
 
-            <p className="text-xs text-muted-foreground">
-              Your backup includes accounts, transactions, people, budgets, and
-              custom categories.
-            </p>
+
           </CardContent>
         </Card>
       </main>

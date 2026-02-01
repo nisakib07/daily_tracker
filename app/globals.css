@@ -375,3 +375,461 @@
   stroke-dasharray: 1000;
   animation: draw-line 1.5s ease-out forwards;
 }
+
+/* Floating animation for empty states */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-8px) rotate(2deg);
+  }
+  75% {
+    transform: translateY(-4px) rotate(-2deg);
+  }
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 4s ease-in-out infinite;
+  animation-delay: 1s;
+}
+
+.animate-float-slow {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Bounce animation */
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+/* Success pop animation */
+@keyframes success-pop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-success-pop {
+  animation: success-pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55) forwards;
+}
+
+/* Wiggle animation for attention */
+@keyframes wiggle {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-5deg);
+  }
+  75% {
+    transform: rotate(5deg);
+  }
+}
+
+.animate-wiggle {
+  animation: wiggle 0.5s ease-in-out;
+}
+
+/* Counter flip animation */
+@keyframes counter-flip {
+  0% {
+    transform: rotateX(90deg);
+    opacity: 0;
+  }
+  100% {
+    transform: rotateX(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-counter-flip {
+  animation: counter-flip 0.4s ease-out forwards;
+  transform-style: preserve-3d;
+}
+
+/* Sparkle animation */
+@keyframes sparkle {
+  0%, 100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-sparkle {
+  animation: sparkle 1.5s ease-in-out infinite;
+}
+
+/* Gradient shift animation */
+@keyframes gradient-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+/* Press feedback */
+.active\:scale-95:active {
+  transform: scale(0.95);
+  transition: transform 0.1s;
+}
+
+/* Celebration confetti burst */
+@keyframes confetti-burst {
+  0% {
+    transform: scale(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+.confetti-burst {
+  animation: confetti-burst 0.8s ease-out forwards;
+}
+
+/* ==========================================
+   GLASSMORPHISM & GRADIENT CARDS
+   ========================================== */
+
+/* Premium glassmorphism card */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.dark .glass-card {
+  background: rgba(30, 30, 40, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Gradient card backgrounds */
+.gradient-card-income {
+  background: linear-gradient(135deg, 
+    rgba(16, 185, 129, 0.1) 0%, 
+    rgba(5, 150, 105, 0.05) 100%);
+  border-left: 3px solid #10b981;
+}
+
+.gradient-card-expense {
+  background: linear-gradient(135deg, 
+    rgba(239, 68, 68, 0.1) 0%, 
+    rgba(220, 38, 38, 0.05) 100%);
+  border-left: 3px solid #ef4444;
+}
+
+.gradient-card-balance {
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.1) 0%, 
+    rgba(37, 99, 235, 0.05) 100%);
+  border-left: 3px solid #3b82f6;
+}
+
+/* Shimmering gradient border */
+.shimmer-border {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-border::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: shimmer-slide 2s infinite;
+}
+
+@keyframes shimmer-slide {
+  100% {
+    left: 100%;
+  }
+}
+
+/* ==========================================
+   BOTTOM SHEET / DRAWER IMPROVEMENTS
+   ========================================== */
+
+/* Drawer handle bar */
+.drawer-handle {
+  width: 36px;
+  height: 4px;
+  background: rgba(128, 128, 128, 0.4);
+  border-radius: 2px;
+  margin: 8px auto 16px;
+}
+
+/* Smooth drawer animation */
+.drawer-content {
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ==========================================
+   SWIPE GESTURE NAVIGATION
+   ========================================== */
+
+/* Swipeable container */
+.swipe-container {
+  touch-action: pan-y pinch-zoom;
+  overflow-x: hidden;
+}
+
+.swipe-content {
+  display: flex;
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.swipe-page {
+  flex-shrink: 0;
+  width: 100%;
+}
+
+/* ==========================================
+   STREAK BADGE & GAMIFICATION
+   ========================================== */
+
+/* Fire streak animation */
+@keyframes flame-flicker {
+  0%, 100% {
+    transform: scale(1) rotate(-2deg);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.05) rotate(1deg);
+    filter: brightness(1.1);
+  }
+  50% {
+    transform: scale(1) rotate(2deg);
+    filter: brightness(1);
+  }
+  75% {
+    transform: scale(1.03) rotate(-1deg);
+    filter: brightness(1.05);
+  }
+}
+
+.animate-flame {
+  animation: flame-flicker 0.8s ease-in-out infinite;
+}
+
+/* Streak badge glow */
+.streak-glow {
+  box-shadow: 
+    0 0 10px rgba(251, 146, 60, 0.5),
+    0 0 20px rgba(251, 146, 60, 0.3),
+    0 0 30px rgba(251, 146, 60, 0.1);
+}
+
+/* Achievement unlock animation */
+@keyframes achievement-unlock {
+  0% {
+    transform: scale(0) rotate(-180deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2) rotate(10deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.animate-achievement {
+  animation: achievement-unlock 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Counter number animation */
+@keyframes count-number {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-count {
+  animation: count-number 0.4s ease-out forwards;
+}
+
+/* ==========================================
+   TRANSACTION LIST IMPROVEMENTS
+   ========================================== */
+
+/* Category avatar */
+.category-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* Transaction row hover effect */
+.transaction-row {
+  transition: all 0.2s ease;
+}
+
+.transaction-row:hover {
+  background: rgba(0, 0, 0, 0.02);
+  transform: translateX(4px);
+}
+
+.dark .transaction-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Amount emphasis animation */
+@keyframes amount-pop {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.amount-emphasis:hover {
+  animation: amount-pop 0.3s ease;
+}
+
+/* ==========================================
+   CHART IMPROVEMENTS
+   ========================================== */
+
+/* Chart touch highlight */
+.chart-touch-area {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.chart-touch-area:active {
+  opacity: 0.7;
+}
+
+/* Chart tooltip styling */
+.chart-tooltip {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(8px);
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  padding: 8px 12px !important;
+}
+
+.dark .chart-tooltip {
+  background: rgba(30, 30, 40, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Pulse effect for active data point */
+@keyframes data-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+.data-point-active {
+  animation: data-pulse 1.5s ease-in-out infinite;
+}
+
+/* ==========================================
+   CATEGORY AVATARS
+   ========================================== */
+
+/* Category emoji avatar for transaction list */
+.category-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;  /* 40px */
+  height: 2.5rem; /* 40px */
+  border-radius: 0.75rem; /* 12px */
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (min-width: 640px) {
+  .category-avatar {
+    width: 2.75rem;  /* 44px */
+    height: 2.75rem; /* 44px */
+  }
+}
+
+.category-avatar:hover {
+  transform: scale(1.05);
+}
+

@@ -34,6 +34,7 @@ import {
   ArrowDownLeft,
   ChevronLeft,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import {
   format,
@@ -849,6 +850,189 @@ export default function AnalyticsPage() {
                 </LineChart>
               </ResponsiveContainer>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Month vs Last Month Comparison */}
+        <Card className="animate-fade-in-up">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-purple-500" />
+              This Month vs Last Month
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Compare your financial performance
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {(() => {
+              // Calculate previous month data
+              const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));
+              const prevMonthEnd = endOfMonth(subMonths(selectedMonth, 1));
+              const prevMonthTx = transactions.filter((tx) => {
+                const txDate = new Date(tx.date);
+                return txDate >= prevMonthStart && txDate <= prevMonthEnd;
+              });
+              
+              const prevSummary = prevMonthTx.reduce(
+                (acc, tx) => {
+                  const amount = Number(tx.amount);
+                  if (incomeTypes.includes(tx.type)) acc.income += amount;
+                  else if (expenseTypes.includes(tx.type)) acc.expense += amount;
+                  return acc;
+                },
+                { income: 0, expense: 0 }
+              );
+              
+              const incomeChange = prevSummary.income > 0 
+                ? ((monthlySummary.income - prevSummary.income) / prevSummary.income) * 100 
+                : monthlySummary.income > 0 ? 100 : 0;
+              const expenseChange = prevSummary.expense > 0 
+                ? ((monthlySummary.expense - prevSummary.expense) / prevSummary.expense) * 100 
+                : monthlySummary.expense > 0 ? 100 : 0;
+              const prevNet = prevSummary.income - prevSummary.expense;
+              const netChange = prevNet !== 0 
+                ? ((net - prevNet) / Math.abs(prevNet)) * 100 
+                : net !== 0 ? 100 : 0;
+
+              return (
+                <div className="space-y-6">
+                  {/* Income Comparison */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Income</span>
+                      <div className="flex items-center gap-2">
+                        {incomeChange !== 0 && (
+                          <span className={cn(
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
+                            incomeChange > 0 
+                              ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                              : "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
+                          )}>
+                            {incomeChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {Math.abs(incomeChange).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Last Month</div>
+                        <div className="text-lg font-semibold text-emerald-600/70 dark:text-emerald-400/70">
+                          ৳{prevSummary.income.toLocaleString()}
+                        </div>
+                        <div className="h-3 bg-emerald-200 dark:bg-emerald-800/50 rounded-full animate-bar-grow" 
+                          style={{ 
+                            width: `${Math.min(100, (prevSummary.income / Math.max(monthlySummary.income, prevSummary.income, 1)) * 100)}%`,
+                            transformOrigin: 'left'
+                          }} 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">This Month</div>
+                        <div className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">
+                          ৳{monthlySummary.income.toLocaleString()}
+                        </div>
+                        <div className="h-3 bg-emerald-500 rounded-full animate-bar-grow" 
+                          style={{ 
+                            width: `${Math.min(100, (monthlySummary.income / Math.max(monthlySummary.income, prevSummary.income, 1)) * 100)}%`,
+                            transformOrigin: 'left',
+                            animationDelay: '0.2s'
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expense Comparison */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Expenses</span>
+                      <div className="flex items-center gap-2">
+                        {expenseChange !== 0 && (
+                          <span className={cn(
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
+                            expenseChange < 0 
+                              ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                              : "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
+                          )}>
+                            {expenseChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {Math.abs(expenseChange).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Last Month</div>
+                        <div className="text-lg font-semibold text-rose-600/70 dark:text-rose-400/70">
+                          ৳{prevSummary.expense.toLocaleString()}
+                        </div>
+                        <div className="h-3 bg-rose-200 dark:bg-rose-800/50 rounded-full animate-bar-grow" 
+                          style={{ 
+                            width: `${Math.min(100, (prevSummary.expense / Math.max(monthlySummary.expense, prevSummary.expense, 1)) * 100)}%`,
+                            transformOrigin: 'left'
+                          }} 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">This Month</div>
+                        <div className="text-lg font-semibold text-rose-600 dark:text-rose-400">
+                          ৳{monthlySummary.expense.toLocaleString()}
+                        </div>
+                        <div className="h-3 bg-rose-500 rounded-full animate-bar-grow" 
+                          style={{ 
+                            width: `${Math.min(100, (monthlySummary.expense / Math.max(monthlySummary.expense, prevSummary.expense, 1)) * 100)}%`,
+                            transformOrigin: 'left',
+                            animationDelay: '0.2s'
+                          }} 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Net Balance Comparison */}
+                  <div className="pt-4 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Net Balance</span>
+                      <div className="flex items-center gap-2">
+                        {netChange !== 0 && (
+                          <span className={cn(
+                            "flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold",
+                            netChange > 0 
+                              ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                              : "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
+                          )}>
+                            {netChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                            {Math.abs(netChange).toFixed(1)}%
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Last Month</div>
+                        <div className={cn(
+                          "text-lg font-semibold",
+                          prevNet >= 0 ? "text-blue-600/70 dark:text-blue-400/70" : "text-orange-600/70 dark:text-orange-400/70"
+                        )}>
+                          ৳{prevNet.toLocaleString()}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">This Month</div>
+                        <div className={cn(
+                          "text-lg font-semibold",
+                          net >= 0 ? "text-blue-600 dark:text-blue-400" : "text-orange-600 dark:text-orange-400"
+                        )}>
+                          ৳{net.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
 

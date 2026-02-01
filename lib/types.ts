@@ -66,6 +66,8 @@ export const DEFAULT_CATEGORIES_OUT = [
   "Health",
   "Education",
   "Rent",
+  "Charity",
+  "Personal_Care",
   "Other Expense",
 ] as const;
 
