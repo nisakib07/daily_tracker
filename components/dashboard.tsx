@@ -35,6 +35,7 @@ import { Ledger } from "@/components/ledger";
 import { MonthlyStats } from "@/components/monthly-stats";
 import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { AIChatAssistant } from "@/components/ai-chat-assistant";
 import { createClient } from "@/lib/supabase/client";
 import { BudgetPlanner } from "@/components/budget-planner";
 import { useAuth } from "@/lib/auth-context";
@@ -59,6 +60,7 @@ import {
   LogOut,
   User,
   Settings,
+  Sparkles,
 } from "lucide-react";
 import {
   format,
@@ -113,6 +115,9 @@ export function Dashboard() {
 
   // ✅ Mobile FAB quick actions drawer
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+
+  // ✅ AI Chat assistant state
+  const [aiChatOpen, setAiChatOpen] = useState(false);
 
   // ✅ NEW: Defaults to drive TransactionModal from PersonLedgerSheet quick actions
   const [moneyInDefaults, setMoneyInDefaults] = useState<LoanQuickDefaults>({});
@@ -337,6 +342,15 @@ export function Dashboard() {
 
             <div className="flex items-center gap-2 sm:gap-3">
               <ThemeToggle />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setAiChatOpen(true)}
+                className="h-9 w-9 sm:h-10 sm:w-10 bg-transparent border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950 hover:border-amber-300 dark:hover:border-amber-700"
+                title="AI Money Assistant"
+              >
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
               <Link href="/analytics">
                 <Button
                   variant="outline"
@@ -824,6 +838,10 @@ export function Dashboard() {
         accounts={accounts}
         people={people}
         onSuccess={fetchData}
+      />
+      <AIChatAssistant
+        open={aiChatOpen}
+        onOpenChange={setAiChatOpen}
       />
     </div>
   );

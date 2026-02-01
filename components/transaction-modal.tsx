@@ -41,6 +41,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
+import { SmartExpenseInput } from "@/components/smart-expense-input";
 
 type TransactionSubType = "regular" | "loan";
 type DefaultLoanAction = "borrow" | "lend" | "repay" | "receive";
@@ -407,6 +408,19 @@ function TransactionForm({
             </div>
 
             <TabsContent value="regular" className="space-y-4 mt-0">
+              {/* Smart Natural Language Input for expenses */}
+              {!isIncome && (
+                <SmartExpenseInput
+                  onParse={(data) => {
+                    setAmount(data.amount);
+                    setCategory(data.category);
+                    setNote(data.note);
+                    setDate(data.date);
+                  }}
+                  availableCategories={availableCategories}
+                />
+              )}
+
               {/* Quick Add Shortcuts for expenses */}
               {!isIncome && (
                 <QuickAddShortcuts 
