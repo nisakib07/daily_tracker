@@ -150,7 +150,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
       "glass",
       style.glowClass,
       "animate-fade-in-up",
-      "min-h-[160px] sm:min-h-[180px] flex flex-col"
+      "h-[160px] sm:h-[180px] flex flex-col"
     )}>
       {/* Gradient top bar */}
       <div className={cn("absolute top-0 left-0 right-0 h-1 bg-gradient-to-r", style.gradient)} />
@@ -173,7 +173,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
         </Button>
       )}
       
-      <div className="relative p-3 sm:p-4 pt-4 sm:pt-5 flex-1 flex flex-col">
+      <div className="relative p-3 sm:p-4 pt-4 sm:pt-5 flex-1 flex flex-col overflow-hidden">
         <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
           <div className={cn(
             "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-lg sm:rounded-xl text-white shadow-lg transition-transform group-hover:scale-110 group-hover:rotate-3",
@@ -201,30 +201,34 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
           </div>
         </div>
         
-        {/* Last Transaction Preview - takes remaining space */}
-        {lastTransaction && (
-          <div className="mt-auto pt-2 border-t border-border/50">
-            <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
-              {isMoneyIn ? (
-                <ArrowDownLeft className="h-3 w-3 text-emerald-500" />
-              ) : (
-                <ArrowUpRight className="h-3 w-3 text-rose-500" />
-              )}
-              <span className={cn(
-                "font-medium",
-                isMoneyIn ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
-              )}>
-                {isMoneyIn ? "+" : "-"}৳{Number(lastTransaction.amount).toLocaleString()}
-              </span>
-              <span className="truncate opacity-70">
-                {lastTransaction.category || lastTransaction.type}
-              </span>
-            </div>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground/60 mt-0.5">
-              {format(parseISO(String(lastTransaction.occurred_at)), "MMM d, h:mm a")}
-            </p>
-          </div>
-        )}
+        {/* Last Transaction Preview - fixed height section */}
+        <div className="mt-auto pt-2 border-t border-border/50 h-[42px] sm:h-[44px]">
+          {lastTransaction ? (
+            <>
+              <div className="flex items-center gap-1.5 text-[10px] sm:text-xs text-muted-foreground">
+                {isMoneyIn ? (
+                  <ArrowDownLeft className="h-3 w-3 flex-shrink-0 text-emerald-500" />
+                ) : (
+                  <ArrowUpRight className="h-3 w-3 flex-shrink-0 text-rose-500" />
+                )}
+                <span className={cn(
+                  "font-medium flex-shrink-0",
+                  isMoneyIn ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                )}>
+                  {isMoneyIn ? "+" : "-"}৳{Number(lastTransaction.amount).toLocaleString()}
+                </span>
+                <span className="truncate opacity-70">
+                  {lastTransaction.category || lastTransaction.type}
+                </span>
+              </div>
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground/60 mt-0.5">
+                {format(parseISO(String(lastTransaction.occurred_at)), "MMM d, h:mm a")}
+              </p>
+            </>
+          ) : (
+            <p className="text-[10px] sm:text-xs text-muted-foreground/50 italic">No recent transactions</p>
+          )}
+        </div>
       </div>
     </Card>
   );
