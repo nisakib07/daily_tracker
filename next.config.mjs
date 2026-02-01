@@ -1,4 +1,4 @@
-import nextPWA from "next-pwa";
+import withPWA from "@ducanh2912/next-pwa";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -7,26 +7,25 @@ const nextConfig = {
   turbopack: {},
 };
 
-export default nextPWA({
+export default withPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
-
-  // 🔑 CRITICAL FIX
+  register: true,
+  skipWaiting: true,
+  
+  // Custom caching for offline support
   runtimeCaching: [
     {
       urlPattern: ({ request }) => request.mode === "navigate",
       handler: "NetworkFirst",
       options: {
         cacheName: "pages",
+        expiration: {
+          maxEntries: 50,
+          maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
+        },
         networkTimeoutSeconds: 10,
       },
     },
   ],
-
-  register: true,
-  skipWaiting: true,
-  clientsClaim: true,
-
-  // ❌ REMOVE offline fallback for now
-  fallbacks: false,
 })(nextConfig);
