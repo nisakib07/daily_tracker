@@ -346,19 +346,6 @@ export function Dashboard() {
                   <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5" />
                 </Button>
               </Link>
-              <div className="text-right">
-                <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Balance
-                </p>
-                <p
-                  className={cn(
-                    "text-lg sm:text-2xl font-bold whitespace-nowrap",
-                    totalBalance >= 0 ? "text-emerald-600" : "text-rose-600",
-                  )}
-                >
-                  ৳{totalBalance.toLocaleString()}
-                </p>
-              </div>
               
               {/* User Menu */}
               <DropdownMenu>

@@ -410,8 +410,9 @@ function TransactionForm({
               {/* Quick Add Shortcuts for expenses */}
               {!isIncome && (
                 <QuickAddShortcuts 
-                  onSelect={({ category: cat, defaultAmount }) => {
+                  onSelect={({ category: cat, label, defaultAmount }) => {
                     setCategory(cat);
+                    setNote(label || "");
                     if (defaultAmount && !amount) {
                       setAmount(defaultAmount.toString());
                     }
