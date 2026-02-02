@@ -157,24 +157,21 @@ export function Dashboard() {
     fetchData();
   }, [fetchData]);
 
-  // Calculate balances from ALL transactions (not filtered)
-  const calculateBalance = (accountId: string) => {
-    return allTransactions.reduce((balance, tx) => {
-      if (tx.to_account_id === accountId) balance += Number(tx.amount);
-      if (tx.from_account_id === accountId) balance -= Number(tx.amount);
-      return balance;
-    }, 0);
-  };
+  // Calculate balances from ALL transactions (not filtered) - memoized
+  const accountsWithBalance = useMemo(() => {
+    return accounts.map((acc) => {
+      const balance = allTransactions.reduce((bal, tx) => {
+        if (tx.to_account_id === acc.id) bal += Number(tx.amount);
+        if (tx.from_account_id === acc.id) bal -= Number(tx.amount);
+        return bal;
+      }, 0);
+      return { ...acc, balance };
+    });
+  }, [accounts, allTransactions]);
 
-  const accountsWithBalance = accounts.map((acc) => ({
-    ...acc,
-    balance: calculateBalance(acc.id),
-  }));
-
-  const totalBalance = accountsWithBalance.reduce(
-    (sum, acc) => sum + (acc.balance || 0),
-    0,
-  );
+  const totalBalance = useMemo(() => {
+    return accountsWithBalance.reduce((sum, acc) => sum + (acc.balance || 0), 0);
+  }, [accountsWithBalance]);
 
   // ✅ Selected person object for PersonLedgerSheet
   const selectedPerson = useMemo(() => {
@@ -182,55 +179,59 @@ export function Dashboard() {
     return people.find((p) => p.id === selectedPersonId) || null;
   }, [people, selectedPersonId]);
 
-  // Filter transactions by selected date/month and type
-  const filteredTransactions = allTransactions.filter((tx) => {
-    const txDate = new Date(tx.date);
+  // Filter transactions by selected date/month and type - memoized
+  const filteredTransactions = useMemo(() => {
+    return allTransactions.filter((tx) => {
+      const txDate = new Date(tx.date);
 
-    if (viewMode === "daily") {
-      const start = startOfDay(selectedDate);
-      const end = endOfDay(selectedDate);
-      if (txDate < start || txDate > end) return false;
-    } else {
-      const start = startOfMonth(selectedMonth);
-      const end = endOfMonth(selectedMonth);
-      if (txDate < start || txDate > end) return false;
-    }
+      if (viewMode === "daily") {
+        const start = startOfDay(selectedDate);
+        const end = endOfDay(selectedDate);
+        if (txDate < start || txDate > end) return false;
+      } else {
+        const start = startOfMonth(selectedMonth);
+        const end = endOfMonth(selectedMonth);
+        if (txDate < start || txDate > end) return false;
+      }
 
-    if (typeFilter !== "all" && tx.type !== typeFilter) return false;
-    return true;
-  });
+      if (typeFilter !== "all" && tx.type !== typeFilter) return false;
+      return true;
+    });
+  }, [allTransactions, viewMode, selectedDate, selectedMonth, typeFilter]);
 
-  // Calculate today's summary
-  const todaySummary = filteredTransactions.reduce(
-    (acc, tx) => {
-      const amount = Number(tx.amount);
-      if (["income", "borrow", "receive"].includes(tx.type))
-        acc.income += amount;
-      else if (["expense", "lend", "repay"].includes(tx.type))
-        acc.expense += amount;
-      return acc;
-    },
-    { income: 0, expense: 0 },
-  );
+  // Calculate today's summary - memoized
+  const todaySummary = useMemo(() => {
+    return filteredTransactions.reduce(
+      (acc, tx) => {
+        const amount = Number(tx.amount);
+        if (["income", "borrow", "receive"].includes(tx.type))
+          acc.income += amount;
+        else if (["expense", "lend", "repay"].includes(tx.type))
+          acc.expense += amount;
+        return acc;
+      },
+      { income: 0, expense: 0 },
+    );
+  }, [filteredTransactions]);
 
   const goToPreviousDay = () => setSelectedDate(subDays(selectedDate, 1));
   const goToNextDay = () => setSelectedDate(addDays(selectedDate, 1));
   const goToToday = () => setSelectedDate(new Date());
 
-  // Helper to get account name by ID
-  const getAccountName = (accountId: string | null) => {
+  // Helper to get account name by ID - memoized callback
+  const getAccountName = useCallback((accountId: string | null) => {
     if (!accountId) return null;
     return accounts.find((a) => a.id === accountId)?.name || null;
-  };
+  }, [accounts]);
 
-  // Helper to get person name by ID
-  const getPersonName = (personId: string | null) => {
+  // Helper to get person name by ID - memoized callback
+  const getPersonName = useCallback((personId: string | null) => {
     if (!personId) return null;
     return people.find((p) => p.id === personId)?.name || null;
-  };
+  }, [people]);
 
-  // Helper to get last transaction for an account (most recent by occurred_at)
-  const getLastTransactionForAccount = (accountId: string) => {
+  // Helper to get last transaction for an account (most recent by occurred_at) - memoized callback
+  const getLastTransactionForAccount = useCallback((accountId: string) => {
     const accountTxs = allTransactions.filter(
       (tx) => tx.from_account_id === accountId || tx.to_account_id === accountId
     );
@@ -241,7 +242,7 @@ export function Dashboard() {
       const bTime = new Date(b.occurred_at || b.date).getTime();
       return bTime - aTime;
     })[0];
-  };
+  }, [allTransactions]);
 
   // Handle edit account
   const handleEditAccount = (account: Account & { balance?: number }) => {

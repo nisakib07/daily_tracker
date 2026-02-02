@@ -4,11 +4,12 @@ import { cn } from "@/lib/utils";
 
 interface SkeletonProps {
   className?: string;
+  style?: React.CSSProperties;
 }
 
-function Skeleton({ className }: SkeletonProps) {
+function Skeleton({ className, style }: SkeletonProps) {
   return (
-    <div className={cn("skeleton rounded-md", className)} />
+    <div className={cn("skeleton rounded-md", className)} style={style} />
   );
 }
 

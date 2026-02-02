@@ -129,9 +129,9 @@ function exportTransactionsToCSV(params: {
   ];
 
   const rows = transactions.map((tx) => {
-    const fromId = (tx as any).from_account_id as string | null | undefined;
-    const toId = (tx as any).to_account_id as string | null | undefined;
-    const personId = (tx as any).person_id as string | null | undefined;
+    const fromId = tx.from_account_id;
+    const toId = tx.to_account_id;
+    const personId = tx.person_id;
 
     return [
       tx.date ? format(new Date(tx.date), "yyyy-MM-dd") : "",
@@ -367,8 +367,8 @@ export default function AnalyticsPage() {
     for (const tx of transactions) {
       const amt = Number(tx.amount);
 
-      const toId = (tx as any).to_account_id as string | null | undefined;
-      const fromId = (tx as any).from_account_id as string | null | undefined;
+      const toId = tx.to_account_id;
+      const fromId = tx.from_account_id;
 
       if (toId) map.set(toId, (map.get(toId) || 0) + amt);
       if (fromId) map.set(fromId, (map.get(fromId) || 0) - amt);

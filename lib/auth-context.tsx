@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import type { User, AuthChangeEvent, Session } from "@supabase/supabase-js";
 
 type AuthContextType = {
   user: User | null;
@@ -25,10 +25,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient();
 
       // Get initial session
-      supabase.auth.getUser().then(({ data: { user } }) => {
+      supabase.auth.getUser().then(({ data: { user } }: { data: { user: User | null } }) => {
         setUser(user);
         setLoading(false);
-      }).catch((error) => {
+      }).catch((error: Error) => {
         console.error('[v0] Error getting user:', error);
         setLoading(false);
       });
@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Listen for auth changes
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((_event, session) => {
+      } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
         setUser(session?.user ?? null);
         setLoading(false);
       });

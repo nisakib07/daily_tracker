@@ -29,7 +29,7 @@ export default function Page() {
     const supabase = createClient()
     
     // Check if user has a valid session (from the reset link)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: unknown } }) => {
       setIsValidSession(!!session)
     })
   }, [])

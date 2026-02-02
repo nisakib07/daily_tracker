@@ -394,11 +394,19 @@ function TransactionForm({
               {/* Quick Add Shortcuts for expenses */}
               {!isIncome && (
                 <QuickAddShortcuts 
-                  onSelect={({ category: cat, label, defaultAmount }) => {
+                  onSelect={({ category: cat, label, defaultAmount, defaultAccountName }) => {
                     setCategory(cat);
                     setNote(label || "");
                     if (defaultAmount && !amount) {
                       setAmount(defaultAmount.toString());
+                    }
+                    if (defaultAccountName) {
+                      const matchingAccount = accounts.find(
+                        (acc) => acc.name.toLowerCase() === defaultAccountName.toLowerCase()
+                      );
+                      if (matchingAccount) {
+                        setAccountId(matchingAccount.id);
+                      }
                     }
                   }}
                 />

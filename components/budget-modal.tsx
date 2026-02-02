@@ -74,7 +74,7 @@ export function BudgetModal({
           user_id: user?.id,
         };
       })
-      .filter(Boolean);
+      .filter((row): row is { month: string; category: string; amount: number; user_id: string | undefined } => row !== null);
 
     // If no valid rows, just close
     if (rows.length === 0) {
@@ -85,7 +85,7 @@ export function BudgetModal({
 
     const { error } = await supabase
       .from("budgets")
-      .upsert(rows as any, { onConflict: "user_id,month,category" });
+      .upsert(rows, { onConflict: "user_id,month,category" });
 
     if (error) {
       console.error("Save budgets error:", error.message);
