@@ -159,13 +159,21 @@ export function Dashboard() {
 
   // Calculate balances from ALL transactions (not filtered) - memoized
   const accountsWithBalance = useMemo(() => {
-    return accounts.map((acc) => {
+    const mapped = accounts.map((acc) => {
       const balance = allTransactions.reduce((bal, tx) => {
         if (tx.to_account_id === acc.id) bal += Number(tx.amount);
         if (tx.from_account_id === acc.id) bal -= Number(tx.amount);
         return bal;
       }, 0);
       return { ...acc, balance };
+    });
+
+    // Sort accounts: cash -> wallet -> card -> others
+    return mapped.sort((a, b) => {
+      const typeOrder: Record<string, number> = { cash: 0, wallet: 1, card: 2 };
+      const orderA = typeOrder[a.type] ?? 99;
+      const orderB = typeOrder[b.type] ?? 99;
+      return orderA - orderB;
     });
   }, [accounts, allTransactions]);
 
@@ -399,11 +407,14 @@ export function Dashboard() {
 
         {/* Account Cards */}
         <section>
-          <div className="grid grid-cols-3 gap-2 sm:gap-3 auto-rows-fr">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 auto-rows-fr">
             {accountsWithBalance.map((account, index) => (
               <div 
                 key={account.id}
-                className="opacity-0 animate-fade-in-up h-full"
+                className={cn(
+                  "opacity-0 animate-fade-in-up h-full",
+                  account.type === "card" ? "col-span-2 sm:col-span-1" : "col-span-1"
+                )}
                 style={{ animationDelay: `${index * 100}ms`, animationFillMode: "forwards" }}
               >
                 <AccountCard
