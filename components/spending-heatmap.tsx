@@ -25,7 +25,7 @@ export function SpendingHeatmap({ transactions, className }: SpendingHeatmapProp
     const spending: Record<string, number> = {};
     
     transactions.forEach((tx) => {
-      if (["expense", "lend", "repay"].includes(tx.type)) {
+      if (tx.type === "expense") {
         const dateKey = format(new Date(tx.date), "yyyy-MM-dd");
         spending[dateKey] = (spending[dateKey] || 0) + Number(tx.amount);
       }

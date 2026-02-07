@@ -122,15 +122,43 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
   const monthlySummary = monthlyTransactions.reduce(
     (acc, tx) => {
       const amount = Number(tx.amount);
-      if (["income", "borrow", "receive"].includes(tx.type)) {
+      if (tx.type === "income") {
         acc.income += amount;
-      } else if (["expense", "lend", "repay"].includes(tx.type)) {
+      } else if (tx.type === "expense") {
         acc.expense += amount;
       }
       return acc;
     },
     { income: 0, expense: 0 }
   );
+
+  // Calculate Opening Balance (Carried Forward)
+  const openingBalance = useMemo(() => {
+    // Filter transactions BEFORE the selected month start
+    const priorTransactions = transactions.filter((tx) => {
+      const txDate = new Date(tx.date);
+      return txDate < monthStart;
+    });
+
+    // Sum all cash flows (INCLUDING loans/debt, as this is actual cash in hand)
+    return priorTransactions.reduce((acc, tx) => {
+      const amount = Number(tx.amount);
+      if (
+        tx.type === "income" ||
+        tx.type === "borrow" ||
+        tx.type === "receive"
+      ) {
+        return acc + amount;
+      } else if (
+        tx.type === "expense" ||
+        tx.type === "lend" ||
+        tx.type === "repay"
+      ) {
+        return acc - amount;
+      }
+      return acc;
+    }, 0);
+  }, [transactions, monthStart]);
 
   const netBalance = monthlySummary.income - monthlySummary.expense;
 
@@ -147,9 +175,9 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
     return prevTxs.reduce(
       (acc, tx) => {
         const amount = Number(tx.amount);
-        if (["income", "borrow", "receive"].includes(tx.type)) {
+        if (tx.type === "income") {
           acc.income += amount;
-        } else if (["expense", "lend", "repay"].includes(tx.type)) {
+        } else if (tx.type === "expense") {
           acc.expense += amount;
         }
         return acc;
@@ -266,92 +294,146 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
       </div>
 
       {/* Monthly Stats Grid with Comparison */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        {/* Income Card */}
-        <div className="rounded-lg bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/50 dark:to-emerald-900/30 p-3 sm:p-4 border border-emerald-100 dark:border-emerald-800/50">
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <p className="text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-              Income
-            </p>
-            <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        {/* Carried Forward / Opening Balance Card */}
+        <div className="rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50/50 dark:from-slate-900 dark:to-slate-800/50 p-4 border border-indigo-100/50 dark:border-slate-800 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+          <div className="absolute right-0 top-0 h-24 w-24 bg-indigo-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-indigo-500/10 transition-colors" />
+          
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-indigo-100/80 dark:bg-slate-800 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <CreditCard className="h-4 w-4" />
+            </div>
           </div>
-          <p className="text-lg sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-            +৳{monthlySummary.income.toLocaleString()}
-          </p>
-          <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
-            <span className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400">
-              {monthlyTransactions.filter(tx => ["income", "borrow", "receive"].includes(tx.type)).length} txns
-            </span>
+          
+          <div className="space-y-1">
+            <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              Opening Balance
+            </p>
+            <p className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-0.5 whitespace-nowrap">
+              <span>৳</span>
+              <span className="tabular-nums tracking-tight">{openingBalance.toLocaleString()}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-muted-foreground/80">
+                Carried Forward
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Income Card */}
+        <div className="rounded-xl bg-gradient-to-br from-emerald-50 to-teal-50/50 dark:from-emerald-950/30 dark:to-teal-900/10 p-4 border border-emerald-100/50 dark:border-emerald-800/30 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+          <div className="absolute right-0 top-0 h-24 w-24 bg-emerald-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-emerald-500/10 transition-colors" />
+          
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-emerald-100/80 dark:bg-emerald-900/50 rounded-lg text-emerald-600 dark:text-emerald-400">
+              <TrendingUp className="h-4 w-4" />
+            </div>
             {incomeChange !== 0 && (
               <span className={cn(
-                "flex items-center text-[9px] sm:text-[10px] font-medium",
-                incomeChange > 0 ? "text-emerald-600" : "text-rose-600"
+                "flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-white/50 dark:bg-black/20 backdrop-blur-sm",
+                incomeChange > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
               )}>
-                {incomeChange > 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {incomeChange > 0 ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
                 {Math.abs(incomeChange).toFixed(0)}%
               </span>
             )}
           </div>
+          
+          <div className="space-y-1">
+            <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              Income
+            </p>
+            <p className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 whitespace-nowrap">
+              <span>+৳</span>
+              <span className="tabular-nums tracking-tight">{monthlySummary.income.toLocaleString()}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-muted-foreground/80">
+                {monthlyTransactions.filter(tx => ["income", "borrow", "receive"].includes(tx.type)).length} transactions
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Expense Card */}
-        <div className="rounded-lg bg-gradient-to-br from-rose-50 to-rose-100/50 dark:from-rose-950/50 dark:to-rose-900/30 p-3 sm:p-4 border border-rose-100 dark:border-rose-800/50">
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <p className="text-[10px] sm:text-xs font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wide">
-              Expense
-            </p>
-            <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-rose-600 dark:text-rose-400" />
-          </div>
-          <p className="text-lg sm:text-2xl font-bold text-rose-700 dark:text-rose-300">
-            -৳{monthlySummary.expense.toLocaleString()}
-          </p>
-          <div className="flex items-center gap-1 mt-0.5 sm:mt-1">
-            <span className="text-[10px] sm:text-xs text-rose-600 dark:text-rose-400">
-              {monthlyTransactions.filter(tx => ["expense", "lend", "repay"].includes(tx.type)).length} txns
-            </span>
+        <div className="rounded-xl bg-gradient-to-br from-rose-50 to-orange-50/50 dark:from-rose-950/30 dark:to-orange-900/10 p-4 border border-rose-100/50 dark:border-rose-800/30 shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300">
+          <div className="absolute right-0 top-0 h-24 w-24 bg-rose-500/5 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none group-hover:bg-rose-500/10 transition-colors" />
+          
+          <div className="flex justify-between items-start mb-2">
+            <div className="p-2 bg-rose-100/80 dark:bg-rose-900/50 rounded-lg text-rose-600 dark:text-rose-400">
+              <TrendingDown className="h-4 w-4" />
+            </div>
             {expenseChange !== 0 && (
               <span className={cn(
-                "flex items-center text-[9px] sm:text-[10px] font-medium",
-                expenseChange < 0 ? "text-emerald-600" : "text-rose-600"
+                "flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-white/50 dark:bg-black/20 backdrop-blur-sm",
+                expenseChange < 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
               )}>
-                {expenseChange > 0 ? <ArrowUpRight className="h-2.5 w-2.5" /> : <ArrowDownRight className="h-2.5 w-2.5" />}
+                {expenseChange > 0 ? <ArrowUpRight className="h-3 w-3 mr-0.5" /> : <ArrowDownRight className="h-3 w-3 mr-0.5" />}
                 {Math.abs(expenseChange).toFixed(0)}%
               </span>
             )}
+          </div>
+          
+          <div className="space-y-1">
+            <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              Expense
+            </p>
+            <p className="text-lg sm:text-xl font-bold text-rose-700 dark:text-rose-400 flex items-center gap-0.5 whitespace-nowrap">
+              <span>-৳</span>
+              <span className="tabular-nums tracking-tight">{monthlySummary.expense.toLocaleString()}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <span className="text-[9px] text-muted-foreground/80">
+                {monthlyTransactions.filter(tx => ["expense", "lend", "repay"].includes(tx.type)).length} transactions
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Net Balance Card */}
         <div className={cn(
-          "rounded-lg p-3 sm:p-4 border",
+          "rounded-xl p-4 border shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300",
           netBalance >= 0 
-            ? "bg-gradient-to-br from-blue-50 to-indigo-100/50 dark:from-blue-950/50 dark:to-indigo-900/30 border-blue-100 dark:border-blue-800/50"
-            : "bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/50 dark:to-amber-900/30 border-amber-100 dark:border-amber-800/50"
+            ? "bg-gradient-to-br from-blue-50 to-indigo-50/50 dark:from-blue-950/30 dark:to-indigo-900/10 border-blue-100/50 dark:border-blue-800/30"
+            : "bg-gradient-to-br from-amber-50 to-orange-50/50 dark:from-amber-950/30 dark:to-orange-900/10 border-amber-100/50 dark:border-amber-800/30"
         )}>
-          <div className="flex items-center justify-between mb-1 sm:mb-2">
-            <p className={cn(
-              "text-[10px] sm:text-xs font-medium uppercase tracking-wide",
-              netBalance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
+          <div className={cn(
+            "absolute right-0 top-0 h-24 w-24 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none transition-colors",
+            netBalance >= 0 ? "bg-blue-500/5 group-hover:bg-blue-500/10" : "bg-amber-500/5 group-hover:bg-amber-500/10"
+          )} />
+
+          <div className="flex justify-between items-start mb-2">
+            <div className={cn(
+              "p-2 rounded-lg",
+              netBalance >= 0 
+                ? "bg-blue-100/80 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400" 
+                : "bg-amber-100/80 dark:bg-amber-900/50 text-amber-600 dark:text-amber-400"
             )}>
-              Net
-            </p>
-            <CreditCard className={cn(
-              "h-3 w-3 sm:h-4 sm:w-4",
-              netBalance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
-            )} />
+              <CreditCard className="h-4 w-4" />
+            </div>
           </div>
-          <p className={cn(
-            "text-lg sm:text-2xl font-bold",
-            netBalance >= 0 ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300"
-          )}>
-            {netBalance >= 0 ? "+" : ""}৳{netBalance.toLocaleString()}
-          </p>
-          <p className={cn(
-            "text-[10px] sm:text-xs mt-0.5 sm:mt-1",
-            netBalance >= 0 ? "text-blue-600 dark:text-blue-400" : "text-amber-600 dark:text-amber-400"
-          )}>
-            {netBalance >= 0 ? "Surplus" : "Deficit"}
-          </p>
+          
+          <div className="space-y-1">
+            <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              Net Balance
+            </p>
+            <p className={cn(
+              "text-lg sm:text-xl font-bold flex items-center gap-0.5 whitespace-nowrap",
+              netBalance >= 0 ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300"
+            )}>
+              <span>{netBalance >= 0 ? "+" : ""}৳</span>
+              <span className="tabular-nums tracking-tight">{netBalance.toLocaleString()}</span>
+            </p>
+            <div className="flex items-center gap-1">
+              <span className={cn(
+                "text-[9px]",
+                netBalance >= 0 ? "text-blue-600/80 dark:text-blue-400/80" : "text-amber-600/80 dark:text-amber-400/80"
+              )}>
+                {netBalance >= 0 ? "Surplus Amount" : "Deficit Amount"}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 

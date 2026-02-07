@@ -176,7 +176,7 @@ export default function AnalyticsPage() {
   const [exporting, setExporting] = useState(false);
 
   // ✅ NEW: Analytics mode (Cashflow includes loans; Profit excludes loans)
-  const [includeLoans, setIncludeLoans] = useState(true);
+  const [includeLoans, setIncludeLoans] = useState(false);
 
   const incomeTypes = useMemo(() => {
     return includeLoans ? ["income", "borrow", "receive"] : ["income"];
@@ -359,29 +359,29 @@ export default function AnalyticsPage() {
     }));
   }, [monthTransactions, selectedMonth, incomeTypes, expenseTypes]);
 
-  // ✅ FIXED: Total Balance matches Dashboard (account-based, from/to)
+  // ✅ FIXED: Total Balance is dynamic (Profit vs Cashflow)
   const totalBalance = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const acc of accounts) map.set(acc.id, 0);
-
+    // In "Profit" mode: Lifetime Income - Lifetime Expense
+    // In "Cashflow" mode: Total In - Total Out (Net Liquidity)
+    const result = { income: 0, expense: 0 };
+    
     for (const tx of transactions) {
       const amt = Number(tx.amount);
 
-      const toId = tx.to_account_id;
-      const fromId = tx.from_account_id;
-
-      if (toId) map.set(toId, (map.get(toId) || 0) + amt);
-      if (fromId) map.set(fromId, (map.get(fromId) || 0) - amt);
+      if (incomeTypes.includes(tx.type)) result.income += amt;
+      else if (expenseTypes.includes(tx.type)) result.expense += amt;
     }
 
-    return Array.from(map.values()).reduce((s, v) => s + v, 0);
-  }, [transactions, accounts]);
+    return result.income - result.expense;
+  }, [transactions, incomeTypes, expenseTypes]);
 
   const exportCSV = async () => {
     setExporting(true);
     try {
       exportTransactionsToCSV({
-        transactions: monthTransactions,
+        transactions: monthTransactions.filter(
+          (tx) => incomeTypes.includes(tx.type) || expenseTypes.includes(tx.type)
+        ),
         accounts,
         people,
         selectedMonth,
@@ -479,7 +479,7 @@ export default function AnalyticsPage() {
               )}
               title="Only income/expense (exclude loans)"
             >
-              Profit
+              Net Income
             </Button>
           </div>
 
@@ -630,7 +630,7 @@ export default function AnalyticsPage() {
               <div className="flex items-center gap-2 mb-1">
                 <Wallet className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                 <span className="text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
-                  Total
+                  {includeLoans ? "Net Cashflow" : "Net Income"}
                 </span>
               </div>
               <p
@@ -642,7 +642,7 @@ export default function AnalyticsPage() {
                 <AnimatedCounter value={totalBalance} prefix="৳" duration={800} />
               </p>
               <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">
-                Matches Dashboard
+                {includeLoans ? "Lifetime Liquidity" : "Lifetime Net Income"}
               </p>
             </CardContent>
           </Card>
@@ -662,42 +662,76 @@ export default function AnalyticsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {expenseByCategory.length > 0 ? (
-                <div className="h-[250px] sm:h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      {/* ✅ Removed labels to prevent mobile overflow */}
-                      <Pie
-                        data={expenseByCategory}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {expenseByCategory.map((_, index) => (
-                          <Cell
-                            key={`cell-exp-${index}`}
-                            fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number) => [
-                          `৳${value.toLocaleString()}`,
-                          "Amount",
-                        ]}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Chart */}
+                <div className="h-[200px] w-full sm:w-1/2 flex-shrink-0">
+                  {expenseByCategory.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={expenseByCategory}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={70}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {expenseByCategory.map((_, index) => (
+                            <Cell
+                              key={`cell-exp-${index}`}
+                              fill={EXPENSE_COLORS[index % EXPENSE_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number) => [
+                            `৳${value.toLocaleString()}`,
+                            "Amount",
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted-foreground text-xs">
+                      No data
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground">
-                  No expense data for this month
+
+                {/* Custom Scrollable Legend */}
+                <div className="w-full sm:w-1/2 flex flex-col">
+                  <div className="max-h-[180px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                    {expenseByCategory.length > 0 ? (
+                      expenseByCategory.map((item, index) => {
+                      const color = EXPENSE_COLORS[index % EXPENSE_COLORS.length];
+                      const total = monthlySummary.expense || 1;
+                      const percent = (item.value / total) * 100;
+                      
+                      return (
+                        <div key={item.name} className="flex items-center justify-between text-xs sm:text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: color }}
+                            />
+                            <span className="truncate font-medium text-foreground">{item.name}</span>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <span className="block font-medium">৳{item.value.toLocaleString()}</span>
+                            <span className="text-[10px] text-muted-foreground">{percent.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-xs text-muted-foreground text-center py-4">
+                      No expense data found
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            </div>
             </CardContent>
           </Card>
 
@@ -713,42 +747,76 @@ export default function AnalyticsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              {incomeByCategory.length > 0 ? (
-                <div className="h-[250px] sm:h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      {/* ✅ Removed labels to prevent mobile overflow */}
-                      <Pie
-                        data={incomeByCategory}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={55}
-                        outerRadius={90}
-                        paddingAngle={2}
-                        dataKey="value"
-                      >
-                        {incomeByCategory.map((_, index) => (
-                          <Cell
-                            key={`cell-inc-${index}`}
-                            fill={INCOME_COLORS[index % INCOME_COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(value: number) => [
-                          `৳${value.toLocaleString()}`,
-                          "Amount",
-                        ]}
-                      />
-                      <Legend />
-                    </PieChart>
-                  </ResponsiveContainer>
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Chart */}
+                <div className="h-[200px] w-full sm:w-1/2 flex-shrink-0">
+                  {incomeByCategory.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={incomeByCategory}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={70}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {incomeByCategory.map((_, index) => (
+                            <Cell
+                              key={`cell-inc-${index}`}
+                              fill={INCOME_COLORS[index % INCOME_COLORS.length]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number) => [
+                            `৳${value.toLocaleString()}`,
+                            "Amount",
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center text-muted-foreground text-xs">
+                      No data
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-muted-foreground">
-                  No income data for this month
+
+                {/* Custom Scrollable Legend */}
+                <div className="w-full sm:w-1/2 flex flex-col">
+                  <div className="max-h-[180px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                    {incomeByCategory.length > 0 ? (
+                      incomeByCategory.map((item, index) => {
+                      const color = INCOME_COLORS[index % INCOME_COLORS.length];
+                      const total = monthlySummary.income || 1;
+                      const percent = (item.value / total) * 100;
+                      
+                      return (
+                        <div key={item.name} className="flex items-center justify-between text-xs sm:text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div 
+                              className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                              style={{ backgroundColor: color }}
+                            />
+                            <span className="truncate font-medium text-foreground">{item.name}</span>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-2">
+                            <span className="block font-medium">৳{item.value.toLocaleString()}</span>
+                            <span className="text-[10px] text-muted-foreground">{percent.toFixed(1)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-xs text-muted-foreground text-center py-4">
+                      No income data found
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
+            </div>
             </CardContent>
           </Card>
         </div>
@@ -763,7 +831,7 @@ export default function AnalyticsPage() {
             <CardDescription className="text-xs">
               {includeLoans
                 ? "Cashflow (incl. loans)"
-                : "Profit (income/expense only)"}
+                : "Net Income (income/expense only)"}
             </CardDescription>
           </CardHeader>
           <CardContent>

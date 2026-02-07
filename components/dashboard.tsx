@@ -204,10 +204,8 @@ export function Dashboard() {
     return filteredTransactions.reduce(
       (acc, tx) => {
         const amount = Number(tx.amount);
-        if (["income", "borrow", "receive"].includes(tx.type))
-          acc.income += amount;
-        else if (["expense", "lend", "repay"].includes(tx.type))
-          acc.expense += amount;
+        if (tx.type === "income") acc.income += amount;
+        else if (tx.type === "expense") acc.expense += amount;
         return acc;
       },
       { income: 0, expense: 0 },

@@ -22,7 +22,7 @@ import { Label } from "@/components/ui/label";
 import type { Account } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
-import { Loader2, Settings, AlertTriangle } from "lucide-react";
+import { Loader2, Settings, AlertTriangle, Scale } from "lucide-react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 interface EditAccountModalProps {
@@ -110,14 +110,13 @@ function EditAccountForm({
         />
       </div>
 
-      {/* Balance Adjustment */}
       <div className="space-y-3">
         <Label className="text-sm font-medium">Balance Adjustment (Optional)</Label>
-        <div className="p-3 sm:p-4 rounded-xl bg-amber-50 border border-amber-200">
+        <div className="p-3 sm:p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
           <div className="flex items-start gap-2 mb-3">
-            <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
-            <p className="text-[10px] sm:text-xs text-amber-700">
-              Use this to correct your balance if there&apos;s a discrepancy. This will create an adjustment transaction.
+            <Scale className="h-4 w-4 text-slate-500 mt-0.5 flex-shrink-0" />
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Use this to align your digital balance with your real-world account. This will create an adjustment transaction.
             </p>
           </div>
           
@@ -126,7 +125,7 @@ function EditAccountForm({
               type="button"
               variant={adjustmentType === "add" ? "default" : "outline"}
               size="sm"
-              className={adjustmentType === "add" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-transparent"}
+              className={adjustmentType === "add" ? "bg-emerald-600 hover:bg-emerald-700 shadow-sm shadow-emerald-500/20" : "bg-transparent border-slate-200 dark:border-slate-700"}
               onClick={() => setAdjustmentType("add")}
             >
               Add Money
@@ -135,7 +134,7 @@ function EditAccountForm({
               type="button"
               variant={adjustmentType === "subtract" ? "default" : "outline"}
               size="sm"
-              className={adjustmentType === "subtract" ? "bg-rose-600 hover:bg-rose-700" : "bg-transparent"}
+              className={adjustmentType === "subtract" ? "bg-rose-600 hover:bg-rose-700 shadow-sm shadow-rose-500/20" : "bg-transparent border-slate-200 dark:border-slate-700"}
               onClick={() => setAdjustmentType("subtract")}
             >
               Remove Money
@@ -213,7 +212,7 @@ export function EditAccountModal({
   if (!account) return null;
 
   const HeaderIcon = () => (
-    <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-slate-500 to-slate-600 text-white">
+    <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md shadow-blue-500/20">
       <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
     </div>
   );
