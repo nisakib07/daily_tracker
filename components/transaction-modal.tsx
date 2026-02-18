@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -96,7 +96,6 @@ function TransactionForm({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
 
-  const amountRef = useRef<HTMLInputElement | null>(null);
 
   const isIncome = type === "in";
   const defaultCategories = isIncome
@@ -107,16 +106,7 @@ function TransactionForm({
     [defaultCategories, customCategories],
   );
 
-  // Auto-focus amount when modal opens (mobile-first)
-  useEffect(() => {
-    if (!open) return;
 
-    const t = setTimeout(() => {
-      amountRef.current?.focus();
-    }, 150);
-
-    return () => clearTimeout(t);
-  }, [open]);
 
   // Load custom categories from localStorage on mount
   useEffect(() => {
@@ -336,7 +326,7 @@ function TransactionForm({
         </TabsList>
 
         {/* ✅ Scrollable content area */}
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-24">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1 pb-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -357,7 +347,6 @@ function TransactionForm({
                 </span>
                 <Input
                   id="amount"
-                  ref={amountRef}
                   type="number"
                   inputMode="decimal"
                   placeholder="0"
@@ -837,7 +826,7 @@ export function TransactionModal({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="h-[90dvh] px-4 pb-2 flex flex-col">
+      <DrawerContent className="max-h-[85dvh] px-4 pb-2 flex flex-col">
         <DrawerHeader className="px-0 shrink-0">
           <div className="flex items-center gap-3">
             <HeaderIcon />

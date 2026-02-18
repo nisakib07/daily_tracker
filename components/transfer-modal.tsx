@@ -253,8 +253,8 @@ export function TransferModal({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="px-4 pb-6 max-h-[90vh]">
-        <DrawerHeader className="px-0">
+      <DrawerContent className="px-4 pb-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[85dvh] flex flex-col">
+        <DrawerHeader className="px-0 shrink-0">
           <div className="flex items-center gap-3">
             <HeaderIcon />
             <DrawerTitle className="text-xl text-blue-600">
@@ -262,7 +262,7 @@ export function TransferModal({
             </DrawerTitle>
           </div>
         </DrawerHeader>
-        <div className="overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <TransferForm
             accounts={accounts}
             onSuccess={onSuccess}
