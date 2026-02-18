@@ -624,6 +624,56 @@
   transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* Hide scrollbar for cleaner mobile UI */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hero amount input glow */
+@keyframes input-glow-emerald {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.08); }
+  50% { box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.5), 0 0 20px rgba(16, 185, 129, 0.12); }
+}
+@keyframes input-glow-rose {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.3), 0 0 12px rgba(244, 63, 94, 0.08); }
+  50% { box-shadow: 0 0 0 2px rgba(244, 63, 94, 0.5), 0 0 20px rgba(244, 63, 94, 0.12); }
+}
+@keyframes input-glow-blue {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3), 0 0 12px rgba(59, 130, 246, 0.08); }
+  50% { box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5), 0 0 20px rgba(59, 130, 246, 0.12); }
+}
+.hero-glow-emerald:focus-within { animation: input-glow-emerald 2s ease-in-out infinite; }
+.hero-glow-rose:focus-within { animation: input-glow-rose 2s ease-in-out infinite; }
+.hero-glow-blue:focus-within { animation: input-glow-blue 2s ease-in-out infinite; }
+
+/* Drawer section card */
+.drawer-section {
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 16px;
+  padding: 16px;
+}
+.dark .drawer-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Drawer bottom bar with blur */
+.drawer-action-bar {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.dark .drawer-action-bar {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(20, 20, 30, 0.85);
+}
+
 /* ==========================================
    SWIPE GESTURE NAVIGATION
    ========================================== */

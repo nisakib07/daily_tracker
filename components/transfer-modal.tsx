@@ -100,118 +100,147 @@ function TransferForm({
   const toAccount = accounts.find(a => a.id === toAccountId);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-      {/* Amount Input */}
-      <div className="space-y-2">
-        <Label htmlFor="amount" className="text-sm font-medium">Amount</Label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-muted-foreground">৳</span>
-          <Input
-            id="amount"
-            type="number"
-            placeholder="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            min="0"
-            step="0.01"
-            className="pl-10 h-12 sm:h-14 text-xl sm:text-2xl font-bold"
-          />
-        </div>
-      </div>
+    <div className="flex flex-col min-h-0 h-full">
+      {/* Scrollable content area */}
+      <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-4">
+        <div className="space-y-3">
+          {/* ✨ Hero Amount Input */}
+          <div className="rounded-2xl p-4 bg-blue-50/80 dark:bg-blue-950/30 hero-glow-blue transition-all">
+            <Label htmlFor="amount" className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
+              Amount
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-bold text-blue-500">
+                ৳
+              </span>
+              <Input
+                id="amount"
+                type="number"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                required
+                min="0"
+                step="0.01"
+                className="pl-10 h-14 text-2xl font-bold bg-white/80 dark:bg-white/5 border-0 rounded-xl shadow-sm focus-visible:ring-2 focus-visible:ring-blue-400 transition-shadow"
+              />
+            </div>
+          </div>
 
-      {/* From Account */}
-      <div className="space-y-2">
-        <Label htmlFor="fromAccount" className="text-sm font-medium">From Account</Label>
-        <Select value={fromAccountId} onValueChange={setFromAccountId} required>
-          <SelectTrigger className="h-11 sm:h-12">
-            <SelectValue placeholder="Select source account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id} disabled={account.id === toAccountId}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+          {/* 📋 Accounts Section */}
+          <div className="drawer-section space-y-3">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <span>📋</span> Accounts
+            </p>
 
-      {/* Transfer Arrow */}
-      {fromAccountId && toAccountId && (
-        <div className="flex items-center justify-center py-2">
-          <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 bg-slate-100 rounded-full">
-            <span className="font-medium text-slate-700 text-sm sm:text-base">{fromAccount?.name}</span>
-            <ArrowRightLeft className="h-4 w-4 text-blue-500" />
-            <span className="font-medium text-slate-700 text-sm sm:text-base">{toAccount?.name}</span>
+            {/* From Account */}
+            <div className="space-y-1.5">
+              <Label htmlFor="fromAccount" className="text-xs font-medium">From Account</Label>
+              <Select value={fromAccountId} onValueChange={setFromAccountId} required>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select source account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id} disabled={account.id === toAccountId}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Transfer Arrow */}
+            {fromAccountId && toAccountId && (
+              <div className="flex items-center justify-center py-1">
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-full">
+                  <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">{fromAccount?.name}</span>
+                  <ArrowRightLeft className="h-3.5 w-3.5 text-blue-500" />
+                  <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">{toAccount?.name}</span>
+                </div>
+              </div>
+            )}
+
+            {/* To Account */}
+            <div className="space-y-1.5">
+              <Label htmlFor="toAccount" className="text-xs font-medium">To Account</Label>
+              <Select value={toAccountId} onValueChange={setToAccountId} required>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Select destination account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id} disabled={account.id === fromAccountId}>
+                      {account.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* 📝 Extras Section */}
+          <div className="drawer-section space-y-3">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+              <span>📝</span> Extras
+            </p>
+
+            {/* Date Input */}
+            <div className="space-y-1.5">
+              <Label htmlFor="date" className="text-xs font-medium">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                max={format(new Date(), "yyyy-MM-dd")}
+                className="h-11 rounded-xl"
+              />
+            </div>
+
+            {/* Note */}
+            <div className="space-y-1.5">
+              <Label htmlFor="note" className="text-xs font-medium">
+                Note <span className="text-muted-foreground">(Optional)</span>
+              </Label>
+              <Textarea
+                id="note"
+                placeholder="Add a note..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                className="resize-none rounded-xl"
+              />
+            </div>
           </div>
         </div>
-      )}
-
-      {/* To Account */}
-      <div className="space-y-2">
-        <Label htmlFor="toAccount" className="text-sm font-medium">To Account</Label>
-        <Select value={toAccountId} onValueChange={setToAccountId} required>
-          <SelectTrigger className="h-11 sm:h-12">
-            <SelectValue placeholder="Select destination account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id} disabled={account.id === fromAccountId}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
       </div>
 
-      {/* Date Input */}
-      <div className="space-y-2">
-        <Label htmlFor="date" className="text-sm font-medium">Date</Label>
-        <Input
-          id="date"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-          max={format(new Date(), "yyyy-MM-dd")}
-          className="h-11 sm:h-12"
-        />
+      {/* Fixed bottom action bar */}
+      <div className="drawer-action-bar pt-3 pb-[env(safe-area-inset-bottom)]">
+        <div className="flex gap-2.5">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1 h-12 rounded-xl bg-transparent active:scale-[0.98] transition-transform"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            className="flex-[1.5] h-12 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/25"
+            disabled={loading || !amount || !fromAccountId || !toAccountId || fromAccountId === toAccountId}
+            onClick={handleSubmit}
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Transfer
+          </Button>
+        </div>
       </div>
-
-      {/* Note */}
-      <div className="space-y-2">
-        <Label htmlFor="note" className="text-sm font-medium">Note (Optional)</Label>
-        <Textarea
-          id="note"
-          placeholder="Add a note..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          className="resize-none"
-        />
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-2 sm:gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1 h-10 sm:h-12 bg-transparent"
-          onClick={() => onOpenChange(false)}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          className="flex-1 h-10 sm:h-12 font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-          disabled={loading || !amount || !fromAccountId || !toAccountId || fromAccountId === toAccountId}
-        >
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Transfer
-        </Button>
-      </div>
-    </form>
+    </div>
   );
 }
 
@@ -253,22 +282,23 @@ export function TransferModal({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="px-4 pb-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[85dvh] flex flex-col">
+      <DrawerContent className="px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] max-h-[85dvh] flex flex-col">
         <DrawerHeader className="px-0 shrink-0">
           <div className="flex items-center gap-3">
             <HeaderIcon />
-            <DrawerTitle className="text-xl text-blue-600">
-              Transfer Between Accounts
-            </DrawerTitle>
+            <div>
+              <DrawerTitle className="text-lg text-blue-600">
+                Transfer Between Accounts
+              </DrawerTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">Move funds between your accounts</p>
+            </div>
           </div>
         </DrawerHeader>
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <TransferForm
-            accounts={accounts}
-            onSuccess={onSuccess}
-            onOpenChange={onOpenChange}
-          />
-        </div>
+        <TransferForm
+          accounts={accounts}
+          onSuccess={onSuccess}
+          onOpenChange={onOpenChange}
+        />
       </DrawerContent>
     </Drawer>
   );
