@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Account, Person, Transaction } from "@/lib/types";
 import { DEFAULT_CATEGORIES_IN, DEFAULT_CATEGORIES_OUT } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, Pencil, Plus, X } from "lucide-react";
+import { Loader2, Pencil, Plus, X, Check, ArrowDownLeft, ArrowUpRight, ArrowRightLeft, HandCoins, Handshake } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { format, parseISO } from "date-fns";
@@ -68,6 +68,7 @@ function EditTransactionForm({
     transaction ? format(parseISO(transaction.date), "yyyy-MM-dd") : ""
   );
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   
   // Custom category state
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -80,6 +81,14 @@ function EditTransactionForm({
   
   const defaultCategories = isIncome ? [...DEFAULT_CATEGORIES_IN] : [...DEFAULT_CATEGORIES_OUT];
   const allCategories = [...defaultCategories, ...customCategories];
+
+  // Format amount for display
+  const formattedAmount = React.useMemo(() => {
+    if (!amount) return "";
+    const num = parseFloat(amount);
+    if (isNaN(num)) return amount;
+    return num.toLocaleString("en-IN");
+  }, [amount]);
 
   // Load custom categories from localStorage
   useEffect(() => {
@@ -96,6 +105,39 @@ function EditTransactionForm({
 
 
   if (!transaction) return null;
+
+  // Get type icon
+  const getTypeIcon = () => {
+    switch (transaction.type) {
+      case "income": return <ArrowDownLeft className="h-3.5 w-3.5" />;
+      case "expense": return <ArrowUpRight className="h-3.5 w-3.5" />;
+      case "transfer": return <ArrowRightLeft className="h-3.5 w-3.5" />;
+      case "lend": return <HandCoins className="h-3.5 w-3.5" />;
+      case "borrow": return <Handshake className="h-3.5 w-3.5" />;
+      case "repay": return <ArrowUpRight className="h-3.5 w-3.5" />;
+      case "receive": return <ArrowDownLeft className="h-3.5 w-3.5" />;
+      default: return <Pencil className="h-3.5 w-3.5" />;
+    }
+  };
+
+  const getTypeLabel = () => {
+    switch (transaction.type) {
+      case "income": return "Income";
+      case "expense": return "Expense";
+      case "transfer": return "Transfer";
+      case "lend": return "Loan Given";
+      case "borrow": return "Borrowed";
+      case "repay": return "Loan Repaid";
+      case "receive": return "Loan Received Back";
+      default: return "Transaction";
+    }
+  };
+
+  const getTypeColor = () => {
+    if (isIncome) return "emerald";
+    if (isTransfer) return "blue";
+    return "rose";
+  };
 
   // Save custom category
   const handleAddCategory = () => {
@@ -159,8 +201,13 @@ function EditTransactionForm({
 
       if (error) throw error;
 
-      onOpenChange(false);
-      onSuccess();
+      // Show success celebration
+      setShowSuccess(true);
+      setTimeout(() => {
+        setShowSuccess(false);
+        onOpenChange(false);
+        onSuccess();
+      }, 800);
     } catch (error) {
       console.error("[v0] Error updating transaction:", error);
     } finally {
@@ -168,207 +215,333 @@ function EditTransactionForm({
     }
   };
 
+  const color = getTypeColor();
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-2">
-      {/* Amount Input */}
-      <div className="space-y-2">
-        <Label htmlFor="amount" className="text-sm font-medium">Amount</Label>
-        <div className="relative">
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-semibold text-muted-foreground">৳</span>
-          <Input
-            id="amount"
-            type="number"
-            placeholder="0"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-            min="0"
-            step="0.01"
-            className="pl-10 h-12 sm:h-14 text-xl sm:text-2xl font-bold"
-          />
+    <div className="flex flex-col min-h-0 h-full">
+      <form onSubmit={handleSubmit} className="flex flex-col min-h-0 h-full">
+        {/* Scrollable content */}
+        <div className="flex-1 min-h-0 overflow-y-auto scrollbar-hide pb-4 space-y-3">
+          {/* Type Badge */}
+          <div className="flex items-center gap-2 animate-field-in field-delay-1">
+            <span className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold animate-badge-in",
+              isIncome 
+                ? "bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300"
+                : isTransfer
+                ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                : "bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300"
+            )}>
+              {getTypeIcon()}
+              {getTypeLabel()}
+            </span>
+          </div>
+
+          {/* ✨ Hero Amount Input — animation wrapper separate from focus-within glow */}
+          <div className="animate-field-in field-delay-1">
+            <div
+              className={cn(
+                "rounded-2xl p-4 relative overflow-hidden",
+                color === "emerald"
+                  ? "bg-emerald-50/80 dark:bg-emerald-950/30 hero-glow-emerald"
+                  : color === "blue"
+                  ? "bg-blue-50/80 dark:bg-blue-950/30 hero-glow-blue"
+                  : "bg-rose-50/80 dark:bg-rose-950/30 hero-glow-rose"
+              )}
+            >
+              {/* Breathing gradient overlay */}
+              <div className={cn(
+                "absolute inset-0 rounded-2xl hero-breathe pointer-events-none",
+                color === "emerald"
+                  ? "bg-gradient-to-br from-emerald-200/20 via-transparent to-emerald-100/10 dark:from-emerald-500/10 dark:to-emerald-400/5"
+                  : color === "blue"
+                  ? "bg-gradient-to-br from-blue-200/20 via-transparent to-blue-100/10 dark:from-blue-500/10 dark:to-blue-400/5"
+                  : "bg-gradient-to-br from-rose-200/20 via-transparent to-rose-100/10 dark:from-rose-500/10 dark:to-rose-400/5"
+              )} />
+              <div className="relative">
+                <Label htmlFor="amount" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2 block">
+                  Amount
+                </Label>
+                <div className="relative">
+                  <span className={cn(
+                    "absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-bold",
+                    color === "emerald" ? "text-emerald-500" 
+                    : color === "blue" ? "text-blue-500" 
+                    : "text-rose-500"
+                  )}>
+                    ৳
+                  </span>
+                  <Input
+                    id="amount"
+                    type="number"
+                    placeholder="0"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    required
+                    min="0"
+                    step="0.01"
+                    className={cn(
+                      "pl-10 h-14 text-2xl font-bold bg-white/80 dark:bg-white/5 border-0 rounded-xl shadow-sm focus-visible:ring-2 transition-shadow",
+                      color === "emerald" ? "focus-visible:ring-emerald-400" 
+                      : color === "blue" ? "focus-visible:ring-blue-400" 
+                      : "focus-visible:ring-rose-400"
+                    )}
+                  />
+                  {/* Live amount format display */}
+                  {amount && parseFloat(amount) > 0 && (
+                    <span className={cn(
+                      "absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium",
+                      color === "emerald" ? "text-emerald-500/60"
+                      : color === "blue" ? "text-blue-500/60"
+                      : "text-rose-500/60"
+                    )}>
+                      ৳{formattedAmount}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 📋 Details Section */}
+          <div className="drawer-section space-y-3 animate-field-in field-delay-2">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              <span>📋</span> Details
+            </p>
+
+            {/* Account Selection */}
+            <div className="space-y-1.5 animate-field-in field-delay-3">
+              <Label htmlFor="account" className="text-xs font-medium">
+                {isTransfer ? "From Account" : "Account"}
+              </Label>
+              <Select value={accountId} onValueChange={setAccountId} required>
+                <SelectTrigger className="h-11 rounded-xl transition-all hover:border-muted-foreground/30">
+                  <SelectValue placeholder="Select account" />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      <span className="flex items-center gap-2">
+                        <span className={cn(
+                          "w-2 h-2 rounded-full shrink-0",
+                          account.name.toLowerCase().includes("cash") ? "bg-emerald-500" :
+                          account.name.toLowerCase().includes("bkash") ? "bg-pink-500" :
+                          account.name.toLowerCase().includes("card") ? "bg-blue-500" :
+                          "bg-slate-400"
+                        )} />
+                        {account.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* To Account for Transfers */}
+            {isTransfer && (
+              <div className="space-y-1.5 animate-field-in field-delay-3">
+                <Label htmlFor="toAccount" className="text-xs font-medium">To Account</Label>
+                <Select value={toAccountId} onValueChange={setToAccountId} required>
+                  <SelectTrigger className="h-11 rounded-xl transition-all hover:border-muted-foreground/30">
+                    <SelectValue placeholder="Select destination account" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id} disabled={account.id === accountId}>
+                        <span className="flex items-center gap-2">
+                          <span className={cn(
+                            "w-2 h-2 rounded-full shrink-0",
+                            account.name.toLowerCase().includes("cash") ? "bg-emerald-500" :
+                            account.name.toLowerCase().includes("bkash") ? "bg-pink-500" :
+                            account.name.toLowerCase().includes("card") ? "bg-blue-500" :
+                            "bg-slate-400"
+                          )} />
+                          {account.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Category Selection (not for transfers or loan-related) with Add New Option */}
+            {!isTransfer && !isLoanRelated && (
+              <div className="space-y-1.5 animate-field-in field-delay-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="category" className="text-xs font-medium">Category</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-xs font-medium text-primary hover:text-primary/80"
+                    onClick={() => setShowAddCategory(!showAddCategory)}
+                  >
+                    <Plus className="mr-1 h-3 w-3" />
+                    Add New
+                  </Button>
+                </div>
+                
+                {showAddCategory ? (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Enter category name"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      className="h-11 rounded-xl flex-1"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCategory();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      size="icon"
+                      onClick={handleAddCategory}
+                      className="h-11 w-11 rounded-xl bg-emerald-600 hover:bg-emerald-700"
+                      disabled={!newCategoryName.trim()}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      onClick={() => {
+                        setShowAddCategory(false);
+                        setNewCategoryName("");
+                      }}
+                      className="h-11 w-11 rounded-xl bg-transparent"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Select value={category} onValueChange={setCategory}>
+                    <SelectTrigger className="h-11 rounded-xl transition-all hover:border-muted-foreground/30">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                          {customCategories.includes(cat) && (
+                            <span className="ml-2 text-xs text-muted-foreground">(custom)</span>
+                          )}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+
+            {/* Person Selection */}
+            {(isLoanRelated || !isTransfer) && (
+              <div className="space-y-1.5 animate-field-in field-delay-4">
+                <Label htmlFor="person" className="text-xs font-medium">
+                  Person {isLoanRelated ? <span className="text-rose-500">*</span> : <span className="text-muted-foreground">(Optional)</span>}
+                </Label>
+                <Select value={personId} onValueChange={setPersonId}>
+                  <SelectTrigger className="h-11 rounded-xl transition-all hover:border-muted-foreground/30">
+                    <SelectValue placeholder="Select person" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {people.map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        {person.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {/* 📝 Extras Section */}
+          <div className="drawer-section space-y-3 animate-field-in field-delay-5">
+            <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+              <span>📝</span> Extras
+            </p>
+
+            {/* Date Input */}
+            <div className="space-y-1.5 animate-field-in field-delay-5">
+              <Label htmlFor="date" className="text-xs font-medium">Date</Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+                max={format(new Date(), "yyyy-MM-dd")}
+                className="h-11 rounded-xl transition-all hover:border-muted-foreground/30"
+              />
+            </div>
+
+            {/* Note */}
+            <div className="space-y-1.5 animate-field-in field-delay-6">
+              <Label htmlFor="note" className="text-xs font-medium">
+                Note <span className="text-muted-foreground">(Optional)</span>
+              </Label>
+              <Textarea
+                id="note"
+                placeholder="Add a note..."
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                rows={2}
+                className="resize-none rounded-xl transition-all hover:border-muted-foreground/30"
+              />
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* Account Selection */}
-      <div className="space-y-2">
-        <Label htmlFor="account" className="text-sm font-medium">
-          {isTransfer ? "From Account" : "Account"}
-        </Label>
-        <Select value={accountId} onValueChange={setAccountId} required>
-          <SelectTrigger className="h-11 sm:h-12">
-            <SelectValue placeholder="Select account" />
-          </SelectTrigger>
-          <SelectContent>
-            {accounts.map((account) => (
-              <SelectItem key={account.id} value={account.id}>
-                {account.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* To Account for Transfers */}
-      {isTransfer && (
-        <div className="space-y-2">
-          <Label htmlFor="toAccount" className="text-sm font-medium">To Account</Label>
-          <Select value={toAccountId} onValueChange={setToAccountId} required>
-            <SelectTrigger className="h-11 sm:h-12">
-              <SelectValue placeholder="Select destination account" />
-            </SelectTrigger>
-            <SelectContent>
-              {accounts.map((account) => (
-                <SelectItem key={account.id} value={account.id} disabled={account.id === accountId}>
-                  {account.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {/* Category Selection (not for transfers or loan-related) with Add New Option */}
-      {!isTransfer && !isLoanRelated && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="category" className="text-sm font-medium">Category</Label>
+        {/* Fixed bottom action bar */}
+        <div className="drawer-action-bar pt-3 pb-[env(safe-area-inset-bottom)]">
+          <div className="flex gap-2.5">
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="h-auto p-0 text-xs font-medium text-primary hover:text-primary/80"
-              onClick={() => setShowAddCategory(!showAddCategory)}
+              variant="outline"
+              className="flex-1 h-12 rounded-xl bg-transparent active:scale-[0.96] transition-all"
+              onClick={() => onOpenChange(false)}
+              disabled={loading || showSuccess}
             >
-              <Plus className="mr-1 h-3 w-3" />
-              Add New
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className={cn(
+                "flex-[1.5] h-12 rounded-xl font-semibold active:scale-[0.96] transition-all shadow-lg relative overflow-hidden",
+                showSuccess
+                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600 animate-success-morph"
+                  : color === "emerald"
+                  ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25 btn-gradient-animate"
+                  : color === "blue"
+                  ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 shadow-blue-500/25 btn-gradient-animate"
+                  : "bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-rose-500/25 btn-gradient-animate",
+              )}
+              disabled={loading || !amount || !accountId}
+            >
+              {showSuccess ? (
+                <span className="flex items-center gap-1.5">
+                  <Check className="h-5 w-5" />
+                  Saved!
+                </span>
+              ) : loading ? (
+                <span className="flex items-center">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </span>
+              ) : (
+                "Save Changes"
+              )}
             </Button>
           </div>
-          
-          {showAddCategory ? (
-            <div className="flex gap-2">
-              <Input
-                placeholder="Enter category name"
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                className="h-11 sm:h-12 flex-1"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddCategory();
-                  }
-                }}
-              />
-              <Button
-                type="button"
-                size="icon"
-                onClick={handleAddCategory}
-                className="h-11 sm:h-12 w-11 sm:w-12 bg-emerald-600 hover:bg-emerald-700"
-                disabled={!newCategoryName.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-              <Button
-                type="button"
-                size="icon"
-                variant="outline"
-                onClick={() => {
-                  setShowAddCategory(false);
-                  setNewCategoryName("");
-                }}
-                className="h-11 sm:h-12 w-11 sm:w-12 bg-transparent"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger className="h-11 sm:h-12">
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                {allCategories.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                    {customCategories.includes(cat) && (
-                      <span className="ml-2 text-xs text-muted-foreground">(custom)</span>
-                    )}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
         </div>
-      )}
-
-      {/* Person Selection */}
-      {(isLoanRelated || !isTransfer) && (
-        <div className="space-y-2">
-          <Label htmlFor="person" className="text-sm font-medium">
-            Person {isLoanRelated ? "(Required)" : "(Optional)"}
-          </Label>
-          <Select value={personId} onValueChange={setPersonId}>
-            <SelectTrigger className="h-11 sm:h-12">
-              <SelectValue placeholder="Select person" />
-            </SelectTrigger>
-            <SelectContent>
-              {people.map((person) => (
-                <SelectItem key={person.id} value={person.id}>
-                  {person.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {/* Date Input */}
-      <div className="space-y-2">
-        <Label htmlFor="date" className="text-sm font-medium">Date</Label>
-        <Input
-          id="date"
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          required
-          max={format(new Date(), "yyyy-MM-dd")}
-          className="h-11 sm:h-12"
-        />
-      </div>
-
-      {/* Note */}
-      <div className="space-y-2">
-        <Label htmlFor="note" className="text-sm font-medium">Note (Optional)</Label>
-        <Textarea
-          id="note"
-          placeholder="Add a note..."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          rows={2}
-          className="resize-none"
-        />
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-2 sm:gap-3 pt-2">
-        <Button
-          type="button"
-          variant="outline"
-          className="flex-1 h-10 sm:h-12 bg-transparent"
-          onClick={() => onOpenChange(false)}
-        >
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          className="flex-1 h-10 sm:h-12 font-semibold"
-          disabled={loading || !amount || !accountId}
-        >
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Save Changes
-        </Button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
 
@@ -416,23 +589,31 @@ export function EditTransactionModal({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <HeaderIcon />
-              <DialogTitle className="text-xl">
-                Edit {getTypeLabel()}
-              </DialogTitle>
-            </div>
-          </DialogHeader>
-          <EditTransactionForm
-            key={transaction.id}
-            transaction={transaction}
-            accounts={accounts}
-            people={people}
-            onOpenChange={onOpenChange}
-            onSuccess={onSuccess}
-          />
+        <DialogContent className="sm:max-w-md p-0 overflow-hidden">
+          <div className="p-4 pb-0">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <HeaderIcon />
+                <DialogTitle className={cn(
+                  "text-xl",
+                  isIncome ? "text-emerald-600" : isTransfer ? "text-blue-600" : "text-rose-600"
+                )}>
+                  Edit {getTypeLabel()}
+                </DialogTitle>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="px-4 pb-4 max-h-[80vh] flex flex-col">
+            <EditTransactionForm
+              key={transaction.id}
+              transaction={transaction}
+              accounts={accounts}
+              people={people}
+              onOpenChange={onOpenChange}
+              onSuccess={onSuccess}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     );
@@ -440,25 +621,32 @@ export function EditTransactionModal({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="px-4 pb-6 max-h-[90vh]">
-        <DrawerHeader className="px-0">
+      <DrawerContent className="max-h-[85dvh] px-4 pb-2 flex flex-col">
+        <DrawerHeader className="px-0 shrink-0">
           <div className="flex items-center gap-3">
             <HeaderIcon />
-            <DrawerTitle className="text-xl">
-              Edit {getTypeLabel()}
-            </DrawerTitle>
+            <div>
+              <DrawerTitle className={cn(
+                "text-lg",
+                isIncome ? "text-emerald-600" : isTransfer ? "text-blue-600" : "text-rose-600"
+              )}>
+                Edit {getTypeLabel()}
+              </DrawerTitle>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Update your {getTypeLabel().toLowerCase()} details
+              </p>
+            </div>
           </div>
         </DrawerHeader>
-        <div className="overflow-y-auto">
-          <EditTransactionForm
-            key={transaction.id}
-            transaction={transaction}
-            accounts={accounts}
-            people={people}
-            onOpenChange={onOpenChange}
-            onSuccess={onSuccess}
-          />
-        </div>
+
+        <EditTransactionForm
+          key={transaction.id}
+          transaction={transaction}
+          accounts={accounts}
+          people={people}
+          onOpenChange={onOpenChange}
+          onSuccess={onSuccess}
+        />
       </DrawerContent>
     </Drawer>
   );

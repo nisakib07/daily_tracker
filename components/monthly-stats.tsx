@@ -118,7 +118,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
     return txDate >= monthStart && txDate <= monthEnd;
   });
 
-  // Calculate monthly summary
+  // Calculate monthly summary (pure income/expense only)
   const monthlySummary = monthlyTransactions.reduce(
     (acc, tx) => {
       const amount = Number(tx.amount);
@@ -131,6 +131,18 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
     },
     { income: 0, expense: 0 }
   );
+
+  // Calculate loan cash flow for current month
+  // Loans are NOT income/expense — they only affect actual cash balance
+  const loanCashFlow = monthlyTransactions.reduce((acc, tx) => {
+    const amount = Number(tx.amount);
+    if (tx.type === "borrow" || tx.type === "receive") {
+      return acc + amount; // cash comes in
+    } else if (tx.type === "lend" || tx.type === "repay") {
+      return acc - amount; // cash goes out
+    }
+    return acc;
+  }, 0);
 
   // Calculate Opening Balance (Carried Forward)
   const openingBalance = useMemo(() => {
@@ -160,7 +172,8 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
     }, 0);
   }, [transactions, monthStart]);
 
-  const netBalance = monthlySummary.income - monthlySummary.expense;
+  // Net balance includes loan cash flows (they affect cash, not income/expense)
+  const netBalance = monthlySummary.income - monthlySummary.expense + loanCashFlow;
 
   // Calculate previous month for comparison
   const prevMonthStart = startOfMonth(subMonths(selectedMonth, 1));

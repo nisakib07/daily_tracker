@@ -813,3 +813,214 @@
   transform: scale(1.05);
 }
 
+/* ==========================================
+   PREMIUM TRANSACTION POPUP ANIMATIONS
+   ========================================== */
+
+/* Staggered field entrance */
+@keyframes field-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-field-in {
+  animation: field-slide-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  opacity: 0;
+}
+
+/* Stagger delay utilities for fields */
+.field-delay-1 { animation-delay: 0ms; }
+.field-delay-2 { animation-delay: 60ms; }
+.field-delay-3 { animation-delay: 120ms; }
+.field-delay-4 { animation-delay: 180ms; }
+.field-delay-5 { animation-delay: 240ms; }
+.field-delay-6 { animation-delay: 300ms; }
+
+/* Success checkmark animation */
+@keyframes success-morph {
+  0% {
+    transform: scale(1);
+    border-radius: 12px;
+  }
+  30% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.02);
+    border-radius: 50px;
+  }
+  100% {
+    transform: scale(1);
+    border-radius: 50px;
+  }
+}
+
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 40;
+    opacity: 0;
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.animate-success-morph {
+  animation: success-morph 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Hero breathing gradient */
+@keyframes hero-breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.hero-breathe {
+  animation: hero-breathe 3s ease-in-out infinite;
+}
+
+/* Currency symbol entrance */
+@keyframes currency-float-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) translateX(-50%) scale(0.8);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0) scale(1);
+  }
+}
+
+.animate-currency-in {
+  animation: currency-float-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Tab spring indicator */
+@keyframes tab-bounce {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.92); }
+  70% { transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+.tab-spring {
+  animation: tab-bounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Quick add button pop effect */
+@keyframes quick-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+.quick-pop {
+  animation: quick-pop 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Submit button gradient shift */
+@keyframes gradient-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.btn-gradient-animate {
+  background-size: 200% 200%;
+  animation: gradient-flow 3s ease infinite;
+}
+
+/* Content crossfade for tab switching */
+@keyframes content-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-content-in {
+  animation: content-fade-in 0.25s ease-out forwards;
+}
+
+/* Type badge pulse */
+@keyframes badge-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-badge-in {
+  animation: badge-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Success overlay */
+.success-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: inherit;
+  border-radius: inherit;
+  z-index: 10;
+}
+
+/* Scroll gradient indicator */
+.scroll-fade-top::before {
+  content: '';
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to bottom, var(--background), transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Enhanced drawer handle */
+.drawer-handle-enhanced {
+  width: 48px;
+  height: 5px;
+  background: linear-gradient(90deg, rgba(128, 128, 128, 0.2), rgba(128, 128, 128, 0.5), rgba(128, 128, 128, 0.2));
+  border-radius: 3px;
+  margin: 0 auto;
+  transition: width 0.2s ease;
+}
+
+.drawer-handle-enhanced:active {
+  width: 56px;
+}
+
+/* AI badge shimmer */
+@keyframes ai-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.ai-badge-shimmer {
+  background-size: 200% 100%;
+  animation: ai-shimmer 2s linear infinite;
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +37,8 @@ import {
   HandCoins,
   Handshake,
   X,
+  Check,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -90,11 +92,22 @@ function TransactionForm({
   const [note, setNote] = useState("");
   const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [loading, setLoading] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [tabAnimKey, setTabAnimKey] = useState(0);
+  const amountInputRef = useRef<HTMLInputElement>(null);
 
   // Custom category state
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
+
+  // Format amount for display
+  const formattedAmount = useMemo(() => {
+    if (!amount) return "";
+    const num = parseFloat(amount);
+    if (isNaN(num)) return amount;
+    return num.toLocaleString("en-IN");
+  }, [amount]);
 
 
   const isIncome = type === "in";
@@ -207,9 +220,14 @@ function TransactionForm({
 
       if (txError) throw txError;
 
-      resetForm();
-      onOpenChange(false);
-      onSuccess();
+      // Show success celebration
+      setShowSuccess(true);
+      setTimeout(() => {
+        resetForm();
+        setShowSuccess(false);
+        onOpenChange(false);
+        onSuccess();
+      }, 800);
     } catch (error) {
       console.error("[v0] Error creating transaction:", error);
       alert("Something went wrong while saving. Please try again.");
@@ -248,9 +266,14 @@ function TransactionForm({
 
       if (error) throw error;
 
-      resetForm();
-      onOpenChange(false);
-      onSuccess();
+      // Show success celebration
+      setShowSuccess(true);
+      setTimeout(() => {
+        resetForm();
+        setShowSuccess(false);
+        onOpenChange(false);
+        onSuccess();
+      }, 800);
     } catch (error) {
       console.error("[v0] Error creating loan action:", error);
       alert("Something went wrong while saving. Please try again.");
@@ -293,13 +316,19 @@ function TransactionForm({
     <div className="flex flex-col min-h-0 h-full">
       <Tabs
         value={subType}
-        onValueChange={(v) => setSubType(v as TransactionSubType)}
+        onValueChange={(v) => {
+          setSubType(v as TransactionSubType);
+          setTabAnimKey(prev => prev + 1);
+        }}
         className="flex flex-1 flex-col min-h-0"
       >
-        <TabsList className="grid w-full grid-cols-2 mb-3 h-auto p-1">
+        <TabsList className="grid w-full grid-cols-2 mb-3 h-auto p-1 rounded-2xl">
           <TabsTrigger
             value="regular"
-            className="flex items-center gap-1.5 text-xs sm:text-sm py-2"
+            className={cn(
+              "flex items-center gap-1.5 text-xs sm:text-sm py-2.5 rounded-xl transition-all data-[state=active]:shadow-md",
+              subType === "regular" && "tab-spring"
+            )}
           >
             {isIncome ? (
               <ArrowDownLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -312,7 +341,10 @@ function TransactionForm({
           </TabsTrigger>
           <TabsTrigger
             value="loan"
-            className="flex items-center gap-1.5 text-xs sm:text-sm py-2"
+            className={cn(
+              "flex items-center gap-1.5 text-xs sm:text-sm py-2.5 rounded-xl transition-all data-[state=active]:shadow-md",
+              subType === "loan" && "tab-spring"
+            )}
           >
             {isIncome ? (
               <Handshake className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -336,69 +368,99 @@ function TransactionForm({
             }}
             className="space-y-3"
           >
-            {/* ✨ Hero Amount Input */}
-            <div
-              className={cn(
-                "rounded-2xl p-4 transition-all",
-                isIncome
-                  ? "bg-emerald-50/80 dark:bg-emerald-950/30 hero-glow-emerald"
-                  : "bg-rose-50/80 dark:bg-rose-950/30 hero-glow-rose"
-              )}
-            >
-              <Label htmlFor="amount" className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block">
-                Amount
-              </Label>
-              <div className="relative">
-                <span className={cn(
-                  "absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-bold",
-                  isIncome ? "text-emerald-500" : "text-rose-500"
-                )}>
-                  ৳
-                </span>
-                <Input
-                  id="amount"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                  min="0"
-                  step="0.01"
-                  className={cn(
-                    "pl-10 h-14 text-2xl font-bold bg-white/80 dark:bg-white/5 border-0 rounded-xl shadow-sm focus-visible:ring-2 transition-shadow",
-                    isIncome ? "focus-visible:ring-emerald-400" : "focus-visible:ring-rose-400"
-                  )}
-                />
+            {/* ✨ Hero Amount Input — animation wrapper separate from focus-within glow */}
+            <div className="animate-field-in field-delay-1">
+              <div
+                className={cn(
+                  "rounded-2xl p-4 relative overflow-hidden",
+                  isIncome
+                    ? "bg-emerald-50/80 dark:bg-emerald-950/30 hero-glow-emerald"
+                    : "bg-rose-50/80 dark:bg-rose-950/30 hero-glow-rose"
+                )}
+              >
+                {/* Breathing gradient overlay */}
+                <div className={cn(
+                  "absolute inset-0 rounded-2xl hero-breathe pointer-events-none",
+                  isIncome
+                    ? "bg-gradient-to-br from-emerald-200/20 via-transparent to-emerald-100/10 dark:from-emerald-500/10 dark:to-emerald-400/5"
+                    : "bg-gradient-to-br from-rose-200/20 via-transparent to-rose-100/10 dark:from-rose-500/10 dark:to-rose-400/5"
+                )} />
+                <div className="relative">
+                  <Label htmlFor="amount" className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest mb-2 block">
+                    Amount
+                  </Label>
+                  <div className="relative">
+                    <span className={cn(
+                      "absolute left-3 top-1/2 -translate-y-1/2 text-2xl font-bold",
+                      isIncome ? "text-emerald-500" : "text-rose-500"
+                    )}>
+                      ৳
+                    </span>
+                    <Input
+                      ref={amountInputRef}
+                      id="amount"
+                      type="number"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      required
+                      min="0"
+                      step="0.01"
+                      className={cn(
+                        "pl-10 h-14 text-2xl font-bold bg-white/80 dark:bg-white/5 border-0 rounded-xl shadow-sm focus-visible:ring-2 transition-shadow",
+                        isIncome ? "focus-visible:ring-emerald-400" : "focus-visible:ring-rose-400"
+                      )}
+                    />
+                    {/* Live amount format display */}
+                    {amount && parseFloat(amount) > 0 && (
+                      <span className={cn(
+                        "absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium",
+                        isIncome ? "text-emerald-500/60" : "text-rose-500/60"
+                      )}>
+                        ৳{formattedAmount}
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
             {/* 📋 Details Section */}
-            <div className="drawer-section space-y-3">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <div className="drawer-section space-y-3 animate-field-in field-delay-2" key={`details-${tabAnimKey}`}>
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
                 <span>📋</span> Details
               </p>
 
               {/* Account Selection */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-field-in field-delay-3">
                 <Label htmlFor="account" className="text-xs font-medium">
                   {isIncome ? "To Account" : "From Account"}
                 </Label>
                 <Select value={accountId} onValueChange={setAccountId} required>
-                  <SelectTrigger className="h-11 rounded-xl">
+                  <SelectTrigger className="h-11 rounded-xl transition-all hover:border-muted-foreground/30">
                     <SelectValue placeholder="Select account" />
                   </SelectTrigger>
                   <SelectContent>
                     {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id}>
-                        {account.name}
+                        <span className="flex items-center gap-2">
+                          <span className={cn(
+                            "w-2 h-2 rounded-full shrink-0",
+                            account.name.toLowerCase().includes("cash") ? "bg-emerald-500" :
+                            account.name.toLowerCase().includes("bkash") ? "bg-pink-500" :
+                            account.name.toLowerCase().includes("card") ? "bg-blue-500" :
+                            "bg-slate-400"
+                          )} />
+                          {account.name}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-            <TabsContent value="regular" className="space-y-3 mt-0">
+            <TabsContent value="regular" className="space-y-3 mt-0 animate-content-in" key={`regular-${tabAnimKey}`}>
               {/* Quick Add Shortcuts for expenses */}
               {!isIncome && (
                 <QuickAddShortcuts 
@@ -421,7 +483,7 @@ function TransactionForm({
               )}
               
               {/* Category */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-field-in field-delay-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="category" className="text-xs font-medium">
                     Category
@@ -497,7 +559,7 @@ function TransactionForm({
               </div>
 
               {/* Person (Optional) */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-field-in field-delay-5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="person" className="text-xs font-medium">
                     Person <span className="text-muted-foreground">(Optional)</span>
@@ -528,7 +590,7 @@ function TransactionForm({
               </div>
             </TabsContent>
 
-            <TabsContent value="loan" className="space-y-3 mt-0">
+            <TabsContent value="loan" className="space-y-3 mt-0 animate-content-in" key={`loan-${tabAnimKey}`}>
               {/* Loan Info */}
               <div
                 className={cn(
@@ -561,7 +623,7 @@ function TransactionForm({
               </div>
 
               {/* Person Selection (Required) */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-field-in field-delay-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="loanPerson" className="text-xs font-medium">
                     Person <span className="text-rose-500">*</span>
@@ -594,13 +656,13 @@ function TransactionForm({
             </div>
 
             {/* 📝 Extras Section */}
-            <div className="drawer-section space-y-3">
-              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+            <div className="drawer-section space-y-3 animate-field-in field-delay-5">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
                 <span>📝</span> Extras
               </p>
 
               {/* Date */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-field-in field-delay-5">
                 <Label htmlFor="date" className="text-xs font-medium">
                   Date
                 </Label>
@@ -611,12 +673,12 @@ function TransactionForm({
                   onChange={(e) => setDate(e.target.value)}
                   required
                   max={format(new Date(), "yyyy-MM-dd")}
-                  className="h-11 rounded-xl"
+                  className="h-11 rounded-xl transition-all hover:border-muted-foreground/30"
                 />
               </div>
 
               {/* Note with Smart Category Suggestion */}
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 animate-field-in field-delay-6">
                 <Label htmlFor="note" className="text-xs font-medium">
                   Note <span className="text-muted-foreground">(Optional)</span>
                 </Label>
@@ -639,11 +701,14 @@ function TransactionForm({
                     }
                   }}
                   rows={2}
-                  className="resize-none rounded-xl"
+                  className="resize-none rounded-xl transition-all hover:border-muted-foreground/30"
                 />
                 {subType === "regular" && (
                   <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <span className="inline-flex items-center px-1 py-0.5 rounded text-[8px] font-medium bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white">AI</span>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] font-bold bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white ai-badge-shimmer">
+                      <Sparkles className="h-2 w-2 mr-0.5" />
+                      AI
+                    </span>
                     Auto-suggests category as you type
                   </p>
                 )}
@@ -659,25 +724,38 @@ function TransactionForm({
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1 h-12 rounded-xl bg-transparent active:scale-[0.98] transition-transform"
+                className="flex-1 h-12 rounded-xl bg-transparent active:scale-[0.96] transition-all"
                 onClick={() => onOpenChange(false)}
-                disabled={loading}
+                disabled={loading || showSuccess}
               >
                 Cancel
               </Button>
               <Button
                 type="button"
                 className={cn(
-                  "flex-[1.5] h-12 rounded-xl font-semibold active:scale-[0.98] transition-transform shadow-lg",
-                  isIncome
-                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25"
-                    : "bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-rose-500/25",
+                  "flex-[1.5] h-12 rounded-xl font-semibold active:scale-[0.96] transition-all shadow-lg relative overflow-hidden",
+                  showSuccess
+                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 animate-success-morph"
+                    : isIncome
+                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-emerald-500/25 btn-gradient-animate"
+                    : "bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-600 hover:to-rose-700 shadow-rose-500/25 btn-gradient-animate",
                 )}
                 disabled={isRegularSubmitDisabled}
                 onClick={handleCreateRegularOrBorrowLend}
               >
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {titlePrimaryRegular}
+                {showSuccess ? (
+                  <span className="flex items-center gap-1.5">
+                    <Check className="h-5 w-5" />
+                    Saved!
+                  </span>
+                ) : loading ? (
+                  <span className="flex items-center">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </span>
+                ) : (
+                  titlePrimaryRegular
+                )}
               </Button>
             </div>
           ) : (
@@ -688,7 +766,7 @@ function TransactionForm({
                     <Button
                       type="button"
                       className={cn(
-                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-xs sm:text-sm active:scale-[0.98] transition-transform shadow-lg shadow-amber-500/20",
+                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-xs sm:text-sm active:scale-[0.96] transition-all shadow-lg shadow-amber-500/20",
                         defaultLoanAction === "borrow" &&
                           "ring-2 ring-orange-300",
                       )}
@@ -705,7 +783,7 @@ function TransactionForm({
                       type="button"
                       onClick={() => handleLoanAction("receive")}
                       className={cn(
-                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-xs sm:text-sm active:scale-[0.98] transition-transform shadow-lg shadow-emerald-500/20",
+                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-xs sm:text-sm active:scale-[0.96] transition-all shadow-lg shadow-emerald-500/20",
                         emphasizeReceive && "ring-2 ring-emerald-300",
                       )}
                       disabled={isLoanDisabled}
@@ -722,7 +800,7 @@ function TransactionForm({
                     <Button
                       type="button"
                       className={cn(
-                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-xs sm:text-sm active:scale-[0.98] transition-transform shadow-lg shadow-blue-500/20",
+                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-xs sm:text-sm active:scale-[0.96] transition-all shadow-lg shadow-blue-500/20",
                         defaultLoanAction === "lend" &&
                           "ring-2 ring-indigo-300",
                       )}
@@ -739,7 +817,7 @@ function TransactionForm({
                       type="button"
                       onClick={() => handleLoanAction("repay")}
                       className={cn(
-                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-xs sm:text-sm active:scale-[0.98] transition-transform shadow-lg shadow-rose-500/20",
+                        "h-12 rounded-xl font-semibold bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-xs sm:text-sm active:scale-[0.96] transition-all shadow-lg shadow-rose-500/20",
                         emphasizeRepay && "ring-2 ring-rose-300",
                       )}
                       disabled={isLoanDisabled}
