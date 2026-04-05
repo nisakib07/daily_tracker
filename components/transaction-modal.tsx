@@ -467,9 +467,7 @@ function TransactionForm({
                   onSelect={({ category: cat, label, defaultAmount, defaultAccountName }) => {
                     setCategory(cat);
                     setNote(label || "");
-                    if (defaultAmount && !amount) {
-                      setAmount(defaultAmount.toString());
-                    }
+                    setAmount(defaultAmount ? defaultAmount.toString() : "");
                     if (defaultAccountName) {
                       const matchingAccount = accounts.find(
                         (acc) => acc.name.toLowerCase() === defaultAccountName.toLowerCase()

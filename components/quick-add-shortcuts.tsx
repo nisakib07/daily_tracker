@@ -20,12 +20,12 @@ interface QuickAddShortcut {
 }
 
 const shortcuts: QuickAddShortcut[] = [
-  { id: "breakfast", label: "Breakfast", icon: Utensils, category: "Food", color: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/70" },
-  { id: "lunch", label: "Lunch", icon: Utensils, category: "Food", color: "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/70" },
-  { id: "dinner", label: "Dinner", icon: Utensils, category: "Food", color: "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70" },
+  { id: "breakfast", label: "Breakfast", icon: Utensils, category: "Food", defaultAmount: 45, defaultAccountName: "Cash", color: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/70" },
+  { id: "lunch", label: "Lunch", icon: Utensils, category: "Food", defaultAccountName: "Cash", color: "bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/70" },
+  { id: "dinner", label: "Dinner", icon: Utensils, category: "Food", defaultAccountName: "Cash", color: "bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70" },
   { id: "rickshaw", label: "Rickshaw", icon: Car, category: "Transport", defaultAmount: 30, defaultAccountName: "Cash", color: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-900/70" },
-  { id: "shopping", label: "Shopping", icon: ShoppingBag, category: "Shopping", color: "bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-900/70" },
-  { id: "snacks", label: "Snacks", icon: Utensils, category: "Food", color: "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/70" },
+  { id: "shopping", label: "Shopping", icon: ShoppingBag, category: "Shopping", defaultAccountName: "Cash", color: "bg-pink-100 dark:bg-pink-900/50 text-pink-700 dark:text-pink-300 hover:bg-pink-200 dark:hover:bg-pink-900/70" },
+  { id: "snacks", label: "Snacks", icon: Utensils, category: "Food", defaultAccountName: "Cash", color: "bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 hover:bg-teal-200 dark:hover:bg-teal-900/70" },
 ];
 
 interface QuickAddShortcutsProps {
