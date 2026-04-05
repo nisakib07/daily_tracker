@@ -60,7 +60,12 @@ export async function updateSession(request: NextRequest) {
 
     // Auth routes - redirect to dashboard if already authenticated
     const isAuthRoute = request.nextUrl.pathname.startsWith('/auth')
-    if (isAuthRoute && user && !request.nextUrl.pathname.includes('sign-up-success')) {
+    if (
+      isAuthRoute && 
+      user && 
+      !request.nextUrl.pathname.includes('sign-up-success') &&
+      !request.nextUrl.pathname.includes('reset-password')
+    ) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       return NextResponse.redirect(url)
