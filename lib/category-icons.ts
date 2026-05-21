@@ -21,7 +21,7 @@ export const CATEGORY_ICONS: Record<string, { emoji: string; bg: string; color: 
   // Income categories
   Salary: { emoji: "💰", bg: "bg-emerald-100 dark:bg-emerald-900/30", color: "text-emerald-600" },
   Freelance: { emoji: "💻", bg: "bg-violet-100 dark:bg-violet-900/30", color: "text-violet-600" },
-  Investment: { emoji: "📈", bg: "bg-yellow-100 dark:bg-yellow-900/30", color: "text-yellow-600" },
+  Investment: { emoji: "📊", bg: "bg-violet-100 dark:bg-violet-900/30", color: "text-violet-600 dark:text-violet-400" },
   Gift: { emoji: "🎁", bg: "bg-pink-100 dark:bg-pink-900/30", color: "text-pink-600" },
   Bonus: { emoji: "🎉", bg: "bg-amber-100 dark:bg-amber-900/30", color: "text-amber-600" },
   "Other Income": { emoji: "💵", bg: "bg-green-100 dark:bg-green-900/30", color: "text-green-600" },
@@ -34,6 +34,11 @@ export const CATEGORY_ICONS: Record<string, { emoji: string; bg: string; color: 
   lend: { emoji: "🤲", bg: "bg-orange-100 dark:bg-orange-900/30", color: "text-orange-600" },
   repay: { emoji: "↩️", bg: "bg-teal-100 dark:bg-teal-900/30", color: "text-teal-600" },
   receive: { emoji: "↪️", bg: "bg-cyan-100 dark:bg-cyan-900/30", color: "text-cyan-600" },
+  invest: { emoji: "📊", bg: "bg-violet-100 dark:bg-violet-900/30", color: "text-violet-600" },
+  invest_return: { emoji: "💰", bg: "bg-violet-100 dark:bg-violet-900/30", color: "text-violet-600" },
+  
+  // Investment categories
+  "Investment Return": { emoji: "💰", bg: "bg-violet-100 dark:bg-violet-900/30", color: "text-violet-600 dark:text-violet-400" },
   
   // Default
   default: { emoji: "💳", bg: "bg-slate-100 dark:bg-slate-800", color: "text-slate-600" },

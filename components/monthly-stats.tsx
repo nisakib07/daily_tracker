@@ -144,6 +144,22 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
     return acc;
   }, 0);
 
+  // Calculate monthly investment activity
+  const investmentSummary = useMemo(() => {
+    return monthlyTransactions.reduce(
+      (acc, tx) => {
+        const amount = Number(tx.amount);
+        if (tx.type === "invest") {
+          acc.invested += amount;
+        } else if (tx.type === "invest_return") {
+          acc.returns += amount;
+        }
+        return acc;
+      },
+      { invested: 0, returns: 0 }
+    );
+  }, [monthlyTransactions]);
+
   // Calculate Opening Balance (Carried Forward)
   const openingBalance = useMemo(() => {
     // Filter transactions BEFORE the selected month start
@@ -158,13 +174,15 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
       if (
         tx.type === "income" ||
         tx.type === "borrow" ||
-        tx.type === "receive"
+        tx.type === "receive" ||
+        tx.type === "invest_return"
       ) {
         return acc + amount;
       } else if (
         tx.type === "expense" ||
         tx.type === "lend" ||
-        tx.type === "repay"
+        tx.type === "repay" ||
+        tx.type === "invest"
       ) {
         return acc - amount;
       }
@@ -449,6 +467,59 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
           </div>
         </div>
       </div>
+
+      {/* Monthly Investment Flow banner */}
+      {(investmentSummary.invested > 0 || investmentSummary.returns > 0) && (
+        <div className="rounded-xl p-4 bg-gradient-to-r from-violet-50 to-purple-50/50 dark:from-violet-950/20 dark:to-purple-900/10 border border-violet-100/50 dark:border-violet-900/30 flex items-center justify-between flex-wrap gap-4 shadow-sm animate-scale-in">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-violet-100 dark:bg-violet-900/50 rounded-lg text-violet-600 dark:text-violet-400">
+              <TrendingUp className="h-5 w-5 text-violet-500" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-violet-800 dark:text-violet-300 uppercase tracking-wide">
+                Investment Flow
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                Excluded from regular spending/income stats
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-4 sm:gap-6">
+            <div>
+              <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                Invested
+              </p>
+              <p className="text-sm font-bold text-violet-700 dark:text-violet-300 flex items-center gap-0.5">
+                <span>৳</span>
+                <span className="tabular-nums">{investmentSummary.invested.toLocaleString()}</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                Returns
+              </p>
+              <p className="text-sm font-bold text-purple-700 dark:text-purple-300 flex items-center gap-0.5">
+                <span>৳</span>
+                <span className="tabular-nums">{investmentSummary.returns.toLocaleString()}</span>
+              </p>
+            </div>
+            <div>
+              <p className="text-[9px] font-medium text-muted-foreground uppercase tracking-wider">
+                Net P/L
+              </p>
+              <p className={cn(
+                "text-sm font-bold flex items-center gap-0.5",
+                (investmentSummary.returns - investmentSummary.invested) >= 0 
+                  ? "text-emerald-600 dark:text-emerald-400" 
+                  : "text-rose-600 dark:text-rose-400"
+              )}>
+                <span>{(investmentSummary.returns - investmentSummary.invested) >= 0 ? "+" : ""}৳</span>
+                <span className="tabular-nums">{(investmentSummary.returns - investmentSummary.invested).toLocaleString()}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Category Ring Charts */}
       {categoryData.length > 0 && (

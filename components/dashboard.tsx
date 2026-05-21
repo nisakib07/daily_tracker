@@ -40,6 +40,10 @@ import { BudgetPlanner } from "@/components/budget-planner";
 import { SpendingHeatmap } from "@/components/spending-heatmap";
 import { FinancialHealthScore } from "@/components/financial-health-score";
 import { AIInsights } from "@/components/ai-insights";
+import { InvestmentTracker } from "@/components/investment-tracker";
+import { InvestmentModal } from "@/components/investment-modal";
+import { InvestmentReturnModal } from "@/components/investment-return-modal";
+import { InvestmentAddFundsModal } from "@/components/investment-add-funds-modal";
 import { useAuth } from "@/lib/auth-context";
 import { DashboardSkeleton } from "@/components/skeleton-loader";
 import { WelcomeSection } from "@/components/welcome-section";
@@ -47,7 +51,7 @@ import { Confetti } from "@/components/confetti";
 import { QuickAddShortcuts } from "@/components/quick-add-shortcuts";
 
 
-import type { Account, Person, Transaction } from "@/lib/types";
+import type { Account, Person, Transaction, Investment } from "@/lib/types";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -60,6 +64,7 @@ import {
   BookOpen,
   Activity,
   BarChart3,
+  TrendingUp,
   Plus,
   LogOut,
   User,
@@ -89,9 +94,10 @@ export function Dashboard() {
   const [people, setPeople] = useState<Person[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
+  const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [activeTab, setActiveTab] = useState<"activity" | "ledger" | "budget">(
+  const [activeTab, setActiveTab] = useState<"activity" | "ledger" | "budget" | "investments">(
     "activity",
   );
   const [viewMode, setViewMode] = useState<"daily" | "monthly">("daily");
@@ -125,6 +131,12 @@ export function Dashboard() {
     {},
   );
 
+  // Investment modal states
+  const [investmentOpen, setInvestmentOpen] = useState(false);
+  const [investmentReturnOpen, setInvestmentReturnOpen] = useState(false);
+  const [investmentAddFundsOpen, setInvestmentAddFundsOpen] = useState(false);
+  const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
+
   // Confetti state for celebrations
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -134,7 +146,7 @@ export function Dashboard() {
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
-    const [accountsRes, peopleRes, transactionsRes] = await Promise.all([
+    const [accountsRes, peopleRes, transactionsRes, investmentsRes] = await Promise.all([
       supabase.from("accounts").select("*").order("created_at"),
       supabase.from("people").select("*").order("name"),
       supabase
@@ -142,6 +154,7 @@ export function Dashboard() {
         .select("*")
         .order("date", { ascending: false })
         .limit(1000),
+      supabase.from("investments").select("*").order("created_at", { ascending: false }),
     ]);
 
     if (accountsRes.data) setAccounts(accountsRes.data);
@@ -150,6 +163,7 @@ export function Dashboard() {
       setAllTransactions(transactionsRes.data);
       setTransactions(transactionsRes.data);
     }
+    if (investmentsRes.data) setInvestments(investmentsRes.data);
     setLoading(false);
   }, []);
 
@@ -207,13 +221,14 @@ export function Dashboard() {
     });
   }, [allTransactions, viewMode, selectedDate, selectedMonth, typeFilter]);
 
-  // Calculate today's summary - memoized
+  // Calculate today's summary - memoized (excludes invest/invest_return from income/expense)
   const todaySummary = useMemo(() => {
     return filteredTransactions.reduce(
       (acc, tx) => {
         const amount = Number(tx.amount);
         if (tx.type === "income") acc.income += amount;
         else if (tx.type === "expense") acc.expense += amount;
+        // invest and invest_return are asset reallocations, not income/expense
         return acc;
       },
       { income: 0, expense: 0 },
@@ -472,30 +487,37 @@ export function Dashboard() {
           <Tabs
             value={activeTab}
             onValueChange={(v) =>
-              setActiveTab(v as "activity" | "ledger" | "budget")
+              setActiveTab(v as "activity" | "ledger" | "budget" | "investments")
             }
           >
-            <TabsList className="grid w-full grid-cols-3 mb-4 h-auto p-1">
+            <TabsList className="grid w-full grid-cols-4 mb-4 h-auto p-1">
               <TabsTrigger
                 value="activity"
-                className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
                 <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Activity
               </TabsTrigger>
               <TabsTrigger
                 value="ledger"
-                className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
                 <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Loan Ledger
+                Ledger
               </TabsTrigger>
               <TabsTrigger
                 value="budget"
-                className="flex items-center gap-1.5 py-2 text-xs sm:text-sm"
+                className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
                 <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Budget
+              </TabsTrigger>
+              <TabsTrigger
+                value="investments"
+                className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
+              >
+                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Invest
               </TabsTrigger>
             </TabsList>
 
@@ -731,6 +753,23 @@ export function Dashboard() {
               transactions={allTransactions}
             />
           </TabsContent>
+          <TabsContent value="investments" className="space-y-4 mt-0">
+            <InvestmentTracker
+              investments={investments}
+              transactions={allTransactions}
+              accounts={accounts}
+              onNewInvestment={() => setInvestmentOpen(true)}
+              onRecordReturn={(inv) => {
+                setSelectedInvestment(inv);
+                setInvestmentReturnOpen(true);
+              }}
+              onAddFunds={(inv) => {
+                setSelectedInvestment(inv);
+                setInvestmentAddFundsOpen(true);
+              }}
+              onSuccess={fetchData}
+            />
+          </TabsContent>
         </Tabs>
         </div>
       </main>
@@ -783,6 +822,17 @@ export function Dashboard() {
               >
                 <ArrowRightLeft className="mr-2 h-5 w-5" />
                 Transfer
+              </Button>
+
+              <Button
+                onClick={() => {
+                  setQuickActionsOpen(false);
+                  setInvestmentOpen(true);
+                }}
+                className="h-12 justify-start bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+              >
+                <TrendingUp className="mr-2 h-5 w-5" />
+                New Investment
               </Button>
 
               <Button
@@ -856,6 +906,27 @@ export function Dashboard() {
         transaction={selectedTransaction}
         accounts={accounts}
         people={people}
+        onSuccess={fetchData}
+      />
+      <InvestmentModal
+        open={investmentOpen}
+        onOpenChange={setInvestmentOpen}
+        accounts={accounts}
+        onSuccess={fetchData}
+      />
+      <InvestmentReturnModal
+        open={investmentReturnOpen}
+        onOpenChange={setInvestmentReturnOpen}
+        accounts={accounts}
+        investments={investments.filter(i => i.status === 'active')}
+        selectedInvestment={selectedInvestment}
+        onSuccess={fetchData}
+      />
+      <InvestmentAddFundsModal
+        open={investmentAddFundsOpen}
+        onOpenChange={setInvestmentAddFundsOpen}
+        accounts={accounts}
+        investment={selectedInvestment}
         onSuccess={fetchData}
       />
     </div>

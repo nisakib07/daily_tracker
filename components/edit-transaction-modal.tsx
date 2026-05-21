@@ -75,9 +75,10 @@ function EditTransactionForm({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
 
-  const isIncome = transaction?.type === "income" || transaction?.type === "borrow" || transaction?.type === "receive";
+  const isIncome = transaction?.type === "income" || transaction?.type === "borrow" || transaction?.type === "receive" || transaction?.type === "invest_return";
   const isTransfer = transaction?.type === "transfer";
   const isLoanRelated = transaction ? ["lend", "borrow", "repay", "receive"].includes(transaction.type) : false;
+  const isInvestmentRelated = transaction ? ["invest", "invest_return"].includes(transaction.type) : false;
   
   const defaultCategories = isIncome ? [...DEFAULT_CATEGORIES_IN] : [...DEFAULT_CATEGORIES_OUT];
   const allCategories = [...defaultCategories, ...customCategories];
@@ -365,8 +366,8 @@ function EditTransactionForm({
               </div>
             )}
 
-            {/* Category Selection (not for transfers or loan-related) with Add New Option */}
-            {!isTransfer && !isLoanRelated && (
+            {/* Category Selection (not for transfers, loan-related, or investment-related) with Add New Option */}
+            {!isTransfer && !isLoanRelated && !isInvestmentRelated && (
               <div className="space-y-1.5 animate-field-in field-delay-4">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="category" className="text-xs font-medium">Category</Label>
@@ -569,6 +570,8 @@ export function EditTransactionModal({
       case "borrow": return "Borrowed";
       case "repay": return "Loan Repaid";
       case "receive": return "Loan Received Back";
+      case "invest": return "Investment";
+      case "invest_return": return "Investment Return";
       default: return "Transaction";
     }
   };
