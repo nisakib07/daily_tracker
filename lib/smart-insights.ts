@@ -600,6 +600,32 @@ export function generateInsights(transactions: Transaction[]): Insight[] {
     });
   }
   
+  // ===== INSIGHT 8: Investment Portfolio Summary =====
+  const totalInvested = transactions
+    .filter((tx) => tx.type === "invest")
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  const totalReturned = transactions
+    .filter((tx) => tx.type === "invest_return")
+    .reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  if (totalInvested > 0) {
+    const netPL = totalReturned - totalInvested;
+    const roi = ((netPL / totalInvested) * 100).toFixed(1);
+    const isProfit = netPL >= 0;
+
+    insights.push({
+      id: "investment-portfolio",
+      type: isProfit ? "positive" : "info",
+      icon: "💼",
+      title: "Investment Portfolio Summary",
+      description: isProfit 
+        ? `Your investments have yielded a net profit of ৳${netPL.toLocaleString()} (ROI: ${roi}%). Great performance!` 
+        : `Your portfolio shows a temporary net loss of ৳${Math.abs(netPL).toLocaleString()} (ROI: ${roi}%). Patience and diversified holdings pay off in the long run.`,
+      priority: 9.5, // High priority so it appears at or near the top
+    });
+  }
+  
   // Sort by priority (descending)
   return insights.sort((a, b) => b.priority - a.priority).slice(0, 4);
 }

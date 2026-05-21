@@ -14,6 +14,14 @@ export interface Person {
   created_at: string;
 }
 
+export interface Investment {
+  id: string;
+  name: string;
+  description: string | null;
+  status: "active" | "closed";
+  created_at: string;
+}
+
 export interface Transaction {
   id: string;
   type:
@@ -23,11 +31,14 @@ export interface Transaction {
     | "lend"
     | "borrow"
     | "repay"
-    | "receive";
+    | "receive"
+    | "invest"
+    | "invest_return";
   amount: number;
   from_account_id: string | null;
   to_account_id: string | null;
   person_id: string | null;
+  investment_id: string | null;
   category: string | null;
   note: string | null;
   date: string;
@@ -89,6 +100,12 @@ export const LOAN_TYPES = {
   BORROW: "borrow", // You borrow from someone (money in)
   REPAY: "repay", // You repay borrowed money (money out)
   RECEIVE: "receive", // You receive loan repayment (money in)
+} as const;
+
+// Investment related transaction types
+export const INVESTMENT_TYPES = {
+  INVEST: "invest", // Money going into an investment (asset reallocation, NOT expense)
+  INVEST_RETURN: "invest_return", // Money coming back from an investment (NOT income)
 } as const;
 
 export interface Budget {

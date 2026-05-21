@@ -34,6 +34,8 @@ import {
   Search,
   X,
   CalendarIcon,
+  Coins,
+  TrendingUp,
 } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -286,6 +288,10 @@ export function ActivityList({
         return <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5" />;
       case "receive":
         return <ArrowDownLeft className="h-4 w-4 sm:h-5 sm:w-5" />;
+      case "invest":
+        return <Coins className="h-4 w-4 sm:h-5 sm:w-5" />;
+      case "invest_return":
+        return <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />;
       default:
         return <ArrowDownLeft className="h-4 w-4 sm:h-5 sm:w-5" />;
     }
@@ -305,6 +311,9 @@ export function ActivityList({
         return "bg-gradient-to-br from-indigo-100 to-indigo-200 dark:from-indigo-900/50 dark:to-indigo-800/50 text-indigo-600 dark:text-indigo-400";
       case "borrow":
         return "bg-gradient-to-br from-amber-100 to-amber-200 dark:from-amber-900/50 dark:to-amber-800/50 text-amber-600 dark:text-amber-400";
+      case "invest":
+      case "invest_return":
+        return "bg-gradient-to-br from-violet-100 to-violet-200 dark:from-violet-900/50 dark:to-violet-800/50 text-violet-600 dark:text-violet-400";
       default:
         return "bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 text-slate-600 dark:text-slate-400";
     }
@@ -315,10 +324,12 @@ export function ActivityList({
       case "income":
       case "borrow":
       case "receive":
+      case "invest_return":
         return "text-emerald-600 dark:text-emerald-400";
       case "expense":
       case "lend":
       case "repay":
+      case "invest":
         return "text-rose-600 dark:text-rose-400";
       case "transfer":
         return "text-blue-600 dark:text-blue-400";
@@ -328,7 +339,7 @@ export function ActivityList({
   };
 
   const isMoneyIn = (type: string) =>
-    ["income", "borrow", "receive"].includes(type);
+    ["income", "borrow", "receive", "invest_return"].includes(type);
   const isLoan = (type: string) =>
     ["lend", "borrow", "repay", "receive"].includes(type);
 
@@ -348,6 +359,10 @@ export function ActivityList({
         return "Loan Repaid";
       case "receive":
         return "Loan Received";
+      case "invest":
+        return "Investment";
+      case "invest_return":
+        return "Investment Return";
       default:
         return type;
     }
