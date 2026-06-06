@@ -2,8 +2,9 @@
 
 import { useMemo } from "react";
 import { AnimatedCounter } from "@/components/animated-counter";
-import { TrendingUp, TrendingDown, Sparkles } from "lucide-react";
+import { TrendingUp, TrendingDown, Sparkles, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 interface WelcomeSectionProps {
   userName?: string;
@@ -43,6 +44,10 @@ export function WelcomeSection({
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground font-medium">
             {greeting}, <span className="text-foreground">{displayName}</span>
+          </p>
+          <p className="flex items-center gap-1 text-[11px] sm:text-xs text-muted-foreground/70">
+            <CalendarDays className="h-3 w-3" />
+            {format(new Date(), "EEEE, MMMM d, yyyy")}
           </p>
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="text-[10px] sm:text-xs text-muted-foreground uppercase tracking-wide">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -68,6 +68,7 @@ import {
   Plus,
   LogOut,
   User,
+  UserPlus,
   Settings,
 } from "lucide-react";
 import {
@@ -143,6 +144,13 @@ export function Dashboard() {
   // Track previous balance for comparison
   const [previousBalance, setPreviousBalance] = useState<number | undefined>(undefined);
 
+  // Pull-to-refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullDistance, setPullDistance] = useState(0);
+  const touchStartY = useRef(0);
+  const isPulling = useRef(false);
+  const PULL_THRESHOLD = 60;
+
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
@@ -170,6 +178,34 @@ export function Dashboard() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Pull-to-refresh handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      touchStartY.current = e.touches[0].clientY;
+      isPulling.current = true;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isPulling.current) return;
+    const delta = e.touches[0].clientY - touchStartY.current;
+    if (delta > 0 && window.scrollY === 0) {
+      setPullDistance(Math.min(delta * 0.4, 80));
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(async () => {
+    if (!isPulling.current) return;
+    isPulling.current = false;
+    if (pullDistance >= PULL_THRESHOLD) {
+      setIsRefreshing(true);
+      setPullDistance(PULL_THRESHOLD);
+      await fetchData();
+      setIsRefreshing(false);
+    }
+    setPullDistance(0);
+  }, [pullDistance, fetchData]);
 
   // Calculate balances from ALL transactions (not filtered) - memoized
   const accountsWithBalance = useMemo(() => {
@@ -339,7 +375,32 @@ export function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div
+      className="min-h-screen bg-gradient-to-b from-slate-50 via-white to-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-refresh indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="flex items-center justify-center overflow-hidden transition-all duration-200"
+          style={{ height: isRefreshing ? PULL_THRESHOLD : pullDistance }}
+        >
+          <Loader2
+            className={cn(
+              "h-5 w-5 text-emerald-500 transition-transform",
+              isRefreshing && "animate-spin",
+              pullDistance >= PULL_THRESHOLD && !isRefreshing && "text-emerald-600"
+            )}
+            style={{ transform: `rotate(${pullDistance * 3}deg)` }}
+          />
+          <span className="ml-2 text-xs text-muted-foreground">
+            {isRefreshing ? "Refreshing..." : pullDistance >= PULL_THRESHOLD ? "Release to refresh" : "Pull to refresh"}
+          </span>
+        </div>
+      )}
+
       {/* Confetti celebration */}
       {showConfetti && <Confetti />}
       
@@ -412,7 +473,7 @@ export function Dashboard() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-6">
+      <main className="mx-auto max-w-2xl px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6 pb-32 sm:pb-6">
         {/* Welcome Section with Animated Balance */}
         <WelcomeSection 
           userName={user?.email}
@@ -495,29 +556,29 @@ export function Dashboard() {
                 value="activity"
                 className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
-                <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Activity
+                <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="hidden min-[360px]:inline">Activity</span>
               </TabsTrigger>
               <TabsTrigger
                 value="ledger"
                 className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
-                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Ledger
+                <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="hidden min-[360px]:inline">Ledger</span>
               </TabsTrigger>
               <TabsTrigger
                 value="budget"
                 className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
-                <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Budget
+                <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="hidden min-[360px]:inline">Budget</span>
               </TabsTrigger>
               <TabsTrigger
                 value="investments"
                 className="flex items-center gap-1 sm:gap-1.5 py-2 text-[11px] sm:text-sm"
               >
-                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                Invest
+                <TrendingUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="hidden min-[360px]:inline">Invest</span>
               </TabsTrigger>
             </TabsList>
 
@@ -578,7 +639,7 @@ export function Dashboard() {
                             : format(selectedDate, "EEE, MMM d")}
                         </Button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
+                      <PopoverContent className="w-auto p-0" align="start" sideOffset={4} collisionPadding={12}>
                         <Calendar
                           mode="single"
                           selected={selectedDate}
@@ -784,7 +845,7 @@ export function Dashboard() {
           className={cn(
             "fixed right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full",
             "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-lg shadow-black/20 dark:shadow-black/40",
-            "active:scale-95 transition-transform",
+            "active:scale-90 transition-transform duration-150",
             allTransactions.length === 0 && "fab-pulse",
           )}
           style={{ bottom: "calc(1rem + env(safe-area-inset-bottom))" }}
@@ -833,6 +894,17 @@ export function Dashboard() {
               >
                 <TrendingUp className="mr-2 h-5 w-5" />
                 New Investment
+              </Button>
+
+              <Button
+                onClick={() => {
+                  setQuickActionsOpen(false);
+                  setPersonOpen(true);
+                }}
+                className="h-12 justify-start bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700"
+              >
+                <UserPlus className="mr-2 h-5 w-5" />
+                Add Person
               </Button>
 
               <Button

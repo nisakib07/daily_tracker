@@ -285,7 +285,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
                 {format(selectedMonth, "MMM yyyy")}
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
+            <PopoverContent className="w-auto p-0" align="end" sideOffset={4} collisionPadding={12}>
               <Calendar
                 mode="single"
                 selected={selectedMonth}
@@ -340,7 +340,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
             <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               Opening Balance
             </p>
-            <p className="text-lg sm:text-xl font-bold text-foreground flex items-center gap-0.5 whitespace-nowrap">
+            <p className="text-base sm:text-xl font-bold text-foreground flex items-center gap-0.5 whitespace-nowrap">
               <span>৳</span>
               <span className="tabular-nums tracking-tight">{openingBalance.toLocaleString()}</span>
             </p>
@@ -375,7 +375,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
             <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               Income
             </p>
-            <p className="text-lg sm:text-xl font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 whitespace-nowrap">
+            <p className="text-base sm:text-xl font-bold text-emerald-700 dark:text-emerald-400 flex items-center gap-0.5 whitespace-nowrap">
               <span>+৳</span>
               <span className="tabular-nums tracking-tight">{monthlySummary.income.toLocaleString()}</span>
             </p>
@@ -410,7 +410,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
             <p className="text-[9px] sm:text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
               Expense
             </p>
-            <p className="text-lg sm:text-xl font-bold text-rose-700 dark:text-rose-400 flex items-center gap-0.5 whitespace-nowrap">
+            <p className="text-base sm:text-xl font-bold text-rose-700 dark:text-rose-400 flex items-center gap-0.5 whitespace-nowrap">
               <span>-৳</span>
               <span className="tabular-nums tracking-tight">{monthlySummary.expense.toLocaleString()}</span>
             </p>
@@ -450,7 +450,7 @@ export function MonthlyStats({ transactions, onMonthChange }: MonthlyStatsProps)
               Net Balance
             </p>
             <p className={cn(
-              "text-lg sm:text-xl font-bold flex items-center gap-0.5 whitespace-nowrap",
+              "text-base sm:text-xl font-bold flex items-center gap-0.5 whitespace-nowrap",
               netBalance >= 0 ? "text-blue-700 dark:text-blue-300" : "text-amber-700 dark:text-amber-300"
             )}>
               <span>{netBalance >= 0 ? "+" : ""}৳</span>

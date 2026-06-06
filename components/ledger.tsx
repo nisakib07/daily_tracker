@@ -78,10 +78,7 @@ export function Ledger({ transactions, people, onViewPerson }: LedgerProps) {
           lastActivityAt,
         };
       })
-      .filter(
-        (entry) =>
-          entry.youOwe > 0 || entry.theyOwe > 0 || entry.netBalance !== 0,
-      )
+      .filter((entry) => entry.netBalance !== 0)
       .sort((a, b) => {
         // 1) most urgent first: bigger absolute net
         const diffAbs = Math.abs(b.netBalance) - Math.abs(a.netBalance);
@@ -98,12 +95,21 @@ export function Ledger({ transactions, people, onViewPerson }: LedgerProps) {
       });
   }, [people, transactions]);
 
+  // Use NET balances for summary so they match the per-person cards
   const totalYouOwe = useMemo(
-    () => ledgerEntries.reduce((sum, e) => sum + e.youOwe, 0),
+    () =>
+      ledgerEntries.reduce(
+        (sum, e) => (e.netBalance < 0 ? sum + Math.abs(e.netBalance) : sum),
+        0,
+      ),
     [ledgerEntries],
   );
   const totalTheyOwe = useMemo(
-    () => ledgerEntries.reduce((sum, e) => sum + e.theyOwe, 0),
+    () =>
+      ledgerEntries.reduce(
+        (sum, e) => (e.netBalance > 0 ? sum + e.netBalance : sum),
+        0,
+      ),
     [ledgerEntries],
   );
 
@@ -130,32 +136,32 @@ export function Ledger({ transactions, people, onViewPerson }: LedgerProps) {
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 gap-2 sm:gap-3">
-        <Card className="p-3 sm:p-4 border-0 bg-gradient-to-br from-emerald-50 to-emerald-100/50">
+        <Card className="p-3 sm:p-4 border-0 bg-gradient-to-br from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            <ArrowDownLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
-            <span className="text-[10px] sm:text-xs font-medium text-emerald-600 uppercase tracking-wide">
+            <ArrowDownLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-[10px] sm:text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
               To Receive
             </span>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-emerald-700">
+          <p className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-300">
             ৳{totalTheyOwe.toLocaleString()}
           </p>
-          <p className="text-[10px] sm:text-xs text-emerald-600/70 mt-0.5 sm:mt-1">
+          <p className="text-[10px] sm:text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5 sm:mt-1">
             People owe you
           </p>
         </Card>
 
-        <Card className="p-3 sm:p-4 border-0 bg-gradient-to-br from-amber-50 to-amber-100/50">
+        <Card className="p-3 sm:p-4 border-0 bg-gradient-to-br from-amber-50 to-amber-100/50 dark:from-amber-950/30 dark:to-amber-900/20">
           <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
-            <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600" />
-            <span className="text-[10px] sm:text-xs font-medium text-amber-600 uppercase tracking-wide">
+            <ArrowUpRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" />
+            <span className="text-[10px] sm:text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">
               To Pay
             </span>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-amber-700">
+          <p className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-300">
             ৳{totalYouOwe.toLocaleString()}
           </p>
-          <p className="text-[10px] sm:text-xs text-amber-600/70 mt-0.5 sm:mt-1">
+          <p className="text-[10px] sm:text-xs text-amber-600/70 dark:text-amber-400/70 mt-0.5 sm:mt-1">
             You owe people
           </p>
         </Card>
@@ -248,15 +254,15 @@ export function Ledger({ transactions, people, onViewPerson }: LedgerProps) {
 
                 {/* Optional: small breakdown row (helps trust) */}
                 <div className="mt-3 grid grid-cols-2 gap-2 text-[11px] sm:text-xs">
-                  <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2">
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 px-2.5 py-2">
                     <p className="text-muted-foreground">They owe</p>
-                    <p className="font-semibold text-emerald-700">
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-400">
                       ৳{entry.theyOwe.toLocaleString()}
                     </p>
                   </div>
-                  <div className="rounded-lg bg-slate-50 border border-slate-100 px-2.5 py-2">
+                  <div className="rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700 px-2.5 py-2">
                     <p className="text-muted-foreground">You owe</p>
-                    <p className="font-semibold text-amber-700">
+                    <p className="font-semibold text-amber-700 dark:text-amber-400">
                       ৳{entry.youOwe.toLocaleString()}
                     </p>
                   </div>

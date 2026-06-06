@@ -166,7 +166,7 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 opacity-0 group-hover:opacity-100 transition-all bg-white/80 dark:bg-slate-700/80 hover:bg-white dark:hover:bg-slate-700 shadow-sm hover:scale-110"
+          className="absolute top-2 right-2 h-7 w-7 sm:h-8 sm:w-8 sm:opacity-0 sm:group-hover:opacity-100 transition-all bg-white/80 dark:bg-slate-700/80 hover:bg-white dark:hover:bg-slate-700 shadow-sm hover:scale-110"
           onClick={() => onEdit(account)}
         >
           <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500 dark:text-slate-300" />
@@ -195,8 +195,8 @@ export function AccountCard({ account, lastTransaction, recentTransactions, onEd
             </p>
           </div>
           
-          {/* Sparkline */}
-          <div className="opacity-60 group-hover:opacity-100 transition-opacity">
+          {/* Sparkline - hidden on mobile where it's too small to read */}
+          <div className="hidden sm:block opacity-60 group-hover:opacity-100 transition-opacity">
             <Sparkline data={sparklineData} color={sparklineColor} />
           </div>
         </div>
