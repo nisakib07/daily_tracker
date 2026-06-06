@@ -68,7 +68,6 @@ import {
   Plus,
   LogOut,
   User,
-  UserPlus,
   Settings,
 } from "lucide-react";
 import {
@@ -896,16 +895,6 @@ export function Dashboard() {
                 New Investment
               </Button>
 
-              <Button
-                onClick={() => {
-                  setQuickActionsOpen(false);
-                  setPersonOpen(true);
-                }}
-                className="h-12 justify-start bg-gradient-to-r from-cyan-500 to-teal-600 hover:from-cyan-600 hover:to-teal-700"
-              >
-                <UserPlus className="mr-2 h-5 w-5" />
-                Add Person
-              </Button>
 
               <Button
                 variant="outline"
