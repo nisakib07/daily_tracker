@@ -63,9 +63,11 @@ export function SpendingHeatmap({ transactions, className }: SpendingHeatmapProp
     }, 0);
   }, [daysInMonth, dailySpending]);
 
-  const dailyAverage = monthTotal / daysInMonth.length;
-
   const isCurrentMonth = format(currentMonth, "yyyy-MM") === format(new Date(), "yyyy-MM");
+  const today = new Date();
+  const effectiveDays = isCurrentMonth ? today.getDate() : daysInMonth.length;
+  const dailyAverage = effectiveDays > 0 ? monthTotal / effectiveDays : 0;
+
 
   return (
     <div className={cn("rounded-xl border bg-card p-4 sm:p-5 space-y-4 animate-fade-in-up", className)}>
