@@ -56,7 +56,7 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed z-50 bg-background p-4 shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out",
+        "fixed z-50 overflow-hidden bg-background p-4 shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out",
         sheetVariants[side],
         className
       )}

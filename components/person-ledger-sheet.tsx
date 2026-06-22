@@ -121,7 +121,7 @@ export function PersonLedgerSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md">
+      <SheetContent side="right" className="flex w-full flex-col sm:max-w-md">
         <SheetHeader>
           <SheetTitle className="flex items-center justify-between gap-3">
             <span>{person ? person.name : "Person"}</span>
@@ -143,7 +143,7 @@ export function PersonLedgerSheet({
           ) : null}
         </SheetHeader>
 
-        <div className="mt-4 space-y-3">
+        <div className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
           {/* ✅ Quick actions (opens TransactionModal, no duplicate form here) */}
           {person && (canReceive || canRepay) ? (
             <Card className="p-3">
