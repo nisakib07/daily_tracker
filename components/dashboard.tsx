@@ -153,23 +153,75 @@ export function Dashboard() {
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
-    const [accountsRes, peopleRes, transactionsRes, investmentsRes] = await Promise.all([
+    // Helper to fetch ALL transactions via pagination.
+    // Supabase PostgREST caps rows per request (default 1000).
+    // We first get the exact count, then paginate to fetch everything.
+    const fetchAllTransactions = async () => {
+      // 1. Get total count
+      const { count, error: countError } = await supabase
+        .from("transactions")
+        .select("*", { count: "exact", head: true });
+
+      if (countError || count === null || count === 0) {
+        console.error("Error getting transaction count:", countError);
+        // Fallback: try a single fetch
+        const { data } = await supabase
+          .from("transactions")
+          .select("*")
+          .order("occurred_at", { ascending: false });
+        return data || [];
+      }
+
+      // 2. Paginate through all rows
+      const PAGE_SIZE = 500; // Conservative to stay within any server limits
+      let allData: Transaction[] = [];
+
+      const totalPages = Math.ceil(count / PAGE_SIZE);
+      
+      // Fetch pages in parallel (batch of up to 5 at a time for speed)
+      for (let batchStart = 0; batchStart < totalPages; batchStart += 5) {
+        const batchEnd = Math.min(batchStart + 5, totalPages);
+        const pagePromises = [];
+        
+        for (let page = batchStart; page < batchEnd; page++) {
+          const from = page * PAGE_SIZE;
+          const to = from + PAGE_SIZE - 1;
+          
+          pagePromises.push(
+            supabase
+              .from("transactions")
+              .select("*")
+              .order("occurred_at", { ascending: false })
+              .range(from, to)
+          );
+        }
+        
+        const results = await Promise.all(pagePromises);
+        for (const { data, error } of results) {
+          if (error) {
+            console.error("Error fetching transactions page:", error);
+            continue;
+          }
+          if (data) {
+            allData = allData.concat(data);
+          }
+        }
+      }
+
+      return allData;
+    };
+
+    const [accountsRes, peopleRes, allTx, investmentsRes] = await Promise.all([
       supabase.from("accounts").select("*").order("created_at"),
       supabase.from("people").select("*").order("name"),
-      supabase
-        .from("transactions")
-        .select("*")
-        .order("date", { ascending: false })
-        .limit(1000),
+      fetchAllTransactions(),
       supabase.from("investments").select("*").order("created_at", { ascending: false }),
     ]);
 
     if (accountsRes.data) setAccounts(accountsRes.data);
     if (peopleRes.data) setPeople(peopleRes.data);
-    if (transactionsRes.data) {
-      setAllTransactions(transactionsRes.data);
-      setTransactions(transactionsRes.data);
-    }
+    setAllTransactions(allTx);
+    setTransactions(allTx);
     if (investmentsRes.data) setInvestments(investmentsRes.data);
     setLoading(false);
   }, []);

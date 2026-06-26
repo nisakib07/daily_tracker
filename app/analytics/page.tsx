@@ -189,17 +189,42 @@ export default function AnalyticsPage() {
   const fetchData = useCallback(async () => {
     const supabase = createClient();
 
-    const [transactionsRes, accountsRes, peopleRes] = await Promise.all([
-      supabase
-        .from("transactions")
-        .select("*")
-        .order("date", { ascending: false })
-        .limit(5000),
+    // Paginate to fetch ALL transactions (Supabase default limit is 1000)
+    const fetchAllTransactions = async () => {
+      const PAGE_SIZE = 1000;
+      let allData: Transaction[] = [];
+      let page = 0;
+      let hasMore = true;
+
+      while (hasMore) {
+        const from = page * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        const { data, error } = await supabase
+          .from("transactions")
+          .select("*")
+          .order("occurred_at", { ascending: false })
+          .range(from, to);
+
+        if (error) break;
+        if (data && data.length > 0) {
+          allData = allData.concat(data);
+          hasMore = data.length === PAGE_SIZE;
+        } else {
+          hasMore = false;
+        }
+        page++;
+      }
+      return allData;
+    };
+
+    const [allTx, accountsRes, peopleRes] = await Promise.all([
+      fetchAllTransactions(),
       supabase.from("accounts").select("*"),
       supabase.from("people").select("*"),
     ]);
 
-    if (transactionsRes.data) setTransactions(transactionsRes.data);
+    setTransactions(allTx);
     if (accountsRes.data) setAccounts(accountsRes.data);
     if (peopleRes.data) setPeople(peopleRes.data);
 

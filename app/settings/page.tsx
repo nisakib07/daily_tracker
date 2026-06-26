@@ -268,7 +268,7 @@ export default function SettingsPage() {
       const [accountsRes, peopleRes, transactionsRes] = await Promise.all([
         supabase.from("accounts").select("*"),
         supabase.from("people").select("*"),
-        supabase.from("transactions").select("*").order("date", { ascending: false }),
+        supabase.from("transactions").select("*").order("occurred_at", { ascending: false }),
       ]);
 
       const accounts = accountsRes.data || [];
