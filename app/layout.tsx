@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { DevServiceWorkerReset } from "@/components/dev-service-worker-reset";
 import { PwaUpdateToast } from "@/components/pwa-update-toast";
 import { AuthProvider } from "@/lib/auth-context";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -51,6 +52,7 @@ export default function RootLayout({
           <AuthProvider>
             {children}
             <Analytics />
+            <DevServiceWorkerReset />
             <PwaUpdateToast />
           </AuthProvider>
         </ThemeProvider>

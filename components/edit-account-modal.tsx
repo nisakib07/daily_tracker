@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,7 +19,8 @@ import {
 } from "@/components/ui/drawer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { Account } from "@/lib/types";
+import type { Account, Transaction } from "@/lib/types";
+import { calculateAccountBalance } from "@/lib/balances";
 import { createClient } from "@/lib/supabase/client";
 import { useAuth } from "@/lib/auth-context";
 import { Loader2, Settings, AlertTriangle, Scale } from "lucide-react";
@@ -29,11 +30,13 @@ interface EditAccountModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   account: (Account & { balance?: number }) | null;
-  onSuccess: () => void;
+  transactions: Transaction[];
+  onSuccess: () => void | Promise<void>;
 }
 
 function EditAccountForm({
   account,
+  transactions,
   onOpenChange,
   onSuccess,
 }: Omit<EditAccountModalProps, 'open'>) {
@@ -50,9 +53,17 @@ function EditAccountForm({
       setAdjustmentAmount("");
       setNote("");
     }
-  }, [account]);
+  }, [account?.id]);
 
   if (!account) return null;
+
+  const currentBalance = calculateAccountBalance(account.id, transactions);
+  const parsedAdjustmentAmount = Number.parseFloat(adjustmentAmount);
+  const hasAdjustment =
+    Number.isFinite(parsedAdjustmentAmount) && parsedAdjustmentAmount > 0;
+  const previewBalance =
+    currentBalance +
+    (adjustmentType === "add" ? 1 : -1) * parsedAdjustmentAmount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,8 +81,10 @@ function EditAccountForm({
         if (error) throw error;
       }
 
-      if (adjustmentAmount && parseFloat(adjustmentAmount) > 0) {
-        const amount = parseFloat(adjustmentAmount);
+      if (hasAdjustment) {
+        if (!user?.id) throw new Error("You must be signed in to adjust balance.");
+
+        const amount = parsedAdjustmentAmount;
         const isAdding = adjustmentType === "add";
 
         const { error } = await supabase.from("transactions").insert({
@@ -88,10 +101,11 @@ function EditAccountForm({
         if (error) throw error;
       }
 
+      await onSuccess();
       onOpenChange(false);
-      onSuccess();
     } catch (error) {
       console.error("[v0] Error updating account:", error);
+      alert("Something went wrong while saving. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -154,19 +168,16 @@ function EditAccountForm({
             />
           </div>
 
-          {adjustmentAmount && parseFloat(adjustmentAmount) > 0 && (
+          {hasAdjustment && (
             <p className="text-xs text-slate-600 mt-2">
-              New balance will be: ৳{(
-                (account.balance || 0) + 
-                (adjustmentType === "add" ? 1 : -1) * parseFloat(adjustmentAmount)
-              ).toLocaleString()}
+              New balance will be: ৳{previewBalance.toLocaleString()}
             </p>
           )}
         </div>
       </div>
 
       {/* Note for adjustment */}
-      {adjustmentAmount && parseFloat(adjustmentAmount) > 0 && (
+      {hasAdjustment && (
         <div className="space-y-2">
           <Label htmlFor="note" className="text-sm font-medium">Adjustment Note (Optional)</Label>
           <Input
@@ -205,9 +216,14 @@ export function EditAccountModal({
   open,
   onOpenChange,
   account,
+  transactions,
   onSuccess,
 }: EditAccountModalProps) {
   const isDesktop = useMediaQuery("(min-width: 640px)");
+  const currentBalance = useMemo(
+    () => (account ? calculateAccountBalance(account.id, transactions) : 0),
+    [account?.id, transactions],
+  );
 
   if (!account) return null;
 
@@ -227,13 +243,14 @@ export function EditAccountModal({
               <div>
                 <DialogTitle className="text-xl">Edit {account.name}</DialogTitle>
                 <DialogDescription>
-                  Current balance: ৳{(account.balance || 0).toLocaleString()}
+                  Current balance: ৳{currentBalance.toLocaleString()}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <EditAccountForm
             account={account}
+            transactions={transactions}
             onOpenChange={onOpenChange}
             onSuccess={onSuccess}
           />
@@ -251,7 +268,7 @@ export function EditAccountModal({
             <div>
               <DrawerTitle className="text-xl">Edit {account.name}</DrawerTitle>
               <DrawerDescription>
-                Current balance: ৳{(account.balance || 0).toLocaleString()}
+                Current balance: ৳{currentBalance.toLocaleString()}
               </DrawerDescription>
             </div>
           </div>
@@ -259,6 +276,7 @@ export function EditAccountModal({
         <div className="overflow-y-auto">
           <EditAccountForm
             account={account}
+            transactions={transactions}
             onOpenChange={onOpenChange}
             onSuccess={onSuccess}
           />

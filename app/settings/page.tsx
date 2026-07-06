@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useAuth } from "@/lib/auth-context";
 import { createClient } from "@/lib/supabase/client";
+import { fetchAllTransactions } from "@/lib/transactions";
 import {
   ArrowLeft,
   Loader2,
@@ -213,12 +214,12 @@ export default function SettingsPage() {
     try {
       const supabase = createClient();
 
-      // Fetch all user data
-      const [accountsRes, peopleRes, transactionsRes, budgetsRes] =
+      // Fetch all user data. Transactions are paged to avoid Supabase row caps.
+      const [accountsRes, peopleRes, transactions, budgetsRes] =
         await Promise.all([
           supabase.from("accounts").select("*"),
           supabase.from("people").select("*"),
-          supabase.from("transactions").select("*"),
+          fetchAllTransactions(supabase),
           supabase.from("budgets").select("*"),
         ]);
 
@@ -228,7 +229,7 @@ export default function SettingsPage() {
         data: {
           accounts: accountsRes.data || [],
           people: peopleRes.data || [],
-          transactions: transactionsRes.data || [],
+          transactions,
           budgets: budgetsRes.data || [],
           customCategories: {
             income: incomeCategories,
@@ -264,16 +265,15 @@ export default function SettingsPage() {
     try {
       const supabase = createClient();
 
-      // Fetch all user data
-      const [accountsRes, peopleRes, transactionsRes] = await Promise.all([
+      // Fetch all user data. Transactions are paged to avoid Supabase row caps.
+      const [accountsRes, peopleRes, transactions] = await Promise.all([
         supabase.from("accounts").select("*"),
         supabase.from("people").select("*"),
-        supabase.from("transactions").select("*").order("occurred_at", { ascending: false }),
+        fetchAllTransactions(supabase),
       ]);
 
       const accounts = accountsRes.data || [];
       const people = peopleRes.data || [];
-      const transactions = transactionsRes.data || [];
 
       // Helper to get account name
       const getAccountName = (id: string | null) => {

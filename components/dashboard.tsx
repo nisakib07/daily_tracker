@@ -36,6 +36,8 @@ import { MonthlyStats } from "@/components/monthly-stats";
 import { PersonLedgerSheet } from "@/components/person-ledger-sheet";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { createClient } from "@/lib/supabase/client";
+import { addBalancesToAccounts } from "@/lib/balances";
+import { fetchAllTransactions } from "@/lib/transactions";
 import { BudgetPlanner } from "@/components/budget-planner";
 import { SpendingHeatmap } from "@/components/spending-heatmap";
 import { FinancialHealthScore } from "@/components/financial-health-score";
@@ -89,7 +91,7 @@ type LoanQuickDefaults = {
 };
 
 export function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -110,9 +112,9 @@ export function Dashboard() {
   const [personOpen, setPersonOpen] = useState(false);
   const [editAccountOpen, setEditAccountOpen] = useState(false);
   const [editTransactionOpen, setEditTransactionOpen] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<
-    (Account & { balance?: number }) | null
-  >(null);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null,
+  );
   const [selectedTransaction, setSelectedTransaction] =
     useState<Transaction | null>(null);
 
@@ -151,70 +153,25 @@ export function Dashboard() {
   const PULL_THRESHOLD = 60;
 
   const fetchData = useCallback(async () => {
+    if (!user) {
+      setAccounts([]);
+      setPeople([]);
+      setAllTransactions([]);
+      setTransactions([]);
+      setInvestments([]);
+      setLoading(false);
+      return;
+    }
+
     const supabase = createClient();
-
-    // Helper to fetch ALL transactions via pagination.
-    // Supabase PostgREST caps rows per request (default 1000).
-    // We first get the exact count, then paginate to fetch everything.
-    const fetchAllTransactions = async () => {
-      // 1. Get total count
-      const { count, error: countError } = await supabase
-        .from("transactions")
-        .select("*", { count: "exact", head: true });
-
-      if (countError || count === null || count === 0) {
-        console.error("Error getting transaction count:", countError);
-        // Fallback: try a single fetch
-        const { data } = await supabase
-          .from("transactions")
-          .select("*")
-          .order("occurred_at", { ascending: false });
-        return data || [];
-      }
-
-      // 2. Paginate through all rows
-      const PAGE_SIZE = 500; // Conservative to stay within any server limits
-      let allData: Transaction[] = [];
-
-      const totalPages = Math.ceil(count / PAGE_SIZE);
-      
-      // Fetch pages in parallel (batch of up to 5 at a time for speed)
-      for (let batchStart = 0; batchStart < totalPages; batchStart += 5) {
-        const batchEnd = Math.min(batchStart + 5, totalPages);
-        const pagePromises = [];
-        
-        for (let page = batchStart; page < batchEnd; page++) {
-          const from = page * PAGE_SIZE;
-          const to = from + PAGE_SIZE - 1;
-          
-          pagePromises.push(
-            supabase
-              .from("transactions")
-              .select("*")
-              .order("occurred_at", { ascending: false })
-              .range(from, to)
-          );
-        }
-        
-        const results = await Promise.all(pagePromises);
-        for (const { data, error } of results) {
-          if (error) {
-            console.error("Error fetching transactions page:", error);
-            continue;
-          }
-          if (data) {
-            allData = allData.concat(data);
-          }
-        }
-      }
-
-      return allData;
-    };
 
     const [accountsRes, peopleRes, allTx, investmentsRes] = await Promise.all([
       supabase.from("accounts").select("*").order("created_at"),
       supabase.from("people").select("*").order("name"),
-      fetchAllTransactions(),
+      fetchAllTransactions(supabase).catch((error) => {
+        console.error("Error fetching transactions:", error);
+        return [];
+      }),
       supabase.from("investments").select("*").order("created_at", { ascending: false }),
     ]);
 
@@ -224,11 +181,12 @@ export function Dashboard() {
     setTransactions(allTx);
     if (investmentsRes.data) setInvestments(investmentsRes.data);
     setLoading(false);
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
+    if (authLoading) return;
     fetchData();
-  }, [fetchData]);
+  }, [authLoading, fetchData]);
 
   // Pull-to-refresh handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -260,27 +218,17 @@ export function Dashboard() {
 
   // Calculate balances from ALL transactions (not filtered) - memoized
   const accountsWithBalance = useMemo(() => {
-    const mapped = accounts.map((acc) => {
-      const balance = allTransactions.reduce((bal, tx) => {
-        if (tx.to_account_id === acc.id) bal += Number(tx.amount);
-        if (tx.from_account_id === acc.id) bal -= Number(tx.amount);
-        return bal;
-      }, 0);
-      return { ...acc, balance };
-    });
-
-    // Sort accounts: cash -> wallet -> card -> others
-    return mapped.sort((a, b) => {
-      const typeOrder: Record<string, number> = { cash: 0, wallet: 1, card: 2 };
-      const orderA = typeOrder[a.type] ?? 99;
-      const orderB = typeOrder[b.type] ?? 99;
-      return orderA - orderB;
-    });
+    return addBalancesToAccounts(accounts, allTransactions);
   }, [accounts, allTransactions]);
 
   const totalBalance = useMemo(() => {
     return accountsWithBalance.reduce((sum, acc) => sum + (acc.balance || 0), 0);
   }, [accountsWithBalance]);
+
+  const selectedAccount = useMemo(() => {
+    if (!selectedAccountId) return null;
+    return accountsWithBalance.find((account) => account.id === selectedAccountId) || null;
+  }, [accountsWithBalance, selectedAccountId]);
 
   // ✅ Selected person object for PersonLedgerSheet
   const selectedPerson = useMemo(() => {
@@ -354,7 +302,7 @@ export function Dashboard() {
 
   // Handle edit account
   const handleEditAccount = (account: Account & { balance?: number }) => {
-    setSelectedAccount(account);
+    setSelectedAccountId(account.id);
     setEditAccountOpen(true);
   };
 
@@ -421,7 +369,7 @@ export function Dashboard() {
 
 
 
-  if (loading) {
+  if (authLoading || loading) {
     return <DashboardSkeleton />;
   }
 
@@ -1009,8 +957,12 @@ export function Dashboard() {
       />
       <EditAccountModal
         open={editAccountOpen}
-        onOpenChange={setEditAccountOpen}
+        onOpenChange={(open) => {
+          setEditAccountOpen(open);
+          if (!open) setSelectedAccountId(null);
+        }}
         account={selectedAccount}
+        transactions={allTransactions}
         onSuccess={fetchData}
       />
       <EditTransactionModal
