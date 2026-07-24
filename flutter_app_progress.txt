@@ -1,0 +1,838 @@
+Flutter App Progress Notes
+Date: July 7, 2026
+
+Project goal
+------------
+We are converting the existing Money Master website into a Flutter app inside the same project folder.
+The Flutter app lives in the mobile/ folder and uses the same Supabase backend as the web version.
+
+The goal is not just to show the website inside an app. We are rebuilding the main app experience in Flutter:
+authentication, dashboard, accounts, transactions, ledger, budgets, investments, analytics, and settings.
+
+
+Current setup
+-------------
+- Flutter project created inside mobile/
+- Supabase environment values are wired into the Flutter dev runner
+- Windows Developer Mode was enabled so Flutter plugins can work correctly
+- Local preview runs on:
+  http://127.0.0.1:52710
+- The preview is started without opening a new browser window automatically
+- The app is currently forced to light mode to avoid confusing dark-mode form rendering
+
+
+Completed so far
+----------------
+1. Flutter project foundation
+   - Created the Flutter app under mobile/
+   - Added app theme and Money Master shell
+   - Added Supabase initialization
+   - Added local run script for development preview
+
+2. Authentication
+   - Added auth gate
+   - Added sign-in flow connected to Supabase
+   - App now shows dashboard only after sign-in
+
+3. Dashboard
+   - Added Money Master app header
+   - Added account balance summary
+   - Added a FAB quick-action menu for transactions and investments
+   - Added monthly stats panel
+   - Added tab navigation for Activity, Ledger, Budget, and Investments
+
+4. Accounts
+   - Shows account balances
+   - Account edit sheet added
+   - Account rename and balance adjustment added
+
+5. Transactions
+   - Money In added
+   - Money Out added
+   - Transfer added
+   - Transaction create logic connected to Supabase
+   - Dashboard now refreshes automatically after transaction create/update
+   - Activity list added
+   - Daily and monthly activity filters added
+   - Transaction edit added
+   - Transaction delete added
+   - Recent bug: transaction form was failing on Flutter web because of dropdown layout constraints.
+     Latest fix replaces the unsafe dropdown row and opens transaction forms as a full page instead of a bottom sheet.
+     The user has now confirmed that transaction saving, automatic refresh, and delete work in the browser.
+   - Transfer form now explains that at least two accounts are required and disables saving when only one account exists.
+   - Transaction forms now adapt to narrow phone screens and safely handle long account/category names.
+   - Edit Transaction now recovers safely when an older transaction references an account or person that is no longer available.
+
+6. Ledger / People
+   - Add person added
+   - Borrow money added
+   - Give loan added
+   - Repay loan added
+   - Receive repayment added
+   - Ledger summary added
+   - Person edit added
+   - Person delete added
+   - Person history sheet added
+   - Saved people list added in the Ledger tab
+
+7. Budget
+   - Budget tab added
+   - Monthly budget rows added
+   - Budget editor added
+   - Category budget storage connected to Supabase
+   - Budget editing now opens as a modern full-page monthly planning workspace
+   - Planned total and active category count update while amounts are entered
+   - Category limits use a responsive one- or two-column layout
+   - Custom categories reject duplicate names without losing the entered text
+   - Save and cancel remain fixed while the category list scrolls
+   - Clear Month uses a top-bar delete action with confirmation
+
+8. Investments
+   - Investments tab added
+   - New investment added
+   - Add funds added
+   - Record return added
+   - Delete investment added
+   - New Investment, Add Funds, and Record Return now open as modern full-page forms
+   - Investment forms keep Save and Cancel fixed while content scrolls
+   - Account and investment selectors safely handle long names and large balances
+   - Record Return recovers when a previously selected investment no longer exists
+   - Empty account and investment states clearly disable saving
+
+9. Analytics
+   - Analytics button added
+   - Analytics sheet added with real dashboard data
+   - Analytics now opens as a modern full-page financial report
+   - Phone layouts use one readable column while desktop pairs related modules
+   - The desktop report stays inside a centered 960-pixel workspace
+   - Financial health, monthly flow, insights, categories, and heatmap remain intact
+   - Empty financial data has clear report states
+
+10. Settings and categories
+   - Settings sheet added
+   - Custom categories added with local storage
+   - Transaction forms can load default plus custom categories
+   - Settings now opens as a modern full-page preferences workspace
+   - Income and Expense category panels stack on phones and pair on desktop
+   - Duplicate categories show clear inline feedback
+   - Category add/delete failures are surfaced instead of failing silently
+   - Long category labels truncate safely inside removable chips
+
+11. Testing and checks
+   - dart format has been run after changes
+   - flutter analyze has passed after changes
+   - flutter test has passed after changes
+   - Added widget tests for Money In, Money Out, Transfer, and Edit Transaction form rendering
+   - Added widget tests for Money In amount validation and one-account Transfer guard behavior
+   - Added finance calculation tests for balances, monthly totals, recent activity, and ledger totals
+
+12. Activity search
+   - Added a search box to the Activity tab
+   - Search works inside the currently selected day or month
+   - Search checks category, note, transaction type, account name, person name, investment name, amount, and date
+   - Search result count is shown in the Activity section title
+   - Empty state now changes when a search has no matches
+
+13. Activity account filter
+   - Added an Account dropdown to the Activity tab
+   - Can show transactions for all accounts or one selected account
+   - Filter matches both source and destination accounts, so transfers work correctly
+   - Account filter works together with day/month mode, type chips, and search
+
+14. Activity date modes
+   - Daily mode shows transactions for one selected day
+   - Monthly mode shows transactions for one selected month
+   - The previous All date-range mode was removed at the user's request
+   - Type and account All filters remain available inside Daily and Monthly
+
+15. Finance calculation tests
+   - Account balance math is covered by tests
+   - Total balance math is covered by tests
+   - Current-month income and expense totals are covered by tests
+   - Recent activity limit is covered by tests
+   - Ledger payable/receivable totals are covered by tests
+
+16. Auto-refresh after transaction saves
+   - Fixed the dashboard not updating after adding a transaction
+   - Successful transaction create/update now triggers a post-save dashboard refresh
+   - Floating quick actions now wait for the selected action before opening the form
+   - Dashboard refresh now forces a fresh completed snapshot into the UI
+   - Transaction update/delete now detects when Supabase affects zero rows instead of silently reporting success
+
+17. Small-phone UI polish
+   - Transaction forms adapt to narrow phone screens
+   - Dashboard spacing adapts below 360 pixels wide
+   - Account cards switch to one column when two columns would be cramped
+   - The FAB quick-action menu is the single transaction entry point
+   - Activity mode and date controls adapt to narrow widths
+   - Large total balances scale down safely instead of overflowing
+   - Transaction rows give descriptions and amounts enough space on small phones
+   - Investment summary metrics use a taller compact layout
+   - Dashboard test covers Activity, Ledger, Budget, and Investments at 320 x 568
+
+18. Shared form layout and Account Edit polish
+   - Added a reusable full-page form shell, header, and fixed action bar
+   - Account Edit now opens as a normal full-screen form instead of a bottom sheet
+   - Form content scrolls while the save and cancel controls remain available
+   - Dragging the form dismisses the keyboard
+   - Account adjustment controls and balance preview adapt to narrow widths
+   - Account Edit is tested at 320 x 568 with a long name and large values
+
+19. Modern visual redesign foundation
+   - Rebuilt the global light theme with stronger typography and clearer surface hierarchy
+   - Added a centered 1120-pixel desktop workspace instead of stretching across the browser
+   - Rebuilt the top bar so branding and actions align with dashboard content
+   - Repositioned the FAB to align with the centered desktop workspace
+   - Re-composed the balance and accounts into a responsive overview layout
+   - Replaced oversized account cards with compact fixed-height cards
+   - Redesigned the total balance panel as the main visual focal point
+   - Redesigned monthly statistics with a clearer header, metrics, and savings progress
+   - Redesigned dashboard tabs with a stronger modern active state
+   - Added a subtle animated transition when switching dashboard tabs
+   - Added wide-desktop regression coverage at 1440 x 900
+
+20. Modern mobile navigation and workspace redesign
+   - Added persistent bottom navigation for Activity, Ledger, Budget, and Invest on phones
+   - Desktop retains the centered workspace tab bar
+   - Selecting a mobile destination automatically reveals the selected workspace
+   - Rebuilt Activity controls as one cohesive cash-flow surface
+   - Search and account filtering sit side by side when desktop space allows
+   - Transaction filters use a cleaner labeled chip row
+   - Transactions from the same day are grouped into one compact timeline card
+   - Transaction rows are now dense interactive rows instead of separate repeated cards
+   - Added consistent visual headers to Ledger, Budget, and Investments
+   - Refreshed Ledger summary surfaces and the Budget control panel
+
+21. Swipe actions for Activity
+   - Swipe an Activity row to the right to reveal Edit
+   - Swipe an Activity row to the left to reveal Delete
+   - Edit uses a blue action surface and opens the existing edit form
+   - Delete uses a red action surface and opens the existing confirmation dialog
+   - Rows snap back instead of disappearing before the database action succeeds
+   - The three-dot action menu remains available for desktop and accessibility
+   - Dashboard tests confirm transaction rows support horizontal swipe gestures
+
+22. Modern People and Loan forms
+   - Add Person now opens as a modern full-page form
+   - Edit Person now opens as a modern full-page form
+   - Borrow, Give Loan, Repay, and Receive now use the shared full-page form system
+   - Form content scrolls independently while save and cancel actions stay fixed
+   - Dragging form content dismisses the keyboard
+   - Loan amount entry uses a stronger accent-colored amount surface
+   - Account and person dropdowns safely truncate long names
+   - Old or missing initial person references fall back to a valid saved person
+   - Added 320 x 568 tests for Add Person, Edit Person, and all four loan actions
+
+23. Modern Budget editor
+   - Replaced the draggable Budget modal with the shared full-page form pattern
+   - Added a live monthly planned-total summary and budgeted-category count
+   - Added category-specific icons and cleaner amount inputs
+   - Added responsive one-column phone and two-column wide-screen layouts
+   - Kept clear-month confirmation while simplifying the fixed action bar
+   - Added five Budget widget tests at 320 x 568
+
+24. Modern Investment forms
+   - Migrated New Investment, Add Funds, and Record Return from draggable modals
+   - Added responsive full-page forms with fixed action bars and keyboard-dismiss scrolling
+   - Redesigned amount entry and the close-investment control
+   - Removed risky expanded rows from account dropdown items
+   - Added safe fallback for stale selected-investment references
+   - Added five Investment widget tests at 320 x 568
+
+25. Modern Analytics report
+   - Replaced the draggable Analytics modal with a full-page reporting workspace
+   - Added a month-aware financial overview header
+   - Added responsive single-column phone and paired-column desktop layouts
+   - Kept the spending heatmap compact on wide screens
+   - Added four Analytics tests for phone, desktop, empty data, and navigation
+
+26. Modern Settings workspace
+   - Replaced the draggable Settings modal with a full-page preferences workspace
+   - Added signed-in account context and responsive category panels
+   - Added inline duplicate-category feedback and safer persistence errors
+   - Added compact empty states, counts, and long-label chip handling
+   - Added five Settings tests for phone, desktop, persistence, deletion, and navigation
+
+27. UI resilience audit
+   - Added shared empty, inline notice, error, and skeleton state widgets
+   - Replaced the dashboard spinner with a structured responsive loading skeleton
+   - Dashboard errors now hide raw backend details and offer a working retry flow
+   - Standardized empty states across Activity, Ledger, Budget, Investments, and loan history
+   - Standardized missing account, person, and investment notices in forms
+   - Replaced the Settings spinner with responsive category-panel skeletons
+   - Fixed a compact Sign In header overflow found during keyboard testing
+   - Verified the dashboard at 280 pixels wide with long names and large amounts
+   - Verified all major forms with a 260-pixel simulated mobile keyboard
+
+28. Final interaction polish
+   - Added one shared destructive confirmation dialog for people, transactions, investments, budgets, and categories
+   - Standardized warning icons, cancellation, destructive labels, and confirmation wording
+   - Raised compact command targets to at least 48 pixels
+   - Added focus traversal groups to shared full-page forms
+   - Added spoken saving/signing-in progress labels
+   - Added semantic button labels to custom tabs, account cards, and person rows
+   - Added screen-reader Edit and Delete actions to swipeable transactions
+   - Settings category updates now disable repeated submissions and show progress
+   - Dashboard deletions now block repeated taps and show a labeled progress bar
+
+
+Current known issue / latest work
+---------------------------------
+The main issue we were debugging is the transaction form.
+
+What happened:
+- When clicking Money In, Money Out, or Transfer, the form area appeared blank.
+- The console showed Flutter rendering/layout assertions.
+- The exact console error later showed the problem was inside the account dropdown:
+  RenderFlex children have non-zero flex but incoming width constraints are unbounded.
+
+Latest fix made:
+- Transaction forms now open as a normal full-screen form page instead of a modal bottom sheet.
+- The unsafe Row + Expanded layout inside account dropdown items was removed.
+- Dropdowns now use isExpanded: true.
+
+Status:
+- Code compiles.
+- Analyzer passes.
+- Tests pass.
+- Automated widget tests confirm Money In, Money Out, Transfer, and Edit Transaction forms render their main fields.
+- Automated widget tests confirm Money In shows a validation error when amount is empty.
+- Automated widget tests confirm Transfer cannot be saved when only one account exists.
+- Automated tests confirm core finance calculations for balances, monthly totals, recent activity, and ledger totals.
+- Dashboard transaction create/update refresh behavior was tightened after manual testing found stale data until browser refresh.
+- Transaction delete/update now checks the returned Supabase rows so failed mutations are no longer silent.
+- User confirmed in the browser that transaction saving, automatic refresh, and delete work end to end.
+
+
+Approximate completion
+----------------------
+The Flutter app is roughly 97% complete as a functional port.
+
+The core app structure and most main features are already built.
+However, it is not production-ready yet because we still need to verify every workflow carefully, polish the UI, and test on real mobile devices.
+
+
+What is left
+------------
+1. Confirm transaction forms work correctly
+   - Money In rendering is covered by widget test
+   - Money Out rendering is covered by widget test
+   - Transfer rendering is covered by widget test
+   - Edit transaction rendering is covered by widget test
+   - Money In empty amount validation is covered by widget test
+   - One-account Transfer guard is covered by widget test
+   - Manual browser save, automatic refresh, and delete testing passed
+
+2. Finish UI polish
+   - Dashboard has a modern responsive visual system at phone and desktop sizes
+   - Phone navigation and all four dashboard workspaces now share the modern design language
+   - Dashboard and transaction form spacing is covered at 320 x 568
+   - Desktop dashboard width and card height are covered at 1440 x 900
+   - Account Edit now uses the shared full-page form pattern
+   - People and Loan forms now use the shared full-page form pattern
+   - Account, People, Loan, Budget, and Investment forms now share the modern full-page pattern
+   - Settings now uses the modern responsive full-page layout
+   - Empty, loading, retry, and inline notice states now share one visual system
+   - Text overflow is covered at 280 and 320 pixels with long content and large values
+   - Keyboard-open layouts are covered across all major form families
+   - Destructive dialogs, focus order, loading feedback, semantics, and touch targets now share consistent interaction rules
+
+3. Full workflow testing
+   - Sign in
+   - Add income
+   - Add expense
+   - Transfer money
+   - Edit/delete transaction
+   - Add/edit/delete person
+   - Borrow/lend/repay/receive
+   - Set budgets
+   - Add investment
+   - Add investment funds
+   - Record investment return
+   - Delete investment
+   - Core finance calculations now have automated test coverage
+
+4. Mobile device testing
+   - Android emulator or real Android phone
+   - iOS later if needed, but this requires macOS
+   - Check keyboard behavior on forms
+   - Check scrolling on small screens
+
+5. Build preparation
+   - App icon
+   - App name
+   - Android package name
+   - Release build settings
+   - Supabase redirect/auth settings if needed
+
+6. Optional later improvements
+   - More detailed filters
+   - Better charts
+   - Offline cache
+   - Notifications/reminders
+   - Export reports
+
+
+Latest update
+-------------
+July 10, 2026
+- Completed the final interaction polish phase.
+- Added a shared destructive confirmation dialog across every delete and clear workflow.
+- Standardized destructive wording, warning icons, Cancel behavior, and red confirmation actions.
+- Raised compact icon and navigation controls to 48-pixel touch targets.
+- Added focus traversal grouping and spoken loading labels to shared forms and Sign In.
+- Added semantic labels to custom tabs, account cards, person rows, and transaction rows.
+- Added screen-reader Edit and Delete actions to swipeable Activity transactions.
+- Added busy-state protections for Settings category updates and dashboard deletions.
+- Added interaction tests for dialogs, disabled saving controls, command target sizes, and custom accessibility actions.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 57 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next phase: full signed-in workflow testing.
+
+July 10, 2026
+- Completed the app-wide UI resilience audit.
+- Added shared empty, inline notice, error, and skeleton widgets.
+- Replaced the dashboard spinner with a structured responsive skeleton.
+- Sanitized dashboard errors and fixed retry so a failed load can recover correctly.
+- Standardized empty and missing-data states across dashboard workspaces, transactions, investments, and loan history.
+- Replaced the Settings spinner with responsive skeleton panels.
+- Fixed the compact Sign In branding overflow found by keyboard-inset testing.
+- Added dashboard tests for loading, failed-load retry, fully empty data, and 280-pixel layouts.
+- Added keyboard-open tests for Transactions, Account Edit, People, Loans, Budgets, Investments, Settings, and Sign In.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 54 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next phase: full signed-in workflow testing.
+
+July 10, 2026
+- Migrated Settings from a draggable modal to a modern full-page preferences workspace.
+- Added a signed-in account header and responsive stacked-phone / paired-desktop category panels.
+- Added inline duplicate-category feedback and surfaced add/delete persistence failures.
+- Added safe long-label chips, category counts, and compact empty states.
+- Added five Settings tests covering narrow phones, wide desktops, duplicate handling, real mocked persistence, confirmed deletion, and full-page navigation.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 42 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next phase: audit loading, error, empty, and text-overflow states across the app.
+
+July 10, 2026
+- Migrated Analytics from a draggable modal to a modern full-page financial report.
+- Added a centered 960-pixel desktop workspace and compact phone layout.
+- Paired related report modules on desktop while keeping one readable column on phones.
+- Added a month-aware overview header and preserved all existing health, flow, insight, category, and heatmap calculations.
+- Added four Analytics tests covering narrow phones, wide desktops, empty data, and full-page navigation.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 37 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next modernization task: Settings layout.
+
+July 10, 2026
+- Migrated New Investment, Add Funds, and Record Return to the shared full-page form system.
+- Added fixed responsive action bars and drag-to-dismiss keyboard behavior.
+- Redesigned investment amount entry and the close-after-return control.
+- Replaced risky account dropdown rows with safe truncating labels for long names and large balances.
+- Added fallback handling when a selected investment no longer exists in the active list.
+- Added clear disabled states when accounts or active investments are unavailable.
+- Added five narrow-phone tests covering all forms, validation, empty states, stale selections, scrolling, and full-page navigation.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 33 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next modernization task: Analytics and Settings layouts.
+
+July 10, 2026
+- Migrated the monthly Budget editor from a draggable modal to the shared full-page form system.
+- Added a live planned-total summary and active-category count.
+- Added responsive one-column phone and two-column wide-screen category layouts.
+- Added category-specific icons, duplicate custom-category handling, and clearer amount validation.
+- Moved Clear Month to a top-bar delete action while preserving its confirmation dialog.
+- Added five Budget tests covering narrow layout, scrolling, totals, custom categories, validation, clear confirmation, and full-page navigation.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 28 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next modernization task: Investment forms.
+
+July 10, 2026
+- Migrated Add Person and Edit Person from modal sheets to modern full-page forms.
+- Migrated Borrow, Give Loan, Repay, and Receive to the shared full-page form system.
+- Added fixed responsive action bars and drag-to-dismiss keyboard behavior.
+- Improved loan amount hierarchy and long account/person dropdown handling.
+- Fixed invalid saved initial-person references so the form selects a valid person instead of crashing.
+- Added six narrow-phone tests covering every People and Loan form at 320 x 568.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 23 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next modernization task: Budget forms, followed by Investment forms.
+
+July 10, 2026
+- Added swipe actions to the grouped Activity transaction rows.
+- Right swipe reveals Edit and left swipe reveals Delete.
+- Swipe actions reuse the existing edit and confirmed-delete workflows.
+- Rows do not disappear optimistically before the action succeeds.
+- Kept the action menu as a non-swipe alternative.
+- Updated dashboard coverage to verify horizontal Dismissible transaction rows.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 17 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next visual phase remains forms, analytics, settings, and modal action sheets.
+
+July 10, 2026
+- User appreciated the first redesign but requested a substantially more modern app experience.
+- Added persistent bottom navigation on phones while retaining desktop tabs.
+- Mobile destination changes now animate and reveal the selected workspace.
+- Redesigned Activity into a cohesive cash-flow control surface.
+- Search and account filters now adapt into a desktop row or mobile stack.
+- Grouped same-day transactions into compact timeline cards with interactive rows and dividers.
+- Added consistent workspace identities to Ledger, Budget, and Investments.
+- Refreshed Ledger summary blocks and the Budget month/action panel.
+- Updated dashboard tests to verify mobile navigation and every workspace.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 17 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next visual phase: modernize the remaining full-page forms, analytics, settings, and modal action sheets.
+
+July 10, 2026
+- User raised a major concern that the Flutter UI looked outdated.
+- Paused the form-migration sequence and completed a modern dashboard redesign pass.
+- Refreshed the global theme, typography hierarchy, buttons, inputs, chips, menus, and feedback styling.
+- Added a centered 1120-pixel desktop workspace so dashboard content no longer stretches edge to edge.
+- Rebuilt the top bar, balance panel, account cards, monthly statistics, dashboard tabs, and FAB alignment.
+- Account cards now stay compact instead of becoming extremely tall on wide browser windows.
+- Added a subtle animated transition between Activity, Ledger, Budget, and Investments.
+- Existing 320 x 568 phone dashboard coverage still passes.
+- Added a 1440 x 900 desktop test for centered width and fixed account-card height.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 17 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next visual phase: carry the new design language through people, budget, investment, analytics, and settings screens.
+
+July 10, 2026
+- Removed the duplicate Money In, Money Out, and Transfer button row from the dashboard.
+- The FAB remains the single quick-action entry point and still offers Money In, Money Out, Transfer, and New Investment.
+- Removed the Activity date-range All mode, leaving Daily and Monthly.
+- Kept the transaction-type All filter and All accounts filter because they filter different data inside the selected day or month.
+- Updated the dashboard widget test to confirm the time-mode control no longer contains All.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 16 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next form polish task remains Add Person, Edit Person, and loan entry forms.
+
+July 10, 2026
+- Added the shared full-page form layout used for consistent phone behavior.
+- Migrated Account Edit from a modal bottom sheet to the shared form page.
+- Account Edit now has a fixed responsive action bar, scrollable content, and drag-to-dismiss keyboard behavior.
+- Long account names, large current balances, and large preview balances truncate safely.
+- Added a 320 x 568 Account Edit widget test with long text and large values.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 16 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next form polish task: migrate Add Person, Edit Person, and loan entry forms to the shared full-page pattern.
+
+July 10, 2026
+- Completed the dashboard small-phone responsive layout pass.
+- App header, page padding, account grid, quick actions, activity controls, large balances, and transaction rows now adapt to narrow widths.
+- Fixed account cards that could overflow vertically when shown as one column.
+- Fixed investment summary metrics that could overflow vertically on a 320-pixel-wide phone.
+- Added a full dashboard widget test at 320 x 568 with long names and large money values.
+- The new test opens Activity, Ledger, Budget, and Investments and checks for rendering errors.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 15 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next UI polish task: make account, people, budget, investment, analytics, and settings forms visually consistent on small phones.
+
+July 10, 2026
+- User confirmed that transaction saving, automatic dashboard refresh, and transaction delete are working.
+- The transaction stabilization milestone is complete.
+- Started the UI polish phase with transaction forms.
+- Added adaptive spacing and action-button sizing for narrow phone screens.
+- Added drag-to-dismiss keyboard behavior to transaction forms.
+- Long form titles, account names, category names, and action labels now truncate safely instead of overflowing.
+- Fixed Edit Transaction when an old transaction references an account or person that is no longer available.
+- Added narrow 320 x 568 phone-screen tests for Money In, Transfer, and Edit Transaction using long real-world text values.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed with 14 tests.
+- Local Flutter web preview was restarted successfully at:
+  http://127.0.0.1:52710
+- Next UI polish task: improve dashboard spacing and responsive layout on small phone screens.
+
+July 10, 2026
+- User reported dashboard still did not update automatically after adding a transaction.
+- User also reported transaction delete was not working.
+- Dashboard refresh logic was changed to load a fresh snapshot first, then force the UI to use that completed snapshot.
+- FutureBuilder keys now change after refresh to force the dashboard and floating action button to rebuild.
+- Transaction update/delete repository calls now use returned rows to detect zero-row mutations.
+- Transaction delete no longer adds a client-side user_id filter; Supabase RLS remains the security boundary.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next thing to verify in the browser: hard refresh the page, add Money In, then delete that same transaction.
+
+July 10, 2026
+- Fixed the dashboard stale-data issue after transaction saves.
+- After Money In, Money Out, Transfer, or edit transaction saves, the dashboard now runs a post-save refresh automatically.
+- Floating quick actions now close first, return the selected action, and then open the correct form.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next thing to verify in the browser: add Money In again and confirm the dashboard updates without manually refreshing the browser.
+
+July 10, 2026
+- Added automated tests for DashboardSnapshot finance calculations.
+- Tests cover account balances, total balance, current-month income, current-month expense, recent activity limit, and ledger payable/receivable totals.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview is still running at:
+  http://127.0.0.1:52710
+- Next recommended step: manual browser workflow testing for saving Money In, Money Out, and Transfer transactions.
+
+July 10, 2026
+- Local Flutter web preview was started again.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Status: running locally.
+- Next phase: manual workflow testing, then UI polish, then mobile device/build preparation.
+
+July 7, 2026
+- Tightened the Transfer form behavior when only one account exists.
+- Transfer now shows a clear message that at least two accounts are needed.
+- The Transfer save button is disabled until at least two accounts exist.
+- Added widget tests for Money In amount validation and one-account Transfer guard behavior.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Still needs manual browser confirmation: save Money In, Money Out, and Transfer transactions with your signed-in account.
+
+July 7, 2026
+- Added automated widget tests for transaction form rendering.
+- Tests cover Money In, Money Out, Transfer, and Edit Transaction forms.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next thing to verify in the browser: manually save Money In, Money Out, and Transfer transactions.
+
+July 7, 2026
+- Activity All mode was added.
+- The Activity tab can now switch between Daily, Monthly, and All.
+- All mode lets search, account filter, and type chips work across every transaction.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next thing to verify in the browser: open Activity, choose All, and search/filter across all transactions.
+
+July 7, 2026
+- Activity account filter was added.
+- It can filter the Activity tab by all accounts or one selected account.
+- It works together with search and transaction type filters.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next thing to verify in the browser: open Activity and choose an account from the Account dropdown.
+
+July 7, 2026
+- Activity search was added to the Flutter app.
+- It can search transactions by category, note, account, person, investment, amount, type, and date.
+- flutter analyze passed.
+- flutter test passed.
+- Local Flutter web preview was restarted successfully after the change.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next thing to verify in the browser: open Activity and try searching for a category, note, account name, or amount.
+
+July 7, 2026
+- Local Flutter web preview was restarted successfully.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Status: running locally.
+- Next thing to verify in the browser: click Money In / Money Out / Transfer and confirm the transaction form opens correctly.
+
+
+Simple summary
+--------------
+We are building a real Flutter version of the existing Money Master website.
+Most of the main finance features are already in place.
+The biggest current task is stabilizing and verifying the transaction form flow.
+After that, the next phase should be UI polish, full testing, and preparing for mobile device builds.
+
+
+July 10, 2026
+- Fixed a transaction Activity date-filter bug in the Flutter app.
+- Activity now uses the app-written `occurred_at` timestamp instead of the legacy `date` field, preventing transactions from disappearing from Today's Activity when the two dates differ across timezones.
+- Added a regression test for a legacy date mismatch.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed: 63 tests.
+- Local Flutter web preview was restarted successfully.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Next check: look at Today's Activity after saving a transaction and confirm the new row appears.
+
+
+July 10, 2026
+- Completed the cache-first performance phase for the Flutter app.
+- Added a shared per-user dashboard cache with in-memory reuse and persistent local storage.
+- Cached data now appears immediately while stale data revalidates in the background.
+- Added refresh coordination so concurrent refreshes share one database request.
+- CRUD operations invalidate the cache and perform one coordinated post-save sync.
+- Manual refresh and app resume can force a fresh sync when cached data is stale.
+- Added stale/offline fallback messaging so cached financial data remains visible during connection failures.
+- Removed the old double-refresh delay after transaction mutations.
+- Reduced Supabase payload size by selecting only the fields the dashboard needs.
+- Added cache serialization, persistence, concurrency, mutation invalidation, and 5,000-transaction stress tests.
+- dart format passed.
+- flutter analyze passed.
+- flutter test passed: 68 tests.
+- Local Flutter web preview restarted successfully and returned HTTP 200.
+- Current preview URL:
+  http://127.0.0.1:52710
+- The remaining advanced optimization is server-side aggregation, paged historical Activity, and a fully offline write queue. These require reviewed Supabase/API changes so account balances and reports remain correct.
+
+
+July 11, 2026
+- Started the local Flutter web preview again.
+- Preview health check returned HTTP 200.
+- Current preview URL:
+  http://127.0.0.1:52710
+
+
+July 11, 2026
+- Completed the advanced performance and production-hardening code phase.
+- Added scripts/003_performance_security.sql with authenticated user-scoped RLS policies, anonymous-access removal, composite indexes, server dashboard summaries, cursor-paged Activity reads, and atomic mutation receipts.
+- Added an idempotent offline mutation RPC design that prevents duplicate writes when a committed request is retried.
+- Added an encrypted persistent offline mutation queue with retryable-network-error detection and pending-sync feedback in the dashboard.
+- Dashboard cache and queued financial payloads now use AES-256-GCM encryption; the encryption key is kept in platform secure storage.
+- Disabled Android cloud backup for encrypted local data and added Android internet permission.
+- Added application-level Flutter, platform, and asynchronous error logging.
+- Activity now renders 100 transactions at a time with Load Older controls.
+- Added cursor-based transaction page and server-summary client APIs with safe fallback when the migration is not installed.
+- Added tests for encrypted cache storage, queue persistence/replay, duplicate queue protection, server summaries, and batched Activity rendering.
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 73 tests.
+- Flutter web preview restarted successfully and returned HTTP 200.
+- Current preview URL:
+  http://127.0.0.1:52710
+- Required deployment step: run scripts/003_performance_security.sql once in the Supabase SQL editor. Until then, the app automatically uses its existing database fallback path.
+
+
+July 11, 2026
+- Installed and configured the Android SDK command-line tools locally at C:\Users\bdCalling\AppData\Local\Android\Sdk.
+- Installed the Android platform/build tools needed by Flutter and accepted the local SDK licenses.
+- Removed the unused old file_picker dependency because it blocked Android APK compilation with the current Android Gradle Plugin.
+- Built a working debug Android APK for phone testing.
+- APK file:
+  C:\Sakib\daily_tracker\mobile\build\app\outputs\flutter-apk\app-debug.apk
+
+
+July 11, 2026
+- Fixed the first phone APK issue where the app showed "Supabase keys are needed before sign in can run."
+- Cause: the Android APK was built without Flutter dart-define values, while web preview was reading .env.local through the dev script.
+- Added mobile/tool/build_android_debug.ps1 to build Android debug APKs with SUPABASE_URL and SUPABASE_ANON_KEY mapped from NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+- Rebuilt the APK with Supabase configuration included.
+- Updated APK file:
+  C:\Sakib\daily_tracker\mobile\build\app\outputs\flutter-apk\app-debug.apk
+
+
+July 17, 2026
+- Built a fresh Android debug APK for phone testing using mobile/tool/build_android_debug.ps1.
+- Supabase configuration was included through Flutter dart-define values from .env.local.
+- APK file:
+  C:\Sakib\daily_tracker\mobile\build\app\outputs\flutter-apk\app-debug.apk
+- APK timestamp:
+  July 17, 2026 4:07 PM
+
+
+July 18, 2026
+- Fixed a timezone bug where a transaction selected for July 17 could appear under July 18 on Android.
+- Cause: transaction timestamps were being sent to Supabase without an explicit timezone marker, so late local times could be interpreted as UTC and shift the displayed day.
+- Added mobile/lib/core/date_times.dart with timezone-safe Supabase timestamp serialization and local-time parsing.
+- Updated transaction writes, edits, paging cursors, cache serialization, and offline queued mutation payloads to use UTC ISO timestamps with a Z suffix.
+- Updated model parsing so UTC timestamps from Supabase are converted back to local device time before display.
+- Added test/date_times_test.dart to cover late-night selected-date round trips.
+- dart format passed.
+- flutter analyze --no-pub passed with no issues.
+- flutter test --no-pub passed: 75 tests.
+- Built a fresh Android debug APK for phone testing.
+- APK file:
+  C:\Sakib\daily_tracker\mobile\build\app\outputs\flutter-apk\app-debug.apk
+- APK timestamp:
+  July 18, 2026 2:25 PM
+
+
+July 24, 2026
+- Added two features that existed on the website but were missing from the Flutter app.
+- Quick Add shortcuts (Breakfast, Lunch, Dinner, Rickshaw, Shopping, Snacks) now appear on the Add Expense form, matching the web app's presets. Tapping one fills the category, note, a preset amount when the shortcut has one, and switches the account to Cash.
+- The Analytics spending heatmap day cells are now tappable. Tapping a day opens a bottom sheet listing that day's expense transactions with a running total, or an empty state when nothing was spent that day.
+- Added widget tests for both features: quick-add category/note/amount/account fill-in, quick-add clearing a typed amount when the shortcut has no preset, tapping a day with expenses, and tapping an empty day.
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 79 tests.
+
+
+July 24, 2026 (later)
+- Full visual redesign: dark neon fintech theme, rolled out app-wide.
+- Rebuilt AppTheme.dark() as a complete theme (was previously an incomplete, unused fallback forced off in favor of light mode): near-black glass surfaces, glowing emerald/violet/cyan/amber/rose accents, Space Grotesk display type and Manrope body type via the new google_fonts dependency.
+- Flipped the app's default themeMode from light to dark now that the dark theme is complete.
+- Dashboard: aurora glow backdrop, glowing gradient hero balance card with an animated count-up total, glass account cards with a colored top-glow bar and staggered fade/slide-in entrance, neon gradient active tab pill, redesigned Quick Actions sheet.
+- Extended the same treatment to Sign In, Analytics (glowing cards, gradient header icon, redesigned day-detail sheet), Settings (gradient header banner, glowing category cards), and the shared form shell used by the Account/Budget/Investment/People forms (glow icon, glow top border, gradient action button).
+- Promoted the aurora background, press-scale, and fade-slide-in animation widgets out of the dashboard into shared/widgets/aurora_background.dart so other screens reuse them.
+- Bulk-swapped the old muted accent palette (AppTheme.emerald/rose/blue/amber) for the new neon equivalents across dashboard, analytics, settings, and all entry forms.
+- Fixed a real bug found along the way: several cards combined a non-uniform Border (different colors per side) with a borderRadius, which Flutter disallows and throws on at paint time — this crashed the Analytics day-detail sheet and would have crashed the dashboard's Quick Actions sheet. Fixed both to use Border.all with a single glow color.
+- Fixed FilledButton foreground contrast: the new theme's default button foreground is dark (tuned for the bright emerald default), which produced illegible dark-on-dark/dark-on-rose text wherever a button overrode just the background color. Added explicit white foreground overrides everywhere this pattern is used.
+- Scope: the Dashboard, Sign In, Analytics, and Settings screens are fully redesigned. The Transaction/Account/Budget/Investment/People entry forms inherit the dark theme correctly (fixed, no broken colors) and got shared-shell glow polish, but haven't had a full bespoke pass like the four screens above.
+- Added a dark-themed smoke test for the dashboard's Quick Actions sheet (the app's other tests intentionally pin AppTheme.light() for isolation, so this is the one test that actually renders under the production dark theme).
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 80 tests.
+
+
+July 24, 2026 (later still)
+- Fixed a real bug the user found: empty (no-spend) days on the Analytics heatmap rendered invisible — a hardcoded light-grey cell background left over from the light theme, combined with Theme.of(context).disabledColor text, produced white-on-white. Fixed both to theme-aware dark tones.
+- Removed the runtime dependency on Google's font CDN: downloaded the exact static weights the theme uses (Manrope 400/700/800, Space Grotesk 700) and bundled them as local assets, replacing the google_fonts package with plain Flutter font declarations in pubspec.yaml. The app's typography no longer depends on network access, consistent with its existing offline-first architecture.
+- Extended the neon glow treatment to the dashboard's Ledger, Budget, and Investments tab content (previously only dark-theme-correct, not bespoke) — glowing card shadows keyed to each card's semantic color, plus a full sweep of the remaining muted accent colors to their neon equivalents across the whole dashboard file.
+- Added a light/dark appearance toggle in Settings, backed by a new Riverpod NotifierProvider (ThemeModeController) that persists the choice via SharedPreferences and drives MoneyMasterApp's themeMode. This is the app's first real use of the Riverpod ProviderScope that was already wired at the root but previously unused.
+- Along the way, fixed a genuine test regression: the new Settings section pushed the income-category input below Flutter's lazy-list build threshold in the extreme-short keyboard-open viewport test, so the existing keyboard-resilience test needed a scroll step added (same pattern already used elsewhere in the suite) rather than the input being reachable without scrolling.
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 81 tests.
