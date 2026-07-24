@@ -1,5 +1,6 @@
 package com.example.money_master
 
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 
-class MainActivity : FlutterActivity()
+// local_auth (biometric app lock) requires a FragmentActivity host on Android.
+class MainActivity : FlutterFragmentActivity()

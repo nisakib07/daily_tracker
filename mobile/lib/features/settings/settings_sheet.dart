@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_lock_controller.dart';
+import '../../core/daily_reminder_controller.dart';
 import '../../core/theme_mode_controller.dart';
 import '../../data/category_store.dart';
 import '../../shared/theme/app_theme.dart';
@@ -190,6 +192,8 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
                               .read(themeModeProvider.notifier)
                               .setThemeMode(mode),
                         ),
+                        const SizedBox(height: 14),
+                        const _SecuritySection(),
                         const SizedBox(height: 18),
                         if (_isLoading)
                           const _SettingsLoadingState()
@@ -449,6 +453,191 @@ class _AppearanceSection extends StatelessWidget {
           },
         ),
       ),
+    );
+  }
+}
+
+class _SecuritySection extends ConsumerWidget {
+  const _SecuritySection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final lock = ref.watch(appLockProvider);
+    final reminder = ref.watch(dailyReminderProvider);
+
+    return Card(
+      elevation: 8,
+      shadowColor: AppTheme.neonViolet.withValues(alpha: 0.25),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppTheme.neonViolet.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.shield_outlined,
+                    color: AppTheme.neonViolet,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Security & Reminders',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Protect the app and remember to log daily',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            _SecurityToggleRow(
+              switchKey: const ValueKey('settings-app-lock-toggle'),
+              icon: Icons.fingerprint,
+              title: 'App lock',
+              subtitle: lock.isSupported
+                  ? 'Require your fingerprint, face, or PIN to open the app'
+                  : 'No screen lock is set up on this device, so this is unavailable',
+              value: lock.enabled,
+              enabled: lock.isSupported,
+              onChanged: (value) =>
+                  ref.read(appLockProvider.notifier).setEnabled(value),
+            ),
+            const SizedBox(height: 14),
+            const Divider(height: 1),
+            const SizedBox(height: 14),
+            _SecurityToggleRow(
+              switchKey: const ValueKey('settings-daily-reminder-toggle'),
+              icon: Icons.notifications_active_outlined,
+              title: 'Daily reminder',
+              subtitle: reminder.enabled
+                  ? 'Reminding you at ${reminder.time.format(context)} every day'
+                  : "Get a nudge to log today's spending",
+              value: reminder.enabled,
+              enabled: true,
+              onChanged: (value) async {
+                final granted = await ref
+                    .read(dailyReminderProvider.notifier)
+                    .setEnabled(value);
+                if (!granted && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Notification permission was denied. Enable it in your phone settings to use reminders.',
+                      ),
+                    ),
+                  );
+                }
+              },
+            ),
+            if (reminder.enabled) ...[
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: OutlinedButton.icon(
+                  key: const ValueKey('settings-reminder-time-button'),
+                  onPressed: () async {
+                    final picked = await showTimePicker(
+                      context: context,
+                      initialTime: reminder.time,
+                    );
+                    if (picked != null) {
+                      await ref
+                          .read(dailyReminderProvider.notifier)
+                          .setTime(picked);
+                    }
+                  },
+                  icon: const Icon(Icons.schedule, size: 18),
+                  label: Text('Remind me at ${reminder.time.format(context)}'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SecurityToggleRow extends StatelessWidget {
+  const _SecurityToggleRow({
+    required this.switchKey,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final Key switchKey;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled
+        ? AppTheme.neonViolet
+        : Theme.of(context).colorScheme.onSurfaceVariant;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 2),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Switch(
+          key: switchKey,
+          value: value,
+          onChanged: enabled ? onChanged : null,
+        ),
+      ],
     );
   }
 }

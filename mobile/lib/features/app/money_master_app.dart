@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/daily_reminder_controller.dart';
 import '../../core/theme_mode_controller.dart';
 import '../../shared/theme/app_theme.dart';
 import '../auth/auth_gate.dart';
@@ -11,6 +12,9 @@ class MoneyMasterApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    // Touching this provider on every launch re-syncs the scheduled daily
+    // reminder in case the OS cleared it (force-stop, battery optimization).
+    ref.read(dailyReminderProvider);
     return MaterialApp(
       title: 'Money Master',
       debugShowCheckedModeBanner: false,

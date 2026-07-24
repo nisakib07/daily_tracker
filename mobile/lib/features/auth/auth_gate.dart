@@ -7,6 +7,7 @@ import '../../core/app_config.dart';
 import '../../data/cached_money_data_source.dart';
 import '../../data/money_repository.dart';
 import '../dashboard/dashboard_screen.dart';
+import 'app_lock_gate.dart';
 import 'sign_in_screen.dart';
 
 class AuthGate extends StatefulWidget {
@@ -76,7 +77,9 @@ class _AuthGateState extends State<AuthGate> {
       return const SignInScreen();
     }
 
-    return DashboardScreen(user: _user!, dataSource: _dataSource);
+    return AppLockGate(
+      child: DashboardScreen(user: _user!, dataSource: _dataSource),
+    );
   }
 }
 

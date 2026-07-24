@@ -34,6 +34,8 @@ void main() {
 
     expect(find.text('Settings'), findsOneWidget);
     expect(find.text('Personal categories'), findsOneWidget);
+
+    await _scrollToCategories(tester, find.text('Income Categories'));
     expect(find.text('Income Categories'), findsOneWidget);
     expect(find.text('Expense Categories'), findsOneWidget);
     expect(
@@ -65,10 +67,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('settings-income-input')),
-      'consulting',
-    );
+    final incomeInput = find.byKey(const ValueKey('settings-income-input'));
+    await _scrollToCategories(tester, incomeInput);
+    await tester.enterText(incomeInput, 'consulting');
     await tester.pump();
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
@@ -92,10 +93,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(
-      find.byKey(const ValueKey('settings-expense-input')),
-      'Home repairs',
-    );
+    final expenseInput = find.byKey(const ValueKey('settings-expense-input'));
+    await _scrollToCategories(tester, expenseInput);
+    await tester.enterText(expenseInput, 'Home repairs');
     await tester.pump();
     await tester.testTextInput.receiveAction(TextInputAction.done);
     await tester.pumpAndSettle();
@@ -175,6 +175,71 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // local_auth.isDeviceSupported() never resolves without a registered
+  // platform channel in the widget test harness (it hangs rather than
+  // throwing), so this can only be exercised on-device.
+  testWidgets(
+    'Settings shows app lock as unavailable when the device has no screen lock',
+    skip: true,
+    (tester) async {
+      await _pumpAtSize(
+        tester,
+        const Size(320, 568),
+        const SettingsSheet(email: 'user@example.com'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Security & Reminders'), findsOneWidget);
+      expect(
+        find.text(
+          'No screen lock is set up on this device, so this is unavailable',
+        ),
+        findsOneWidget,
+      );
+
+      final lockSwitch = tester.widget<Switch>(
+        find.byKey(const ValueKey('settings-app-lock-toggle')),
+      );
+      expect(lockSwitch.value, isFalse);
+      expect(lockSwitch.onChanged, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  // FlutterTimezone.getLocalTimezone() never resolves without a registered
+  // platform channel in the widget test harness (it hangs rather than
+  // throwing), so this can only be exercised on-device.
+  testWidgets(
+    'Settings daily reminder toggle fails gracefully without the native plugin',
+    skip: true,
+    (tester) async {
+      await _pumpAtSize(
+        tester,
+        const Size(320, 568),
+        const SettingsSheet(email: 'user@example.com'),
+      );
+      await tester.pumpAndSettle();
+
+      final reminderSwitch = find.byKey(
+        const ValueKey('settings-daily-reminder-toggle'),
+      );
+      expect(tester.widget<Switch>(reminderSwitch).value, isFalse);
+
+      await tester.tap(reminderSwitch);
+      await tester.pumpAndSettle();
+
+      // No native notification plugin is registered in the widget test
+      // environment, so enabling should fail gracefully with a message
+      // rather than throwing or silently reporting success.
+      expect(
+        find.textContaining('Notification permission was denied'),
+        findsOneWidget,
+      );
+      expect(tester.widget<Switch>(reminderSwitch).value, isFalse);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Settings helper opens and closes a full-page route', (
     tester,
   ) async {
@@ -221,5 +286,21 @@ Future<void> _pumpAtSize(WidgetTester tester, Size size, Widget child) async {
     ProviderScope(
       child: MaterialApp(theme: AppTheme.light(), home: child),
     ),
+  );
+}
+
+/// The category sections sit below the Appearance and Security cards, so on
+/// short viewports they can fall outside the ListView's lazy-build range
+/// until scrolled into view.
+Future<void> _scrollToCategories(WidgetTester tester, Finder target) async {
+  await tester.scrollUntilVisible(
+    target,
+    200,
+    scrollable: find
+        .descendant(
+          of: find.byKey(const ValueKey('settings-scroll-view')),
+          matching: find.byType(Scrollable),
+        )
+        .first,
   );
 }
