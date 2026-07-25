@@ -51,7 +51,6 @@ class _DashboardScreenState extends State<DashboardScreen>
   final TextEditingController _activitySearchController =
       TextEditingController();
   final GlobalKey _tabContentKey = GlobalKey();
-  int _snapshotVersion = 0;
   bool _isMutating = false;
   DashboardTab _activeTab = DashboardTab.activity;
   ActivityMode _activityMode = ActivityMode.daily;
@@ -79,7 +78,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       _cacheSubscription = dataSource.snapshots.listen((snapshot) {
         if (!mounted) return;
         setState(() {
-          _snapshotVersion++;
           _snapshotFuture = Future<DashboardSnapshot>.value(snapshot);
         });
       });
@@ -124,7 +122,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
     if (!hasCachedSnapshot) {
       setState(() {
-        _snapshotVersion++;
         _snapshotFuture = nextSnapshot;
       });
     }
@@ -536,15 +533,18 @@ class _DashboardScreenState extends State<DashboardScreen>
             child: AbsorbPointer(
               absorbing: _isMutating,
               child: FutureBuilder<DashboardSnapshot>(
-                key: ValueKey(_snapshotVersion),
                 future: _snapshotFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState != ConnectionState.done) {
-                    return const _LoadingState();
-                  }
-
-                  if (snapshot.hasError) {
-                    return _ErrorState(onRetry: _refresh);
+                  // Once we have data once, keep showing it through later
+                  // background refreshes instead of flashing back to a
+                  // loading placeholder while the new future settles.
+                  if (!snapshot.hasData) {
+                    if (snapshot.connectionState != ConnectionState.done) {
+                      return const _LoadingState();
+                    }
+                    if (snapshot.hasError) {
+                      return _ErrorState(onRetry: _refresh);
+                    }
                   }
 
                   final data = snapshot.requireData;
@@ -788,7 +788,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         ],
       ),
       floatingActionButton: FutureBuilder<DashboardSnapshot>(
-        key: ValueKey('fab-$_snapshotVersion'),
         future: _snapshotFuture,
         builder: (context, snapshot) {
           if (!snapshot.hasData) return const SizedBox.shrink();
@@ -1608,6 +1607,7 @@ class _MonthlyStatsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final monthStart = DateTime(selectedMonth.year, selectedMonth.month);
     final monthTransactions = snapshot.transactions.where((transaction) {
       final date = transaction.displayDate;
       return date.year == selectedMonth.year &&
@@ -1622,6 +1622,23 @@ class _MonthlyStatsPanel extends StatelessWidget {
         .fold<double>(0, (total, transaction) => total + transaction.amount);
     final net = income - expense;
     final savingsRate = income > 0 ? ((net / income) * 100).clamp(0, 100) : 0;
+
+    // Cash carried forward from before this month: unlike income/expense
+    // above, this includes loan and investment cash flows since it tracks
+    // actual cash in hand, not just income/spending.
+    const positiveTypes = {'income', 'borrow', 'receive', 'invest_return'};
+    const negativeTypes = {'expense', 'lend', 'repay', 'invest'};
+    final openingBalance = snapshot.transactions
+        .where((transaction) => transaction.displayDate.isBefore(monthStart))
+        .fold<double>(0, (total, transaction) {
+          if (positiveTypes.contains(transaction.type)) {
+            return total + transaction.amount;
+          }
+          if (negativeTypes.contains(transaction.type)) {
+            return total - transaction.amount;
+          }
+          return total;
+        });
 
     final nowMonth = DateTime(DateTime.now().year, DateTime.now().month);
     final isCurrentMonth =
@@ -1694,13 +1711,26 @@ class _MonthlyStatsPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: _StatTile(
+                    label: 'Opening Balance',
+                    value: openingBalance,
+                    color: AppTheme.neonViolet,
+                    icon: Icons.account_balance_wallet_outlined,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StatTile(
                     label: 'Income',
                     value: income,
                     color: AppTheme.neonEmerald,
                     icon: Icons.trending_up,
                   ),
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 Expanded(
                   child: _StatTile(
                     label: 'Expense',

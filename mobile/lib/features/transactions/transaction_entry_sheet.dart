@@ -452,12 +452,13 @@ class EditTransactionSheet extends StatefulWidget {
 class _EditTransactionSheetState extends State<EditTransactionSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
-  final _categoryController = TextEditingController();
   final _noteController = TextEditingController();
 
   String? _accountId;
   String? _toAccountId;
   String? _personId;
+  String? _category;
+  List<String> _categories = const [];
   late DateTime _selectedDate;
   bool _isSaving = false;
   String? _error;
@@ -532,7 +533,6 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
     super.initState();
     _amountController.text = _amountText(_transaction.amount);
     _noteController.text = _transaction.note ?? '';
-    _categoryController.text = _transaction.category ?? _defaultCategory();
     _selectedDate = _transaction.displayDate;
     _accountId = _initialAccountId();
     _toAccountId = _transaction.toAccountId;
@@ -555,14 +555,44 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
     if (!_hasPerson(_personId)) {
       _personId = null;
     }
+
+    if (_showCategory) {
+      _category = _transaction.category ?? _defaultCategory();
+      _categories = _withCurrentCategory(_defaultCategoryList);
+      _loadCategories();
+    }
   }
 
   @override
   void dispose() {
     _amountController.dispose();
-    _categoryController.dispose();
     _noteController.dispose();
     super.dispose();
+  }
+
+  List<String> get _defaultCategoryList {
+    if (_transaction.isIncomeLike) return defaultIncomeCategories;
+    if (_transaction.isExpenseLike) return defaultExpenseCategories;
+    return const [];
+  }
+
+  // The transaction's saved category may be a legacy/custom value that
+  // isn't in the default or merged list; the dropdown requires its value
+  // to be one of its items, so make sure it's always included.
+  List<String> _withCurrentCategory(List<String> categories) {
+    if (_category == null || categories.contains(_category)) {
+      return categories;
+    }
+    return [_category!, ...categories];
+  }
+
+  Future<void> _loadCategories() async {
+    final kind = _transaction.isIncomeLike
+        ? CategoryKind.income
+        : CategoryKind.expense;
+    final categories = await CategoryStore().loadMerged(kind);
+    if (!mounted) return;
+    setState(() => _categories = _withCurrentCategory(categories));
   }
 
   Future<void> _save() async {
@@ -589,9 +619,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
             accountId: _accountId!,
             toAccountId: _isTransfer ? _toAccountId : null,
             personId: _showPerson ? _personId : _transaction.personId,
-            category: _showCategory
-                ? _categoryController.text
-                : _transaction.category,
+            category: _showCategory ? _category : _transaction.category,
             note: _noteController.text,
             occurredAt: _dateWithOriginalTime(
               _selectedDate,
@@ -701,18 +729,11 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
                       ],
                       if (_showCategory) ...[
                         const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _categoryController,
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            labelText: 'Category',
-                            prefixIcon: Icon(Icons.sell_outlined),
-                          ),
-                          validator: (value) {
-                            if ((value ?? '').trim().isEmpty) {
-                              return 'Enter a category';
-                            }
-                            return null;
+                        _CategoryDropdown(
+                          value: _category,
+                          categories: _categories,
+                          onChanged: (value) {
+                            setState(() => _category = value);
                           },
                         ),
                       ],
