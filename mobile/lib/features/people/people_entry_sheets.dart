@@ -42,13 +42,12 @@ Future<void> showPersonHistorySheet({
   required Person person,
   required List<TransactionRecord> transactions,
 }) {
-  return showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.transparent,
-    builder: (context) =>
-        PersonHistorySheet(person: person, transactions: transactions),
+  return Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      fullscreenDialog: true,
+      builder: (context) =>
+          PersonHistorySheet(person: person, transactions: transactions),
+    ),
   );
 }
 
@@ -671,64 +670,66 @@ class PersonHistorySheet extends StatelessWidget {
     final color = receive ? AppTheme.neonEmerald : AppTheme.neonAmber;
     final status = receive ? 'They owe you' : 'You owe';
 
-    return _SheetFrame(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _Handle(),
-          const SizedBox(height: 18),
-          _Header(
-            title: person.name,
-            subtitle: person.phone?.isNotEmpty == true
-                ? person.phone!
-                : 'Loan history and balance',
-            icon: Icons.receipt_long_outlined,
-            color: color,
-          ),
-          if (person.note?.isNotEmpty == true) ...[
-            const SizedBox(height: 10),
+    return AppFormPage(
+      title: person.name,
+      accent: color,
+      child: SingleChildScrollView(
+        padding: appFormContentPadding(context),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppFormHeader(
+              title: person.name,
+              subtitle: person.phone?.isNotEmpty == true
+                  ? person.phone!
+                  : 'Loan history and balance',
+              icon: Icons.receipt_long_outlined,
+              color: color,
+            ),
+            if (person.note?.isNotEmpty == true) ...[
+              const SizedBox(height: 10),
+              Text(
+                person.note!,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            _HistoryBalanceCard(
+              status: status,
+              amount: summary.netBalance.abs(),
+              color: color,
+              theyOwe: summary.theyOwe,
+              youOwe: summary.youOwe,
+            ),
+            const SizedBox(height: 18),
             Text(
-              person.note!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              'History',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 10),
+            if (rows.isEmpty)
+              const _HistoryEmptyState()
+            else
+              ...rows.map(
+                (transaction) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _PersonHistoryTile(transaction: transaction),
+                ),
+              ),
+            const SizedBox(height: 4),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
               ),
             ),
           ],
-          const SizedBox(height: 16),
-          _HistoryBalanceCard(
-            status: status,
-            amount: summary.netBalance.abs(),
-            color: color,
-            theyOwe: summary.theyOwe,
-            youOwe: summary.youOwe,
-          ),
-          const SizedBox(height: 18),
-          Text(
-            'History',
-            style: Theme.of(
-              context,
-            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          if (rows.isEmpty)
-            const _HistoryEmptyState()
-          else
-            ...rows.map(
-              (transaction) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _PersonHistoryTile(transaction: transaction),
-              ),
-            ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close'),
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -923,115 +924,6 @@ class _HistoryEmptyState extends StatelessWidget {
       message: 'Borrowing and lending activity for this person will show here.',
       color: AppTheme.neonAmber,
       compact: true,
-    );
-  }
-}
-
-class _SheetFrame extends StatelessWidget {
-  const _SheetFrame({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        widthFactor: 1,
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: 560,
-            maxHeight: size.height * 0.9,
-          ),
-          child: Material(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-            clipBehavior: Clip.antiAlias,
-            child: SafeArea(
-              top: false,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
-                child: child,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _Handle extends StatelessWidget {
-  const _Handle();
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        width: 42,
-        height: 4,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.outlineVariant,
-          borderRadius: BorderRadius.circular(99),
-        ),
-      ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
+import '../../shared/widgets/app_form_page.dart';
 import '../../shared/widgets/app_state_widgets.dart';
 
 enum TransactionEntryKind { income, expense, transfer }
@@ -304,7 +305,7 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
         widget.accounts.isNotEmpty &&
         (!_isTransfer || widget.accounts.length > 1);
 
-    return _TransactionFormPage(
+    return AppFormPage(
       title: _title,
       accent: _accent,
       child: Form(
@@ -315,7 +316,7 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: _formContentPadding(context),
+                padding: appFormContentPadding(context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -408,9 +409,9 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
                 ),
               ),
             ),
-            _ActionBar(
+            AppFormActionBar(
               accent: _accent,
-              title: _title,
+              saveLabel: _title,
               isSaving: _isSaving,
               canSave: canSave,
               onCancel: () => Navigator.of(context).pop(false),
@@ -667,7 +668,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
         (!_isTransfer || widget.accounts.length > 1) &&
         (!_isLoanRelated || widget.people.isNotEmpty);
 
-    return _TransactionFormPage(
+    return AppFormPage(
       title: 'Edit Transaction',
       accent: _accent,
       child: Form(
@@ -678,7 +679,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
               child: SingleChildScrollView(
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
-                padding: _formContentPadding(context),
+                padding: appFormContentPadding(context),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -784,9 +785,9 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
                 ),
               ),
             ),
-            _ActionBar(
+            AppFormActionBar(
               accent: _accent,
-              title: 'Save Changes',
+              saveLabel: 'Save Changes',
               isSaving: _isSaving,
               canSave: canSave,
               onCancel: () => Navigator.of(context).pop(false),
@@ -834,72 +835,6 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
   bool _hasPerson(String? personId) {
     return personId != null &&
         widget.people.any((person) => person.id == personId);
-  }
-}
-
-class _TransactionFormPage extends StatelessWidget {
-  const _TransactionFormPage({
-    required this.title,
-    required this.accent,
-    required this.child,
-  });
-
-  final String title;
-  final Color accent;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          tooltip: 'Close',
-          onPressed: () => Navigator.of(context).pop(false),
-          icon: const Icon(Icons.close),
-        ),
-        title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth > 640
-                ? 640.0
-                : constraints.maxWidth;
-
-            return Align(
-              alignment: Alignment.topCenter,
-              child: SizedBox(
-                width: width,
-                height: constraints.maxHeight,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    border: Border(
-                      top: BorderSide(color: accent.withValues(alpha: 0.24)),
-                      left: constraints.maxWidth > 640
-                          ? BorderSide(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            )
-                          : BorderSide.none,
-                      right: constraints.maxWidth > 640
-                          ? BorderSide(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.outlineVariant,
-                            )
-                          : BorderSide.none,
-                    ),
-                  ),
-                  child: FocusTraversalGroup(child: child),
-                ),
-              ),
-            );
-          },
-        ),
-      ),
-    );
   }
 }
 
@@ -1311,93 +1246,6 @@ class _NoPeopleNotice extends StatelessWidget {
       color: AppTheme.neonRose,
     );
   }
-}
-
-class _ActionBar extends StatelessWidget {
-  const _ActionBar({
-    required this.accent,
-    required this.title,
-    required this.isSaving,
-    required this.canSave,
-    required this.onCancel,
-    required this.onSave,
-  });
-
-  final Color accent;
-  final String title;
-  final bool isSaving;
-  final bool canSave;
-  final VoidCallback onCancel;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 360;
-        return Container(
-          padding: EdgeInsets.fromLTRB(
-            compact ? 12 : 18,
-            12,
-            compact ? 12 : 18,
-            compact ? 12 : 18,
-          ),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            border: Border(
-              top: BorderSide(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: isSaving ? null : onCancel,
-                  child: const Text(
-                    'Cancel',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              SizedBox(width: compact ? 8 : 10),
-              Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: isSaving || !canSave ? null : onSave,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accent,
-                    foregroundColor: Colors.white,
-                  ),
-                  icon: isSaving
-                      ? Semantics(
-                          label: 'Saving',
-                          child: const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : const Icon(Icons.check),
-                  label: Text(
-                    isSaving ? 'Saving...' : title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-EdgeInsets _formContentPadding(BuildContext context) {
-  final horizontal = MediaQuery.sizeOf(context).width < 360 ? 12.0 : 18.0;
-  return EdgeInsets.fromLTRB(horizontal, 10, horizontal, 18);
 }
 
 DateTime _dateWithCurrentTime(DateTime date) {
