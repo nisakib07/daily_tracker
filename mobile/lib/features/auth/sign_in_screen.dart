@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_state_widgets.dart';
 import '../../shared/widgets/aurora_background.dart';
+import 'forgot_password_screen.dart';
 
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -68,6 +69,7 @@ class _SignInScreenState extends State<SignInScreen> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
+                key: const ValueKey('sign-in-scroll-view'),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 padding: EdgeInsets.all(compact ? 12 : 24),
@@ -200,6 +202,21 @@ class _SignInScreenState extends State<SignInScreen> {
                                     }
                                     return null;
                                   },
+                                ),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: TextButton(
+                                    onPressed: _isLoading
+                                        ? null
+                                        : () => Navigator.of(context).push(
+                                            MaterialPageRoute(
+                                              fullscreenDialog: true,
+                                              builder: (context) =>
+                                                  const ForgotPasswordScreen(),
+                                            ),
+                                          ),
+                                    child: const Text('Forgot password?'),
+                                  ),
                                 ),
                                 if (_error != null) ...[
                                   const SizedBox(height: 12),

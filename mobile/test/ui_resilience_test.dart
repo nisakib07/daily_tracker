@@ -122,10 +122,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(password.hitTestable(), findsOneWidget);
-    expect(
-      find.widgetWithText(FilledButton, 'Sign in').hitTestable(),
-      findsOneWidget,
+
+    final signIn = find.widgetWithText(FilledButton, 'Sign in');
+    await tester.scrollUntilVisible(
+      signIn,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const ValueKey('sign-in-scroll-view')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
     );
+
+    expect(signIn.hitTestable(), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
