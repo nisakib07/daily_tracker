@@ -49,11 +49,21 @@ class DailyReminderController extends Notifier<DailyReminderSettings> {
 
   Future<void> _restore() async {
     final prefs = await SharedPreferences.getInstance();
-    final enabled = prefs.getBool(_reminderEnabledPrefsKey) ?? false;
+    var enabled = prefs.getBool(_reminderEnabledPrefsKey) ?? false;
     final hour =
         prefs.getInt(_reminderHourPrefsKey) ?? kDefaultReminderTime.hour;
     final minute =
         prefs.getInt(_reminderMinutePrefsKey) ?? kDefaultReminderTime.minute;
+
+    if (enabled &&
+        !await NotificationService.instance.arePermissionsGranted()) {
+      // The OS-level permission was revoked (e.g. from system settings)
+      // since the reminder was enabled; reflect that instead of silently
+      // keeping a reminder "on" that will never actually fire.
+      enabled = false;
+      await prefs.setBool(_reminderEnabledPrefsKey, false);
+    }
+
     state = DailyReminderSettings(
       loaded: true,
       enabled: enabled,

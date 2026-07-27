@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:money_master/data/cached_money_data_source.dart';
 import 'package:money_master/data/money_repository.dart';
+import 'package:money_master/data/offline_mutation_queue.dart';
 import 'package:money_master/data/secure_cache_store.dart';
 import 'package:money_master/models/money_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -154,7 +155,8 @@ DashboardSnapshot _snapshot({double amount = 100}) {
   );
 }
 
-class _FakeMoneyDataSource implements MoneyDataSource {
+class _FakeMoneyDataSource
+    implements MoneyDataSource, IdempotentMoneyMutationExecutor {
   _FakeMoneyDataSource(this.snapshot);
 
   DashboardSnapshot snapshot;
@@ -165,6 +167,11 @@ class _FakeMoneyDataSource implements MoneyDataSource {
   Future<DashboardSnapshot> fetchDashboard() async {
     fetchCount++;
     return snapshot;
+  }
+
+  @override
+  Future<void> executeMutation(QueuedMoneyMutation mutation) async {
+    if (mutation.kind == 'money_in') createMoneyInCount++;
   }
 
   @override

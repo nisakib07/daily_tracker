@@ -49,6 +49,7 @@ class SecureDashboardCacheStore implements DashboardCacheStore {
   final SharedPreferences? _preferences;
   final AesGcm _cipher = AesGcm.with256bits();
   SecretKey? _secretKey;
+  Future<SecretKey>? _keyFuture;
 
   @override
   Future<String?> read(String key) async {
@@ -107,10 +108,17 @@ class SecureDashboardCacheStore implements DashboardCacheStore {
     await prefs.remove(key);
   }
 
-  Future<SecretKey> _loadKey() async {
+  Future<SecretKey> _loadKey() {
     final existing = _secretKey;
-    if (existing != null) return existing;
+    if (existing != null) return Future.value(existing);
+    // Memoize the in-flight load/create so concurrent read()/write() calls
+    // on first run await the same key instead of racing to each generate
+    // and persist their own, which would leave one caller silently unable
+    // to decrypt what the other wrote.
+    return _keyFuture ??= _loadOrCreateKey();
+  }
 
+  Future<SecretKey> _loadOrCreateKey() async {
     final encoded = await _keyStore.read(_keyName);
     if (encoded != null && encoded.isNotEmpty) {
       final key = SecretKey(base64Decode(encoded));

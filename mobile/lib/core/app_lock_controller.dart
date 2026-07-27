@@ -36,10 +36,13 @@ class AppLockController extends Notifier<AppLockSettings> {
   @override
   AppLockSettings build() {
     unawaited(_restore());
+    // Default to unsupported until _restore() confirms otherwise, so the
+    // Settings toggle can't briefly appear enabled on a device that turns
+    // out not to have a usable biometric/device-credential lock.
     return const AppLockSettings(
       loaded: false,
       enabled: false,
-      isSupported: true,
+      isSupported: false,
     );
   }
 

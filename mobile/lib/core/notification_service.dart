@@ -64,7 +64,12 @@ class NotificationService {
             AndroidFlutterLocalNotificationsPlugin
           >();
       if (androidPlugin != null) {
-        return await androidPlugin.requestNotificationsPermission() ?? false;
+        final granted = await androidPlugin.requestNotificationsPermission();
+        // null means the runtime POST_NOTIFICATIONS permission doesn't apply
+        // on this OS version (Android < 13), not that it was denied — fall
+        // back to whether notifications are actually enabled for the app.
+        if (granted != null) return granted;
+        return await androidPlugin.areNotificationsEnabled() ?? true;
       }
 
       final iosPlugin = _plugin
@@ -86,6 +91,39 @@ class NotificationService {
         'Could not request notification permission: $error\n$stackTrace',
       );
       return false;
+    }
+  }
+
+  /// Checks current permission status without prompting the user. Used to
+  /// detect a permission that was revoked from system settings after the
+  /// reminder was enabled, so the app doesn't keep believing it's active.
+  Future<bool> arePermissionsGranted() async {
+    if (!await _ensureInitialized()) return false;
+
+    try {
+      final androidPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      if (androidPlugin != null) {
+        return await androidPlugin.areNotificationsEnabled() ?? true;
+      }
+
+      final iosPlugin = _plugin
+          .resolvePlatformSpecificImplementation<
+            IOSFlutterLocalNotificationsPlugin
+          >();
+      if (iosPlugin != null) {
+        final status = await iosPlugin.checkPermissions();
+        return status?.isEnabled ?? true;
+      }
+
+      return true;
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Could not check notification permission: $error\n$stackTrace',
+      );
+      return true;
     }
   }
 

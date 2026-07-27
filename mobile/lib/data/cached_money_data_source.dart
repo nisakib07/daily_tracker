@@ -61,6 +61,8 @@ class CachedMoneyDataSource
 
   int get pendingMutationCount => _mutationQueue.pendingCount;
 
+  int get failedMutationCount => _mutationQueue.failedCount;
+
   bool get hasStaleData {
     final syncedAt = _lastSyncedAt;
     return _snapshot != null &&
@@ -173,20 +175,17 @@ class CachedMoneyDataSource
   Future<void> _mutate({
     required String kind,
     required Map<String, dynamic> payload,
-    required Future<void> Function() fallback,
   }) async {
-    final executor = remote;
-    if (executor is IdempotentMoneyMutationExecutor) {
-      final mutationExecutor = executor as IdempotentMoneyMutationExecutor;
-      final mutation = _mutationQueue.create(kind, payload);
-      try {
-        await mutationExecutor.executeMutation(mutation);
-      } catch (error) {
-        if (!isRetryableMutationError(error)) rethrow;
-        await _mutationQueue.enqueue(mutation);
-      }
-    } else {
-      await fallback();
+    // remote is always a MoneyRepository in production, which implements
+    // IdempotentMoneyMutationExecutor — every mutation goes through the
+    // offline-capable queue path.
+    final executor = remote as IdempotentMoneyMutationExecutor;
+    final mutation = _mutationQueue.create(kind, payload);
+    try {
+      await executor.executeMutation(mutation);
+    } catch (error) {
+      if (!isRetryableMutationError(error)) rethrow;
+      await _mutationQueue.enqueue(mutation);
     }
 
     _needsRemoteRefresh = true;
@@ -209,7 +208,9 @@ class CachedMoneyDataSource
           await refresh();
         }
       } catch (_) {
-        // Non-retryable failures remain visible through the normal form flow.
+        // Truly unexpected errors only; non-retryable mutation failures are
+        // already moved to the queue's failed list by drain() and don't
+        // throw here.
       } finally {
         _notifyStatus();
       }
@@ -281,13 +282,6 @@ class CachedMoneyDataSource
       'occurred_at': toSupabaseTimestamp(occurredAt),
       'note': note,
     },
-    fallback: () => remote.createMoneyIn(
-      amount: amount,
-      accountId: accountId,
-      category: category,
-      occurredAt: occurredAt,
-      note: note,
-    ),
   );
 
   @override
@@ -306,13 +300,6 @@ class CachedMoneyDataSource
       'occurred_at': toSupabaseTimestamp(occurredAt),
       'note': note,
     },
-    fallback: () => remote.createMoneyOut(
-      amount: amount,
-      accountId: accountId,
-      category: category,
-      occurredAt: occurredAt,
-      note: note,
-    ),
   );
 
   @override
@@ -331,13 +318,6 @@ class CachedMoneyDataSource
       'occurred_at': toSupabaseTimestamp(occurredAt),
       'note': note,
     },
-    fallback: () => remote.createTransfer(
-      amount: amount,
-      fromAccountId: fromAccountId,
-      toAccountId: toAccountId,
-      occurredAt: occurredAt,
-      note: note,
-    ),
   );
 
   @override
@@ -348,7 +328,6 @@ class CachedMoneyDataSource
   }) => _mutate(
     kind: 'create_person',
     payload: {'name': name, 'phone': phone, 'note': note},
-    fallback: () => remote.createPerson(name: name, phone: phone, note: note),
   );
 
   @override
@@ -365,20 +344,11 @@ class CachedMoneyDataSource
       'phone': phone,
       'note': note,
     },
-    fallback: () => remote.updatePerson(
-      personId: personId,
-      name: name,
-      phone: phone,
-      note: note,
-    ),
   );
 
   @override
-  Future<void> deletePerson(String personId) => _mutate(
-    kind: 'delete_person',
-    payload: {'person_id': personId},
-    fallback: () => remote.deletePerson(personId),
-  );
+  Future<void> deletePerson(String personId) =>
+      _mutate(kind: 'delete_person', payload: {'person_id': personId});
 
   @override
   Future<void> updateAccount({
@@ -396,13 +366,6 @@ class CachedMoneyDataSource
       'add_money': addMoney,
       'note': note,
     },
-    fallback: () => remote.updateAccount(
-      accountId: accountId,
-      name: name,
-      adjustmentAmount: adjustmentAmount,
-      addMoney: addMoney,
-      note: note,
-    ),
   );
 
   @override
@@ -430,14 +393,6 @@ class CachedMoneyDataSource
       'occurred_at': toSupabaseTimestamp(occurredAt),
       'note': note,
     },
-    fallback: () => remote.createLoanTransaction(
-      type: type,
-      amount: amount,
-      accountId: accountId,
-      personId: personId,
-      occurredAt: occurredAt,
-      note: note,
-    ),
   );
 
   @override
@@ -458,14 +413,6 @@ class CachedMoneyDataSource
       'description': description,
       'note': note,
     },
-    fallback: () => remote.createInvestment(
-      name: name,
-      amount: amount,
-      fromAccountId: fromAccountId,
-      occurredAt: occurredAt,
-      description: description,
-      note: note,
-    ),
   );
 
   @override
@@ -484,13 +431,6 @@ class CachedMoneyDataSource
       'occurred_at': toSupabaseTimestamp(occurredAt),
       'note': note,
     },
-    fallback: () => remote.addInvestmentFunds(
-      investmentId: investmentId,
-      amount: amount,
-      fromAccountId: fromAccountId,
-      occurredAt: occurredAt,
-      note: note,
-    ),
   );
 
   @override
@@ -511,14 +451,6 @@ class CachedMoneyDataSource
       'close_investment': closeInvestment,
       'note': note,
     },
-    fallback: () => remote.recordInvestmentReturn(
-      investmentId: investmentId,
-      amount: amount,
-      toAccountId: toAccountId,
-      occurredAt: occurredAt,
-      closeInvestment: closeInvestment,
-      note: note,
-    ),
   );
 
   @override
@@ -555,16 +487,6 @@ class CachedMoneyDataSource
         'category': transfer ? 'Transfer' : category,
         'note': note,
       },
-      fallback: () => remote.updateTransaction(
-        transaction: transaction,
-        amount: amount,
-        occurredAt: occurredAt,
-        accountId: accountId,
-        toAccountId: toAccountId,
-        personId: personId,
-        category: category,
-        note: note,
-      ),
     );
   }
 
@@ -578,29 +500,24 @@ class CachedMoneyDataSource
       'month': DateTime(month.year, month.month).toIso8601String(),
       'budgets': budgets,
     },
-    fallback: () =>
-        remote.replaceBudgetsForMonth(month: month, budgets: budgets),
   );
 
   @override
   Future<void> clearBudgetsForMonth(DateTime month) => _mutate(
     kind: 'clear_budgets',
     payload: {'month': DateTime(month.year, month.month).toIso8601String()},
-    fallback: () => remote.clearBudgetsForMonth(month),
   );
 
   @override
   Future<void> deleteInvestment(String investmentId) => _mutate(
     kind: 'delete_investment',
     payload: {'investment_id': investmentId},
-    fallback: () => remote.deleteInvestment(investmentId),
   );
 
   @override
   Future<void> deleteTransaction(String transactionId) => _mutate(
     kind: 'delete_transaction',
     payload: {'transaction_id': transactionId},
-    fallback: () => remote.deleteTransaction(transactionId),
   );
 
   Future<void> close() async {

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/app_lock_controller.dart';
 import '../../shared/theme/app_theme.dart';
@@ -70,6 +71,14 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
     });
   }
 
+  Future<void> _signOut() async {
+    // The one way out if biometrics/device credential stop working while
+    // app-lock is enabled — signing out ends the local session (Supabase
+    // auth + RLS remain the real security boundary), and AuthGate swaps
+    // this whole screen out for SignInScreen once the session clears.
+    await Supabase.instance.client.auth.signOut();
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(appLockProvider);
@@ -86,7 +95,11 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
     if (!_locked) return widget.child;
 
-    return _LockScreen(isAuthenticating: _authenticating, onUnlock: _unlock);
+    return _LockScreen(
+      isAuthenticating: _authenticating,
+      onUnlock: _unlock,
+      onSignOut: _signOut,
+    );
   }
 }
 
@@ -103,10 +116,15 @@ class _AppLockSplash extends StatelessWidget {
 }
 
 class _LockScreen extends StatelessWidget {
-  const _LockScreen({required this.isAuthenticating, required this.onUnlock});
+  const _LockScreen({
+    required this.isAuthenticating,
+    required this.onUnlock,
+    required this.onSignOut,
+  });
 
   final bool isAuthenticating;
   final VoidCallback onUnlock;
+  final VoidCallback onSignOut;
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +204,11 @@ class _LockScreen extends StatelessWidget {
                               isAuthenticating ? 'Checking...' : 'Unlock',
                             ),
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: isAuthenticating ? null : onSignOut,
+                          child: const Text('Sign out instead'),
                         ),
                       ],
                     ),

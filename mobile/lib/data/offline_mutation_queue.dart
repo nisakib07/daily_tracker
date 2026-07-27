@@ -67,8 +67,17 @@ class OfflineMutationQueue {
   Future<void>? _loadFuture;
   Future<int>? _drainFuture;
   final List<QueuedMoneyMutation> _mutations = [];
+  final List<QueuedMoneyMutation> _failed = [];
 
   int get pendingCount => _mutations.length;
+
+  /// Mutations that failed with a non-retryable error during drain (e.g. the
+  /// referenced row was deleted before the queued mutation could be applied).
+  /// Kept out of the active queue so one bad mutation can't block every
+  /// mutation queued after it.
+  int get failedCount => _failed.length;
+
+  List<QueuedMoneyMutation> get failedMutations => List.unmodifiable(_failed);
 
   QueuedMoneyMutation create(String kind, Map<String, dynamic> payload) {
     return QueuedMoneyMutation(
@@ -113,7 +122,14 @@ class OfflineMutationQueue {
         await executor.executeMutation(mutation);
       } catch (error) {
         if (isRetryableMutationError(error)) return applied;
-        rethrow;
+        // A non-retryable failure means this specific mutation can never
+        // succeed (e.g. it references a row deleted in the meantime) — drop
+        // it into the failed list rather than leaving it stuck at the head
+        // of the queue, which would block every mutation queued after it.
+        _mutations.removeAt(0);
+        _failed.add(mutation);
+        await _persist();
+        continue;
       }
 
       _mutations.removeAt(0);
@@ -125,36 +141,54 @@ class OfflineMutationQueue {
   }
 
   Future<void> _read() async {
-    final raw = await _store.read(_key);
-    if (raw == null || raw.isEmpty) return;
+    _mutations
+      ..clear()
+      ..addAll(await _readList(_key));
+    _failed
+      ..clear()
+      ..addAll(await _readList(_failedKey));
+  }
+
+  Future<List<QueuedMoneyMutation>> _readList(String key) async {
+    final raw = await _store.read(key);
+    if (raw == null || raw.isEmpty) return const [];
 
     try {
       final rows = jsonDecode(raw);
-      if (rows is! List) return;
-      _mutations
-        ..clear()
-        ..addAll(
-          rows.whereType<Map>().map(
+      if (rows is! List) return const [];
+      return rows
+          .whereType<Map>()
+          .map(
             (row) =>
                 QueuedMoneyMutation.fromJson(Map<String, dynamic>.from(row)),
-          ),
-        );
+          )
+          .toList();
     } catch (_) {
-      _mutations.clear();
-      await _store.delete(_key);
+      await _store.delete(key);
+      return const [];
     }
   }
 
   Future<void> _persist() async {
-    if (_mutations.isEmpty) {
-      await _store.delete(_key);
+    await _writeList(_key, _mutations);
+    await _writeList(_failedKey, _failed);
+  }
+
+  Future<void> _writeList(
+    String key,
+    List<QueuedMoneyMutation> mutations,
+  ) async {
+    if (mutations.isEmpty) {
+      await _store.delete(key);
       return;
     }
     await _store.write(
-      _key,
-      jsonEncode(_mutations.map((item) => item.toJson()).toList()),
+      key,
+      jsonEncode(mutations.map((item) => item.toJson()).toList()),
     );
   }
+
+  String get _failedKey => '$_key.failed';
 }
 
 bool isRetryableMutationError(Object error) {

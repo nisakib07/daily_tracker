@@ -990,7 +990,15 @@ class MoneyRepository
           'investment_id,category,note,occurred_at,created_at',
         );
     if (before != null) {
-      query = query.lt('occurred_at', toSupabaseTimestamp(before.occurredAt));
+      // Matches the tie-break in the money_master_transaction_page RPC: rows
+      // sharing the exact same occurred_at as the cursor must still be
+      // ordered by id, or same-timestamp transactions can be skipped between
+      // pages.
+      final beforeAt = toSupabaseTimestamp(before.occurredAt);
+      query = query.or(
+        'occurred_at.lt.$beforeAt,'
+        'and(occurred_at.eq.$beforeAt,id.lt.${before.id})',
+      );
     }
     final rows = await query
         .order('occurred_at', ascending: false)
