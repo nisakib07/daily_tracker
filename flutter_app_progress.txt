@@ -836,3 +836,48 @@ July 24, 2026 (later still)
 - dart format passed.
 - flutter analyze passed with no issues.
 - flutter test passed: 81 tests.
+
+
+July 27, 2026
+- Note: the biometric app lock / daily reminder feature, Android core library desugaring fix, dashboard double-refresh/Opening Balance fixes, and investment tile theming fix (commits 1c9b84c, 8766c53, 3b3b205, b3467ab) landed after the last entry above without being logged here.
+- Full review pass over mobile/lib/data, mobile/lib/core, and mobile/lib/features found and fixed six real correctness bugs:
+  - Offline mutation queue could jam permanently: a queued mutation that fails with a non-retryable error (e.g. it references a row deleted in the meantime) was left stuck at the head of the queue forever, silently blocking every mutation queued after it. offline_mutation_queue.dart now moves such mutations to a separate persisted "failed" list and keeps draining the rest.
+  - notification_service.dart treated Android's requestNotificationsPermission() returning null (the normal response below Android 13, where the runtime permission doesn't exist) as "denied," so enabling the daily reminder incorrectly reported failure on most real Android phones. Now falls back to areNotificationsEnabled().
+  - daily_reminder_controller.dart kept believing the reminder was active even after the OS-level notification permission was revoked from system settings, so it would silently stop firing. Restore now re-checks permission (via a new non-prompting NotificationService.arePermissionsGranted()) and turns the setting off if it was revoked.
+  - money_repository.dart's RPC-unavailable fallback path for transaction paging was missing the occurred_at-tie/id tie-break that the real money_master_transaction_page RPC has, so transactions sharing an identical timestamp could be skipped between pages. Fixed to match the RPC's ordering exactly.
+  - secure_cache_store.dart's encryption key bootstrap had a race: two concurrent first-run read/write calls could each generate and persist their own key, leaving one silently unable to decrypt its own data later. _loadKey now memoizes the in-flight bootstrap so concurrent callers share one key.
+  - app_lock_controller.dart optimistically reported the device as supporting app-lock before the async support check resolved, which could briefly let Settings offer to enable it on an unsupported device. Now defaults to unsupported until confirmed. Also added a "Sign out instead" escape hatch on the lock screen (app_lock_gate.dart), since there was previously no way out if biometrics/device credential stopped working while the lock was enabled.
+- Added test/offline_mutation_queue_test.dart (dead-letter behavior, retryable-vs-non-retryable handling, persistence across instances) and test/secure_cache_store_test.dart (verified both new tests actually fail against the pre-fix code before confirming they pass against the fix).
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 86 tests.
+
+
+July 27, 2026 (later)
+- Followed up on the review pass above with cleanup and one new feature:
+  - Removed the offline-mutation fallback path in cached_money_data_source.dart: it was dead in production (MoneyRepository always implements IdempotentMoneyMutationExecutor), so every _mutate call site had an unreachable fallback closure. Simplified _mutate to call the executor directly and dropped ~15 fallback closures; updated the test fake to implement IdempotentMoneyMutationExecutor instead.
+  - Migrated transaction_entry_sheet.dart off its private, hand-duplicated _TransactionFormPage/_ActionBar/_formContentPadding onto the shared AppFormPage/AppFormActionBar/appFormContentPadding shell. This also fixes real visual drift: the private copy was missing the shared shell's 3px accent border and glow shadow.
+  - Migrated PersonHistorySheet (people_entry_sheets.dart) from a legacy showModalBottomSheet + bespoke _SheetFrame/_Handle/_Header onto the same shared full-page shell, closing out the last holdout of the bottom-sheet-to-full-page migration mentioned in earlier entries. showPersonHistorySheet now pushes a MaterialPageRoute like the other person/loan sheets instead of showing a modal bottom sheet.
+  - Checked dashboard_screen.dart's _EmptyCard (flagged earlier as a "thin unnecessary wrapper used once") and found that flag was wrong on inspection — it's actually reused at 4 call sites, so it was left alone.
+  - Added a "Format check" step (dart format --output=none --set-exit-if-changed .) to .github/workflows/build-android.yml, ahead of analyze, so formatting drift fails CI instead of only being caught locally.
+  - Added the mobile app's first forgot-password flow: AppConfig.webAppUrl (defaults to the deployed web app's production URL, overridable via --dart-define=WEB_APP_URL), a new ForgotPasswordScreen (lib/features/auth/forgot_password_screen.dart) that calls Supabase resetPasswordForEmail with redirectTo pointed at the web app's existing /auth/callback -> /auth/reset-password pages (mobile has no deep-link handling for the recovery flow, so completion happens in the browser via the already-built web reset page), and a "Forgot password?" link wired into sign_in_screen.dart.
+  - Fixed a genuine test regression the new link caused: the Sign In keyboard-resilience test could no longer see the "Sign in" button without scrolling once the extra "Forgot password?" row was added, on the smallest supported viewport with the keyboard open. Added a key to the sign-in ScrollView and a scrollUntilVisible step to the test, matching the same pattern already used for the analogous Settings keyboard test.
+  - Added test/forgot_password_screen_test.dart (form rendering, validation errors; does not exercise the live Supabase call).
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 88 tests.
+
+
+July 27, 2026 (later still)
+- Added a Cash Flow Forecast feature to both clients (lib/smart-insights.ts calculateCashFlowForecast, mirrored in mobile's analytics_sheet.dart): looks at the trailing 30 days of transactions, computes the average daily net change across all accounts, and projects either a "run low by [date]" warning or an "on track to grow by ~X" message, with an explicit "not enough data yet" state under 7 days of history. New card on the web Budget tab and the mobile Analytics screen.
+- Rewrote the Financial Health Score algorithm on both clients (calculateFinancialHealth in lib/smart-insights.ts, _calculateHealth in mobile's analytics_sheet.dart) after a review found four real flaws, not just polish issues:
+  - Early-month distortion: savings rate, spending consistency, and income stability now compare a trailing 30-day window against the 30 days before it, instead of the current calendar month against last calendar month, which used to make the score wildly wrong for roughly the first third of every month (e.g. rent paid on day 1 before salary lands looked like a spending crisis). Budget adherence stays calendar-month based since budgets are inherently monthly.
+  - "No data" no longer scores as "decent data": each metric can now be explicitly insufficientData (shown as a dashed placeholder bar instead of a fake score), and the overall score is normalized only across the metrics that actually have data. A brand-new account with zero transaction history now gets an honest "add a few weeks of transactions" message instead of a falsely encouraging grade.
+  - Budget Adherence no longer has a blind spot for unbudgeted overspending: if total monthly spending blows past the total budgeted amount by more than 20%, the score is docked even if each individually-budgeted category looked fine on its own.
+  - Added a 5th metric, Financial Cushion: months of expenses covered by current account balance minus outstanding money owed to other people (via the existing loan ledger), since the old score was 100% flow-based and ignored net worth and debt entirely. Point weights were rebalanced across all 5 metrics (25/20/20/15/20) to make room for it; grade thresholds (A/B/C/D/F at 85/70/55/40) were left unchanged since the overall score is still normalized to 0-100.
+  - Also fixed a real, separate bug found while wiring this up: the web dashboard never actually passed budget data into the Financial Health Score component at all (BudgetPlanner fetches its own budgets internally and never exposed them to the parent), so "Budget Adherence" had silently always shown its "No budgets set" default on web, even for users with budgets set. Added a lightweight budgets fetch in dashboard.tsx for the current month and wired it through.
+- Verified with hand-built fixtures covering all major branches of both new/changed functions (insufficient-data, growing/stable/declining/critical cash flow; brand-new-account, early-days, healthy-with-debt, unbudgeted-overspend, debt-exceeds-balance for health score) before and after each fix, plus `tsc --noEmit` clean on web.
+- Added test/analytics_sheet_test.dart coverage for the new cash-flow-forecast "declining" branch, the health score's insufficient-data message, and the financial-cushion metric rendering with real numbers.
+- dart format passed.
+- flutter analyze passed with no issues.
+- flutter test passed: 91 tests.

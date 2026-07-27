@@ -42,6 +42,7 @@ import { BudgetPlanner } from "@/components/budget-planner";
 import { SpendingHeatmap } from "@/components/spending-heatmap";
 import { FinancialHealthScore } from "@/components/financial-health-score";
 import { AIInsights } from "@/components/ai-insights";
+import { CashFlowForecast } from "@/components/cash-flow-forecast";
 import { InvestmentTracker } from "@/components/investment-tracker";
 import { InvestmentModal } from "@/components/investment-modal";
 import { InvestmentReturnModal } from "@/components/investment-return-modal";
@@ -97,6 +98,9 @@ export function Dashboard() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [investments, setInvestments] = useState<Investment[]>([]);
+  const [currentMonthBudgets, setCurrentMonthBudgets] = useState<
+    { category: string; amount: number }[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<"activity" | "ledger" | "budget" | "investments">(
@@ -159,13 +163,15 @@ export function Dashboard() {
       setAllTransactions([]);
       setTransactions([]);
       setInvestments([]);
+      setCurrentMonthBudgets([]);
       setLoading(false);
       return;
     }
 
     const supabase = createClient();
+    const currentMonthKey = format(startOfMonth(new Date()), "yyyy-MM-01");
 
-    const [accountsRes, peopleRes, allTx, investmentsRes] = await Promise.all([
+    const [accountsRes, peopleRes, allTx, investmentsRes, budgetsRes] = await Promise.all([
       supabase.from("accounts").select("*").order("created_at"),
       supabase.from("people").select("*").order("name"),
       fetchAllTransactions(supabase).catch((error) => {
@@ -173,6 +179,7 @@ export function Dashboard() {
         return [];
       }),
       supabase.from("investments").select("*").order("created_at", { ascending: false }),
+      supabase.from("budgets").select("category, amount").eq("month", currentMonthKey),
     ]);
 
     if (accountsRes.data) setAccounts(accountsRes.data);
@@ -180,6 +187,14 @@ export function Dashboard() {
     setAllTransactions(allTx);
     setTransactions(allTx);
     if (investmentsRes.data) setInvestments(investmentsRes.data);
+    if (budgetsRes.data) {
+      setCurrentMonthBudgets(
+        budgetsRes.data.map((row: { category: string; amount: number }) => ({
+          category: row.category,
+          amount: Number(row.amount),
+        })),
+      );
+    }
     setLoading(false);
   }, [user?.id]);
 
@@ -799,12 +814,18 @@ export function Dashboard() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <FinancialHealthScore
                 transactions={allTransactions}
+                currentBalance={totalBalance}
+                budgets={currentMonthBudgets}
               />
               <AIInsights
                 transactions={allTransactions}
               />
             </div>
-            
+            <CashFlowForecast
+              transactions={allTransactions}
+              currentBalance={totalBalance}
+            />
+
             <BudgetPlanner
               selectedMonth={selectedMonth}
               transactions={allTransactions}

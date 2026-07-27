@@ -21,6 +21,7 @@ void main() {
     expect(find.text('Financial overview'), findsOneWidget);
     expect(find.text('Financial Health'), findsOneWidget);
     expect(find.text('Monthly Flow'), findsOneWidget);
+    expect(find.text('Cash Flow Forecast'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.drag(
@@ -64,6 +65,57 @@ void main() {
     expect(flowTopLeft.dy, closeTo(healthTopLeft.dy, 1));
     expect(heatmapTopLeft.dx, greaterThan(categoryTopLeft.dx));
     expect(heatmapTopLeft.dy, closeTo(categoryTopLeft.dy, 1));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Financial health flags a brand-new account instead of guessing a grade',
+    (tester) async {
+      await _pumpAtSize(
+        tester,
+        const Size(320, 568),
+        const AnalyticsSheet(snapshot: _emptySnapshot),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          'Add a few weeks of transactions to unlock a meaningful score.',
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Financial health computes a real financial cushion score from balance and history',
+    (tester) async {
+      await _pumpAtSize(
+        tester,
+        const Size(320, 568),
+        AnalyticsSheet(snapshot: _healthySnapshot),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Financial Cushion'), findsOneWidget);
+      expect(find.textContaining('Excellent'), findsWidgets);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Cash flow forecast projects a decline from real history', (
+    tester,
+  ) async {
+    await _pumpAtSize(
+      tester,
+      const Size(320, 568),
+      AnalyticsSheet(snapshot: _decliningSnapshot),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cash Flow Forecast'), findsOneWidget);
+    expect(find.textContaining('you will run low by'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -257,6 +309,90 @@ final _snapshot = DashboardSnapshot(
       category: 'Household groceries and daily essentials',
     ),
   ],
+);
+
+// 20 days of a small net outflow (-80/day) inside the 30-day forecast
+// window, plus one anchor income outside the window that funds the
+// starting balance without affecting the trailing daily-flow average.
+// Net: avgDailyNetChange ~= -1600/30, balance 3400 -> ~63 days of runway,
+// landing in the "declining" (not yet critical) branch deterministically.
+final _decliningTransactions = [
+  _transaction(
+    id: 'anchor-balance',
+    type: 'income',
+    amount: 5000,
+    occurredAt: _now.subtract(const Duration(days: 35)),
+    toAccountId: _account.id,
+    category: 'Opening balance',
+  ),
+  for (var i = 1; i <= 20; i++)
+    _transaction(
+      id: 'decline-expense-$i',
+      type: 'expense',
+      amount: 100,
+      occurredAt: _now.subtract(Duration(days: i)),
+      fromAccountId: _account.id,
+      category: 'Daily spend',
+    ),
+  for (var i = 1; i <= 20; i++)
+    _transaction(
+      id: 'decline-income-$i',
+      type: 'income',
+      amount: 20,
+      occurredAt: _now.subtract(Duration(days: i)),
+      toAccountId: _account.id,
+      category: 'Side income',
+    ),
+];
+
+final _decliningSnapshot = DashboardSnapshot(
+  accounts: [_account],
+  people: const [],
+  investments: const [],
+  budgets: const [],
+  transactions: _decliningTransactions,
+);
+
+// 45 days of steady income (200/day) and expense (100/day) covering both
+// the trailing 30-day window and enough of the 30-60-day prior window for
+// consistency/income-stability to have real data, plus an old anchor
+// income outside both windows so the resulting balance gives a long
+// (>90 day) financial cushion runway - i.e. an "Excellent" cushion score.
+final _healthyTransactions = [
+  _transaction(
+    id: 'healthy-anchor',
+    type: 'income',
+    amount: 20000,
+    occurredAt: _now.subtract(const Duration(days: 70)),
+    toAccountId: _account.id,
+    category: 'Opening balance',
+  ),
+  for (var i = 1; i <= 45; i++)
+    _transaction(
+      id: 'healthy-income-$i',
+      type: 'income',
+      amount: 200,
+      occurredAt: _now.subtract(Duration(days: i)),
+      toAccountId: _account.id,
+      category: 'Salary',
+    ),
+  for (var i = 1; i <= 45; i++)
+    _transaction(
+      id: 'healthy-expense-$i',
+      type: 'expense',
+      amount: 100,
+      occurredAt: _now.subtract(Duration(days: i)),
+      fromAccountId: _account.id,
+      category: 'Living costs',
+    ),
+];
+
+final _healthySnapshot = DashboardSnapshot(
+  accounts: [_account],
+  people: const [],
+  investments: const [],
+  budgets: const [],
+  transactions: _healthyTransactions,
 );
 
 const _emptySnapshot = DashboardSnapshot(

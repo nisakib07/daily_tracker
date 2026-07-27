@@ -87,6 +87,9 @@ class _AnalyticsReportLayout extends StatelessWidget {
         final wide = constraints.maxWidth >= 760;
         final health = _HealthScoreCard(health: analytics.health);
         final flow = _MonthlyFlowCard(analytics: analytics);
+        final forecast = _CashFlowForecastCard(
+          forecast: analytics.cashFlowForecast,
+        );
         final insights = _InsightsCard(insights: analytics.insights);
         final categories = _CategorySpendingCard(rows: analytics.categoryRows);
         final heatmap = _SpendingHeatmapCard(analytics: analytics);
@@ -97,6 +100,8 @@ class _AnalyticsReportLayout extends StatelessWidget {
               health,
               const SizedBox(height: 12),
               flow,
+              const SizedBox(height: 12),
+              forecast,
               const SizedBox(height: 12),
               insights,
               const SizedBox(height: 12),
@@ -117,6 +122,8 @@ class _AnalyticsReportLayout extends StatelessWidget {
                 Expanded(child: flow),
               ],
             ),
+            const SizedBox(height: 14),
+            forecast,
             const SizedBox(height: 14),
             insights,
             const SizedBox(height: 14),
@@ -290,6 +297,8 @@ class _HealthScoreCard extends StatelessWidget {
             _ScoreBar(metric: health.spendingConsistency),
             const SizedBox(height: 10),
             _ScoreBar(metric: health.incomeStability),
+            const SizedBox(height: 10),
+            _ScoreBar(metric: health.financialCushion),
           ],
         ),
       ),
@@ -304,16 +313,19 @@ class _ScoreBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final progress = metric.maxScore == 0
+    final progress = metric.insufficientData || metric.maxScore == 0
         ? 0.0
         : metric.score / metric.maxScore;
+    final iconColor = metric.insufficientData
+        ? Theme.of(context).colorScheme.onSurfaceVariant
+        : metric.color;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Icon(metric.icon, size: 15, color: metric.color),
+            Icon(metric.icon, size: 15, color: iconColor),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -325,7 +337,9 @@ class _ScoreBar extends StatelessWidget {
               ),
             ),
             Text(
-              '${metric.status} ${metric.score}/${metric.maxScore}',
+              metric.insufficientData
+                  ? metric.status
+                  : '${metric.status} ${metric.score}/${metric.maxScore}',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -333,16 +347,41 @@ class _ScoreBar extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 6),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(99),
-          child: LinearProgressIndicator(
-            minHeight: 7,
-            value: progress.clamp(0, 1).toDouble(),
-            backgroundColor: metric.color.withValues(alpha: 0.12),
-            valueColor: AlwaysStoppedAnimation(metric.color),
+        if (metric.insufficientData)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: DottedProgressPlaceholder(color: iconColor),
+          )
+        else
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              minHeight: 7,
+              value: progress.clamp(0, 1).toDouble(),
+              backgroundColor: metric.color.withValues(alpha: 0.12),
+              valueColor: AlwaysStoppedAnimation(metric.color),
+            ),
           ),
-        ),
       ],
+    );
+  }
+}
+
+/// A muted, empty-looking bar for metrics that don't have enough data yet -
+/// distinct from a real 0-score bar, which would otherwise look identical.
+class DottedProgressPlaceholder extends StatelessWidget {
+  const DottedProgressPlaceholder({super.key, required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 7,
+      decoration: BoxDecoration(
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+        borderRadius: BorderRadius.circular(99),
+      ),
     );
   }
 }
@@ -425,6 +464,103 @@ class _MonthlyFlowCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _CashFlowForecastCard extends StatelessWidget {
+  const _CashFlowForecastCard({required this.forecast});
+
+  final _CashFlowForecast forecast;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _forecastColor(forecast.status);
+
+    return Card(
+      key: const ValueKey('analytics-forecast-card'),
+      elevation: 10,
+      shadowColor: color.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _CardTitle(
+              icon: _forecastIcon(forecast.status),
+              title: 'Cash Flow Forecast',
+              subtitle: forecast.status == _ForecastStatus.insufficientData
+                  ? 'Not enough history yet'
+                  : 'Based on the last ${forecast.daysOfHistory} days',
+              color: color,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              forecast.message,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            if (forecast.status != _ForecastStatus.insufficientData) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _MetricTile(
+                      label: 'Current balance',
+                      value: formatMoney(forecast.currentBalance),
+                      color: AppTheme.neonCyan,
+                      icon: Icons.account_balance_wallet_outlined,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _MetricTile(
+                      label: 'Daily net change',
+                      value:
+                          '${forecast.avgDailyNetChange >= 0 ? '+' : '-'}'
+                          '${formatMoney(forecast.avgDailyNetChange.abs())}',
+                      color: forecast.avgDailyNetChange >= 0
+                          ? AppTheme.neonEmerald
+                          : AppTheme.neonRose,
+                      icon: forecast.avgDailyNetChange >= 0
+                          ? Icons.trending_up
+                          : Icons.trending_down,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Color _forecastColor(_ForecastStatus status) {
+  switch (status) {
+    case _ForecastStatus.growing:
+    case _ForecastStatus.stable:
+      return AppTheme.neonEmerald;
+    case _ForecastStatus.declining:
+      return AppTheme.neonAmber;
+    case _ForecastStatus.critical:
+      return AppTheme.neonRose;
+    case _ForecastStatus.insufficientData:
+      return AppTheme.neonCyan;
+  }
+}
+
+IconData _forecastIcon(_ForecastStatus status) {
+  switch (status) {
+    case _ForecastStatus.growing:
+      return Icons.trending_up;
+    case _ForecastStatus.stable:
+      return Icons.trending_flat;
+    case _ForecastStatus.declining:
+      return Icons.query_stats;
+    case _ForecastStatus.critical:
+      return Icons.warning_amber_rounded;
+    case _ForecastStatus.insufficientData:
+      return Icons.hourglass_empty;
   }
 }
 
@@ -1081,6 +1217,7 @@ class _MetricTile extends StatelessWidget {
 class _AnalyticsData {
   const _AnalyticsData({
     required this.health,
+    required this.cashFlowForecast,
     required this.insights,
     required this.categoryRows,
     required this.dailySpending,
@@ -1092,6 +1229,7 @@ class _AnalyticsData {
   });
 
   final _HealthScore health;
+  final _CashFlowForecast cashFlowForecast;
   final List<_Insight> insights;
   final List<_CategorySpend> categoryRows;
   final Map<String, double> dailySpending;
@@ -1118,7 +1256,6 @@ class _AnalyticsData {
 
     final thisMonthIncome = _sumType(thisMonthTx, 'income');
     final thisMonthExpense = _sumType(thisMonthTx, 'expense');
-    final lastMonthIncome = _sumType(lastMonthTx, 'income');
     final lastMonthExpense = _sumType(lastMonthTx, 'expense');
 
     final categoryRows = _categorySpending(thisMonthTx);
@@ -1134,10 +1271,10 @@ class _AnalyticsData {
         .where((budget) => _isSameMonth(budget.month, thisMonth))
         .toList();
     final health = _calculateHealth(
-      thisMonthIncome: thisMonthIncome,
+      transactions: snapshot.transactions,
       thisMonthExpense: thisMonthExpense,
-      lastMonthIncome: lastMonthIncome,
-      lastMonthExpense: lastMonthExpense,
+      currentBalance: snapshot.totalBalance,
+      outstandingDebt: snapshot.totalToPay,
       budgets: budgets,
       categoryRows: categoryRows,
     );
@@ -1151,9 +1288,14 @@ class _AnalyticsData {
       categoryRows: categoryRows,
       dailyAverage: dailyAverage,
     );
+    final cashFlowForecast = _calculateCashFlowForecast(
+      transactions: snapshot.transactions,
+      currentBalance: snapshot.totalBalance,
+    );
 
     return _AnalyticsData(
       health: health,
+      cashFlowForecast: cashFlowForecast,
       insights: insights,
       categoryRows: categoryRows,
       dailySpending: dailySpending,
@@ -1169,21 +1311,25 @@ class _AnalyticsData {
 class _HealthScore {
   const _HealthScore({
     required this.overall,
+    required this.hasEnoughData,
     required this.grade,
     required this.message,
     required this.savingsRate,
     required this.budgetAdherence,
     required this.spendingConsistency,
     required this.incomeStability,
+    required this.financialCushion,
   });
 
   final int overall;
+  final bool hasEnoughData;
   final String grade;
   final String message;
   final _HealthMetric savingsRate;
   final _HealthMetric budgetAdherence;
   final _HealthMetric spendingConsistency;
   final _HealthMetric incomeStability;
+  final _HealthMetric financialCushion;
 }
 
 class _HealthMetric {
@@ -1194,6 +1340,7 @@ class _HealthMetric {
     required this.status,
     required this.icon,
     required this.color,
+    this.insufficientData = false,
   });
 
   final String label;
@@ -1202,6 +1349,7 @@ class _HealthMetric {
   final String status;
   final IconData icon;
   final Color color;
+  final bool insufficientData;
 }
 
 class _Insight {
@@ -1227,27 +1375,64 @@ class _CategorySpend {
   final double amount;
 }
 
+/// Outstanding money you owe other people (borrow/repay), netted per person
+/// so an overpayment to one person can't offset debt owed to a different
+/// one. Already computed correctly by [DashboardSnapshot.totalToPay].
+///
+/// Mirrors calculateFinancialHealth in the web app's lib/smart-insights.ts.
+/// Savings rate, spending consistency, and income stability compare a
+/// trailing 30-day window against the 30 days before it rather than the
+/// current calendar month against last calendar month, since a strict
+/// calendar comparison badly distorts the score early in the month (e.g.
+/// rent paid on day 1 before salary lands looks like a spending crisis).
+/// Budget adherence stays calendar-month based since budgets are inherently
+/// monthly. Any metric that can't be measured yet is excluded from the
+/// overall score rather than silently defaulting to a mid-range value.
 _HealthScore _calculateHealth({
-  required double thisMonthIncome,
+  required List<TransactionRecord> transactions,
   required double thisMonthExpense,
-  required double lastMonthIncome,
-  required double lastMonthExpense,
+  required double currentBalance,
+  required double outstandingDebt,
   required List<Budget> budgets,
   required List<_CategorySpend> categoryRows,
 }) {
-  final savingsRate = thisMonthIncome > 0
-      ? ((thisMonthIncome - thisMonthExpense) / thisMonthIncome) * 100
+  final now = DateTime.now();
+  final periodStart = now.subtract(const Duration(days: 30));
+  final priorPeriodStart = now.subtract(const Duration(days: 60));
+
+  final periodTx = transactions.where((transaction) {
+    final date = transaction.displayDate;
+    return !date.isBefore(periodStart) && !date.isAfter(now);
+  });
+  final priorPeriodTx = transactions.where((transaction) {
+    final date = transaction.displayDate;
+    return !date.isBefore(priorPeriodStart) && date.isBefore(periodStart);
+  });
+
+  final periodIncome = _sumType(periodTx.toList(), 'income');
+  final periodExpense = _sumType(periodTx.toList(), 'expense');
+  final priorPeriodIncome = _sumType(priorPeriodTx.toList(), 'income');
+  final priorPeriodExpense = _sumType(priorPeriodTx.toList(), 'expense');
+
+  // 1. Savings Rate (0-25)
+  final hasFlowData = periodIncome > 0 || periodExpense > 0;
+  final savingsRate = periodIncome > 0
+      ? ((periodIncome - periodExpense) / periodIncome) * 100
       : 0.0;
-  final savingsScore = savingsRate >= 30
-      ? 30
-      : savingsRate >= 20
+  final savingsScore = !hasFlowData
+      ? 0
+      : savingsRate >= 30
       ? 25
+      : savingsRate >= 20
+      ? 21
       : savingsRate >= 10
-      ? 20
+      ? 17
       : savingsRate >= 0
-      ? 15
-      : 5;
-  final savingsLabel = savingsRate >= 30
+      ? 12
+      : 4;
+  final savingsLabel = !hasFlowData
+      ? 'Not enough data'
+      : savingsRate >= 30
       ? 'Excellent'
       : savingsRate >= 20
       ? 'Great'
@@ -1257,7 +1442,8 @@ _HealthScore _calculateHealth({
       ? 'Fair'
       : 'Needs attention';
 
-  var budgetScore = 15;
+  // 2. Budget Adherence (0-20), calendar-month based since budgets are monthly.
+  var budgetScore = 12; // Default if no budgets (60% of max, same as before)
   var budgetLabel = 'No budgets';
   if (budgets.isNotEmpty) {
     final spending = {for (final row in categoryRows) row.category: row.amount};
@@ -1270,7 +1456,7 @@ _HealthScore _calculateHealth({
       adherenceTotal += adherence.clamp(0, 100).toDouble();
     }
     final budgetValue = adherenceTotal / budgets.length;
-    budgetScore = ((budgetValue / 100) * 25).round();
+    budgetScore = ((budgetValue / 100) * 20).round();
     budgetLabel = budgetValue >= 90
         ? 'Excellent'
         : budgetValue >= 70
@@ -1278,21 +1464,36 @@ _HealthScore _calculateHealth({
         : budgetValue >= 50
         ? 'Fair'
         : 'Over budget';
+
+    // Per-category adherence can look "Excellent" while overall spending
+    // still blows past the total budget through unbudgeted categories -
+    // dock points when that happens instead of missing it entirely.
+    final totalBudgetCap = budgets.fold(0.0, (sum, b) => sum + b.amount);
+    if (totalBudgetCap > 0 && thisMonthExpense > totalBudgetCap * 1.2) {
+      budgetScore = (budgetScore * 0.6).round();
+      budgetLabel = 'Overspending outside budgets';
+    }
   }
 
-  final expenseChange = lastMonthExpense > 0
-      ? ((thisMonthExpense - lastMonthExpense).abs() / lastMonthExpense) * 100
+  // 3. Spending Consistency (0-20)
+  final hasConsistencyData = priorPeriodExpense > 0;
+  final expenseChange = hasConsistencyData
+      ? ((periodExpense - priorPeriodExpense).abs() / priorPeriodExpense) * 100
       : 0.0;
-  final consistencyScore = expenseChange <= 10
-      ? 25
-      : expenseChange <= 20
+  final consistencyScore = !hasConsistencyData
+      ? 0
+      : expenseChange <= 10
       ? 20
+      : expenseChange <= 20
+      ? 16
       : expenseChange <= 30
-      ? 15
+      ? 12
       : expenseChange <= 50
-      ? 10
-      : 5;
-  final consistencyLabel = expenseChange <= 10
+      ? 8
+      : 4;
+  final consistencyLabel = !hasConsistencyData
+      ? 'Not enough data'
+      : expenseChange <= 10
       ? 'Very stable'
       : expenseChange <= 20
       ? 'Stable'
@@ -1302,17 +1503,23 @@ _HealthScore _calculateHealth({
       ? 'Variable'
       : 'Volatile';
 
-  final incomeChange = lastMonthIncome > 0
-      ? ((thisMonthIncome - lastMonthIncome).abs() / lastMonthIncome) * 100
+  // 4. Income Stability (0-15)
+  final hasIncomeStabilityData = priorPeriodIncome > 0;
+  final incomeChange = hasIncomeStabilityData
+      ? ((periodIncome - priorPeriodIncome).abs() / priorPeriodIncome) * 100
       : 0.0;
-  final incomeScore = incomeChange <= 5
-      ? 20
-      : incomeChange <= 15
+  final incomeScore = !hasIncomeStabilityData
+      ? 0
+      : incomeChange <= 5
       ? 15
+      : incomeChange <= 15
+      ? 11
       : incomeChange <= 30
-      ? 10
-      : 5;
-  final incomeLabel = incomeChange <= 5
+      ? 7
+      : 4;
+  final incomeLabel = !hasIncomeStabilityData
+      ? 'Not enough data'
+      : incomeChange <= 5
       ? 'Very stable'
       : incomeChange <= 15
       ? 'Stable'
@@ -1320,8 +1527,69 @@ _HealthScore _calculateHealth({
       ? 'Moderate'
       : 'Variable';
 
-  final overall = savingsScore + budgetScore + consistencyScore + incomeScore;
-  final grade = overall >= 85
+  // 5. Financial Cushion (0-20) - months of expenses covered by current
+  // balance minus outstanding debt owed to other people.
+  final netLiquidPosition = currentBalance - outstandingDebt;
+  final avgDailyExpense = periodExpense / 30;
+
+  int cushionScore;
+  String cushionLabel;
+  double cushionDays;
+  if (avgDailyExpense <= 0) {
+    cushionDays = netLiquidPosition > 0 ? double.infinity : 0;
+    cushionScore = netLiquidPosition > 0 ? 20 : 4;
+    cushionLabel = netLiquidPosition > 0 ? 'Excellent' : 'Needs attention';
+  } else {
+    cushionDays = netLiquidPosition / avgDailyExpense;
+    if (netLiquidPosition <= 0) {
+      cushionScore = 0;
+      cushionLabel = 'In the red';
+    } else if (cushionDays >= 90) {
+      cushionScore = 20;
+      cushionLabel = 'Excellent';
+    } else if (cushionDays >= 60) {
+      cushionScore = 16;
+      cushionLabel = 'Great';
+    } else if (cushionDays >= 30) {
+      cushionScore = 12;
+      cushionLabel = 'Good';
+    } else if (cushionDays >= 14) {
+      cushionScore = 8;
+      cushionLabel = 'Fair';
+    } else {
+      cushionScore = 4;
+      cushionLabel = 'Needs attention';
+    }
+  }
+
+  // Normalize across only the metrics that had enough data to measure, so
+  // a new account isn't penalized (or flattered) by metrics that are
+  // really just "unknown".
+  final metrics = [
+    (score: savingsScore, max: 25, insufficient: !hasFlowData),
+    (score: budgetScore, max: 20, insufficient: false),
+    (score: consistencyScore, max: 20, insufficient: !hasConsistencyData),
+    (score: incomeScore, max: 15, insufficient: !hasIncomeStabilityData),
+    (score: cushionScore, max: 20, insufficient: false),
+  ];
+  final available = metrics.where((m) => !m.insufficient).toList();
+  final availableMax = available.fold(0, (sum, m) => sum + m.max);
+  final overall = availableMax > 0
+      ? ((available.fold(0, (sum, m) => sum + m.score) / availableMax) * 100)
+            .round()
+      : 0;
+  // Budget adherence (defaults when no budgets are set) and financial
+  // cushion (computable from balance alone, even at 0) can both look
+  // "available" without a single real transaction ever happening - require
+  // at least one metric actually derived from transaction history too, or
+  // a brand-new account gets a confident-looking grade from nothing.
+  final hasRealFlowData =
+      hasFlowData || hasConsistencyData || hasIncomeStabilityData;
+  final hasEnoughData = hasRealFlowData && available.length >= 2;
+
+  final grade = !hasEnoughData
+      ? 'F'
+      : overall >= 85
       ? 'A'
       : overall >= 70
       ? 'B'
@@ -1330,7 +1598,9 @@ _HealthScore _calculateHealth({
       : overall >= 40
       ? 'D'
       : 'F';
-  final message = overall >= 85
+  final message = !hasEnoughData
+      ? 'Add a few weeks of transactions to unlock a meaningful score.'
+      : overall >= 85
       ? 'Outstanding. Your money habits look strong.'
       : overall >= 70
       ? 'Great job. Your finances are moving well.'
@@ -1342,20 +1612,22 @@ _HealthScore _calculateHealth({
 
   return _HealthScore(
     overall: overall,
+    hasEnoughData: hasEnoughData,
     grade: grade,
     message: message,
     savingsRate: _HealthMetric(
       label: 'Savings Rate',
       score: savingsScore,
-      maxScore: 30,
+      maxScore: 25,
       status: savingsLabel,
       icon: Icons.savings_outlined,
       color: AppTheme.neonEmerald,
+      insufficientData: !hasFlowData,
     ),
     budgetAdherence: _HealthMetric(
       label: 'Budget Adherence',
       score: budgetScore,
-      maxScore: 25,
+      maxScore: 20,
       status: budgetLabel,
       icon: Icons.track_changes,
       color: AppTheme.neonCyan,
@@ -1363,19 +1635,167 @@ _HealthScore _calculateHealth({
     spendingConsistency: _HealthMetric(
       label: 'Spending Consistency',
       score: consistencyScore,
-      maxScore: 25,
+      maxScore: 20,
       status: consistencyLabel,
       icon: Icons.timeline,
       color: AppTheme.neonRose,
+      insufficientData: !hasConsistencyData,
     ),
     incomeStability: _HealthMetric(
       label: 'Income Stability',
       score: incomeScore,
-      maxScore: 20,
+      maxScore: 15,
       status: incomeLabel,
       icon: Icons.trending_up,
       color: AppTheme.neonAmber,
+      insufficientData: !hasIncomeStabilityData,
     ),
+    financialCushion: _HealthMetric(
+      label: 'Financial Cushion',
+      score: cushionScore,
+      maxScore: 20,
+      status: cushionLabel,
+      icon: Icons.shield_outlined,
+      color: AppTheme.neonCyan,
+    ),
+  );
+}
+
+enum _ForecastStatus { insufficientData, growing, stable, declining, critical }
+
+class _CashFlowForecast {
+  const _CashFlowForecast({
+    required this.status,
+    required this.currentBalance,
+    required this.avgDailyNetChange,
+    required this.daysOfHistory,
+    required this.projectedDate,
+    required this.daysRemaining,
+    required this.message,
+  });
+
+  final _ForecastStatus status;
+  final double currentBalance;
+  final double avgDailyNetChange;
+  final int daysOfHistory;
+  final DateTime? projectedDate;
+  final int? daysRemaining;
+  final String message;
+}
+
+const _forecastWindowDays = 30;
+const _forecastMinHistoryDays = 7;
+
+/// Projects when the total balance will run out (or how it'll grow) based on
+/// the trailing net daily cash flow across all accounts. Transfers between
+/// own accounts net to zero automatically since both the credit and debit
+/// side of the same transaction are included in the same sum. Mirrors
+/// calculateCashFlowForecast in the web app's lib/smart-insights.ts.
+_CashFlowForecast _calculateCashFlowForecast({
+  required List<TransactionRecord> transactions,
+  required double currentBalance,
+}) {
+  final now = DateTime.now();
+  final windowStart = now.subtract(const Duration(days: _forecastWindowDays));
+
+  DateTime? earliest;
+  for (final transaction in transactions) {
+    final date = transaction.displayDate;
+    if (earliest == null || date.isBefore(earliest)) earliest = date;
+  }
+
+  final daysOfHistory = earliest == null
+      ? 0
+      : now.difference(earliest).inDays.clamp(0, _forecastWindowDays);
+
+  if (daysOfHistory < _forecastMinHistoryDays) {
+    return _CashFlowForecast(
+      status: _ForecastStatus.insufficientData,
+      currentBalance: currentBalance,
+      avgDailyNetChange: 0,
+      daysOfHistory: daysOfHistory,
+      projectedDate: null,
+      daysRemaining: null,
+      message:
+          'Keep logging transactions — we need at least a week of history '
+          'to forecast your cash flow.',
+    );
+  }
+
+  var netChange = 0.0;
+  for (final transaction in transactions) {
+    final date = transaction.displayDate;
+    if (date.isBefore(windowStart) || date.isAfter(now)) continue;
+    if (transaction.toAccountId != null) netChange += transaction.amount;
+    if (transaction.fromAccountId != null) netChange -= transaction.amount;
+  }
+
+  final avgDailyNetChange = netChange / daysOfHistory;
+
+  if (avgDailyNetChange >= 0) {
+    final projectedGrowth = avgDailyNetChange * 30;
+    return _CashFlowForecast(
+      status: avgDailyNetChange == 0
+          ? _ForecastStatus.stable
+          : _ForecastStatus.growing,
+      currentBalance: currentBalance,
+      avgDailyNetChange: avgDailyNetChange,
+      daysOfHistory: daysOfHistory,
+      projectedDate: null,
+      daysRemaining: null,
+      message: avgDailyNetChange == 0
+          ? 'Your balance has held steady recently — income and spending '
+                'are roughly matched.'
+          : 'At this pace, your balance is on track to grow by '
+                '~${formatMoney(projectedGrowth)} over the next 30 days.',
+    );
+  }
+
+  final burnRate = -avgDailyNetChange;
+  if (currentBalance <= 0) {
+    return _CashFlowForecast(
+      status: _ForecastStatus.critical,
+      currentBalance: currentBalance,
+      avgDailyNetChange: avgDailyNetChange,
+      daysOfHistory: daysOfHistory,
+      projectedDate: null,
+      daysRemaining: 0,
+      message:
+          'Your balance is already at or below zero, and recent spending '
+          'is outpacing income.',
+    );
+  }
+
+  final daysRemaining = (currentBalance / burnRate).floor();
+  final projectedDate = now.add(Duration(days: daysRemaining));
+
+  if (daysRemaining > 180) {
+    return _CashFlowForecast(
+      status: _ForecastStatus.declining,
+      currentBalance: currentBalance,
+      avgDailyNetChange: avgDailyNetChange,
+      daysOfHistory: daysOfHistory,
+      projectedDate: projectedDate,
+      daysRemaining: daysRemaining,
+      message:
+          'Spending is outpacing income slightly, but at this rate you '
+          'have more than 6 months of runway — worth watching, not urgent.',
+    );
+  }
+
+  return _CashFlowForecast(
+    status: daysRemaining <= 14
+        ? _ForecastStatus.critical
+        : _ForecastStatus.declining,
+    currentBalance: currentBalance,
+    avgDailyNetChange: avgDailyNetChange,
+    daysOfHistory: daysOfHistory,
+    projectedDate: projectedDate,
+    daysRemaining: daysRemaining,
+    message:
+        'At this rate, you will run low by ${formatShortDate(projectedDate)} '
+        '(about $daysRemaining day${daysRemaining == 1 ? '' : 's'}) if '
+        'nothing changes.',
   );
 }
 

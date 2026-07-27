@@ -4,16 +4,18 @@ import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { calculateFinancialHealth, type HealthScoreBreakdown } from "@/lib/smart-insights";
 import type { Transaction } from "@/lib/types";
-import { 
-  TrendingUp, 
-  Wallet, 
-  Target, 
+import {
+  TrendingUp,
+  Wallet,
+  Target,
   Activity,
+  PiggyBank,
   ChevronRight
 } from "lucide-react";
 
 interface FinancialHealthScoreProps {
   transactions: Transaction[];
+  currentBalance: number;
   budgets?: { category: string; amount: number }[];
   className?: string;
   compact?: boolean;
@@ -90,14 +92,14 @@ function CircularProgress({
   );
 }
 
-function MetricBar({ 
-  label, 
-  icon: Icon, 
-  score, 
-  maxScore, 
-  value, 
+function MetricBar({
+  label,
+  icon: Icon,
+  score,
+  maxScore,
   statusLabel,
-  color 
+  color,
+  insufficientData = false,
 }: {
   label: string;
   icon: typeof TrendingUp;
@@ -106,45 +108,51 @@ function MetricBar({
   value: number;
   statusLabel: string;
   color: string;
+  insufficientData?: boolean;
 }) {
-  const percentage = (score / maxScore) * 100;
-  
+  const percentage = insufficientData ? 0 : (score / maxScore) * 100;
+
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5">
-          <Icon className={cn("h-3.5 w-3.5", color)} />
+          <Icon className={cn("h-3.5 w-3.5", insufficientData ? "text-muted-foreground" : color)} />
           <span className="font-medium text-foreground">{label}</span>
         </div>
         <span className="text-muted-foreground">{statusLabel}</span>
       </div>
       <div className="flex items-center gap-2">
         <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-          <div 
-            className={cn(
-              "h-full rounded-full transition-all duration-700 ease-out",
-              color.replace("text-", "bg-")
-            )}
-            style={{ width: `${percentage}%` }}
-          />
+          {insufficientData ? (
+            <div className="h-full w-full rounded-full border border-dashed border-muted-foreground/30" />
+          ) : (
+            <div
+              className={cn(
+                "h-full rounded-full transition-all duration-700 ease-out",
+                color.replace("text-", "bg-")
+              )}
+              style={{ width: `${percentage}%` }}
+            />
+          )}
         </div>
-        <span className="text-[10px] font-medium text-muted-foreground w-8 text-right">
-          {score}/{maxScore}
+        <span className="text-[10px] font-medium text-muted-foreground w-10 text-right">
+          {insufficientData ? "-- / --" : `${score}/${maxScore}`}
         </span>
       </div>
     </div>
   );
 }
 
-export function FinancialHealthScore({ 
-  transactions, 
+export function FinancialHealthScore({
+  transactions,
+  currentBalance,
   budgets,
   className,
   compact = false
 }: FinancialHealthScoreProps) {
   const healthScore = useMemo(() => {
-    return calculateFinancialHealth(transactions, budgets);
-  }, [transactions, budgets]);
+    return calculateFinancialHealth(transactions, currentBalance, budgets);
+  }, [transactions, currentBalance, budgets]);
 
   if (compact) {
     return (
@@ -214,44 +222,57 @@ export function FinancialHealthScore({
           Score Breakdown
         </h4>
         
-        <MetricBar 
+        <MetricBar
           label="Savings Rate"
           icon={Wallet}
           score={healthScore.savingsRate.score}
-          maxScore={30}
+          maxScore={healthScore.savingsRate.maxScore}
           value={healthScore.savingsRate.value}
           statusLabel={healthScore.savingsRate.label}
           color="text-emerald-500"
+          insufficientData={healthScore.savingsRate.insufficientData}
         />
-        
-        <MetricBar 
+
+        <MetricBar
           label="Budget Adherence"
           icon={Target}
           score={healthScore.budgetAdherence.score}
-          maxScore={25}
+          maxScore={healthScore.budgetAdherence.maxScore}
           value={healthScore.budgetAdherence.value}
           statusLabel={healthScore.budgetAdherence.label}
           color="text-blue-500"
         />
-        
-        <MetricBar 
+
+        <MetricBar
           label="Spending Consistency"
           icon={Activity}
           score={healthScore.spendingConsistency.score}
-          maxScore={25}
+          maxScore={healthScore.spendingConsistency.maxScore}
           value={healthScore.spendingConsistency.value}
           statusLabel={healthScore.spendingConsistency.label}
           color="text-purple-500"
+          insufficientData={healthScore.spendingConsistency.insufficientData}
         />
-        
-        <MetricBar 
+
+        <MetricBar
           label="Income Stability"
           icon={TrendingUp}
           score={healthScore.incomeStability.score}
-          maxScore={20}
+          maxScore={healthScore.incomeStability.maxScore}
           value={healthScore.incomeStability.value}
           statusLabel={healthScore.incomeStability.label}
           color="text-amber-500"
+          insufficientData={healthScore.incomeStability.insufficientData}
+        />
+
+        <MetricBar
+          label="Financial Cushion"
+          icon={PiggyBank}
+          score={healthScore.financialCushion.score}
+          maxScore={healthScore.financialCushion.maxScore}
+          value={healthScore.financialCushion.value}
+          statusLabel={healthScore.financialCushion.label}
+          color="text-cyan-500"
         />
       </div>
     </div>

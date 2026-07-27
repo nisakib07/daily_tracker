@@ -1,7 +1,7 @@
 "use client";
 
 import type { Transaction } from "@/lib/types";
-import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, subDays, format } from "date-fns";
 
 // ==========================================
 // SMART CATEGORY SUGGESTIONS
@@ -235,77 +235,125 @@ export function suggestCategories(note: string): string[] {
 // FINANCIAL HEALTH SCORE
 // ==========================================
 
+export interface HealthMetricResult {
+  score: number;
+  maxScore: number;
+  value: number;
+  label: string;
+  insufficientData?: boolean;
+}
+
 export interface HealthScoreBreakdown {
-  overall: number; // 0-100
-  savingsRate: { score: number; value: number; label: string };
-  budgetAdherence: { score: number; value: number; label: string };
-  spendingConsistency: { score: number; value: number; label: string };
-  incomeStability: { score: number; value: number; label: string };
+  overall: number; // 0-100, normalized across whichever metrics have data
+  hasEnoughData: boolean; // false when fewer than 2 metrics could be measured
+  savingsRate: HealthMetricResult;
+  budgetAdherence: HealthMetricResult;
+  spendingConsistency: HealthMetricResult;
+  incomeStability: HealthMetricResult;
+  financialCushion: HealthMetricResult;
   grade: "A" | "B" | "C" | "D" | "F";
   emoji: string;
   message: string;
 }
 
 /**
- * Calculate financial health score (0-100)
+ * Outstanding money owed to other people (borrow/lend/repay/receive),
+ * netted per person so an overpayment to one person can't offset debt owed
+ * to a different one. Mirrors the per-person netting in components/ledger.tsx.
+ */
+function calculateOutstandingDebt(transactions: Transaction[]): number {
+  const byPerson: Record<string, { youOwe: number; theyOwe: number }> = {};
+
+  for (const tx of transactions) {
+    if (!tx.person_id) continue;
+    const entry = byPerson[tx.person_id] || { youOwe: 0, theyOwe: 0 };
+    const amount = Number(tx.amount);
+    switch (tx.type) {
+      case "borrow": entry.youOwe += amount; break;
+      case "lend": entry.theyOwe += amount; break;
+      case "repay": entry.youOwe -= amount; break;
+      case "receive": entry.theyOwe -= amount; break;
+    }
+    byPerson[tx.person_id] = entry;
+  }
+
+  return Object.values(byPerson).reduce(
+    (sum, entry) => sum + Math.max(0, entry.youOwe),
+    0,
+  );
+}
+
+/**
+ * Calculate financial health score (0-100).
+ *
+ * Savings rate, spending consistency, and income stability compare a
+ * trailing 30-day window against the 30 days before it, rather than the
+ * current calendar month against last calendar month - a strict calendar
+ * comparison badly distorts the score early in the month (e.g. rent paid
+ * on day 1 before salary lands looks like a spending crisis). Budget
+ * adherence stays calendar-month based since budgets are inherently
+ * monthly in this app. Any metric that can't be measured yet (no data in
+ * the relevant window) is excluded from the overall score rather than
+ * silently defaulting to a mid-range "looks fine" value.
  */
 export function calculateFinancialHealth(
   transactions: Transaction[],
-  budgets?: { category: string; amount: number }[]
+  currentBalance: number,
+  budgets?: { category: string; amount: number }[],
 ): HealthScoreBreakdown {
   const now = new Date();
+
+  // Rolling windows for flow-based metrics.
+  const periodStart = subDays(now, 30);
+  const priorPeriodStart = subDays(now, 60);
+  const periodTx = transactions.filter((tx) => {
+    const d = new Date(tx.date);
+    return d >= periodStart && d <= now;
+  });
+  const priorPeriodTx = transactions.filter((tx) => {
+    const d = new Date(tx.date);
+    return d >= priorPeriodStart && d < periodStart;
+  });
+
+  const sumType = (rows: Transaction[], type: string) =>
+    rows.filter((tx) => tx.type === type).reduce((sum, tx) => sum + Number(tx.amount), 0);
+
+  const periodIncome = sumType(periodTx, "income");
+  const periodExpense = sumType(periodTx, "expense");
+  const priorPeriodIncome = sumType(priorPeriodTx, "income");
+  const priorPeriodExpense = sumType(priorPeriodTx, "expense");
+
+  // Calendar month, used only for budget adherence (budgets are monthly).
   const thisMonthStart = startOfMonth(now);
   const thisMonthEnd = endOfMonth(now);
-  const lastMonthStart = startOfMonth(subMonths(now, 1));
-  const lastMonthEnd = endOfMonth(subMonths(now, 1));
-  
-  // Get transactions for this month and last month
   const thisMonthTx = transactions.filter((tx) => {
     const d = new Date(tx.date);
     return d >= thisMonthStart && d <= thisMonthEnd;
   });
-  
-  const lastMonthTx = transactions.filter((tx) => {
-    const d = new Date(tx.date);
-    return d >= lastMonthStart && d <= lastMonthEnd;
-  });
-  
-  // Calculate income and expenses
-  const thisMonthIncome = thisMonthTx
-    .filter((tx) => tx.type === "income")
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-  
-  const thisMonthExpense = thisMonthTx
-    .filter((tx) => tx.type === "expense")
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-  
-  const lastMonthIncome = lastMonthTx
-    .filter((tx) => tx.type === "income")
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-  
-  const lastMonthExpense = lastMonthTx
-    .filter((tx) => tx.type === "expense")
-    .reduce((sum, tx) => sum + Number(tx.amount), 0);
-  
-  // 1. Savings Rate Score (0-30 points)
-  const savingsRateValue = thisMonthIncome > 0 
-    ? ((thisMonthIncome - thisMonthExpense) / thisMonthIncome) * 100 
+  const thisMonthExpense = sumType(thisMonthTx, "expense");
+
+  // 1. Savings Rate Score (0-25 points)
+  const hasFlowData = periodIncome > 0 || periodExpense > 0;
+  const savingsRateValue = periodIncome > 0
+    ? ((periodIncome - periodExpense) / periodIncome) * 100
     : 0;
-  
+
   let savingsScore = 0;
-  let savingsLabel = "";
-  
-  if (savingsRateValue >= 30) { savingsScore = 30; savingsLabel = "Excellent"; }
-  else if (savingsRateValue >= 20) { savingsScore = 25; savingsLabel = "Great"; }
-  else if (savingsRateValue >= 10) { savingsScore = 20; savingsLabel = "Good"; }
-  else if (savingsRateValue >= 0) { savingsScore = 15; savingsLabel = "Fair"; }
-  else { savingsScore = 5; savingsLabel = "Needs attention"; }
-  
-  // 2. Budget Adherence Score (0-25 points)
-  let budgetScore = 15; // Default if no budgets
+  let savingsLabel = "Not enough data";
+
+  if (!hasFlowData) {
+    // leave as insufficient data
+  } else if (savingsRateValue >= 30) { savingsScore = 25; savingsLabel = "Excellent"; }
+  else if (savingsRateValue >= 20) { savingsScore = 21; savingsLabel = "Great"; }
+  else if (savingsRateValue >= 10) { savingsScore = 17; savingsLabel = "Good"; }
+  else if (savingsRateValue >= 0) { savingsScore = 12; savingsLabel = "Fair"; }
+  else { savingsScore = 4; savingsLabel = "Needs attention"; }
+
+  // 2. Budget Adherence Score (0-20 points)
+  let budgetScore = 12; // Default if no budgets (60% of max, same proportion as before)
   let budgetValue = 0;
   let budgetLabel = "No budgets set";
-  
+
   if (budgets && budgets.length > 0) {
     const categorySpending: Record<string, number> = {};
     thisMonthTx
@@ -314,64 +362,125 @@ export function calculateFinancialHealth(
         const cat = tx.category || "Uncategorized";
         categorySpending[cat] = (categorySpending[cat] || 0) + Number(tx.amount);
       });
-    
+
     let adherenceTotal = 0;
     let budgetCount = 0;
-    
+
     for (const budget of budgets) {
       const spent = categorySpending[budget.category] || 0;
-      const adherence = budget.amount > 0 
+      const adherence = budget.amount > 0
         ? Math.min(100, (1 - (spent - budget.amount) / budget.amount) * 100)
         : 100;
       adherenceTotal += Math.max(0, adherence);
       budgetCount++;
     }
-    
+
     budgetValue = budgetCount > 0 ? adherenceTotal / budgetCount : 100;
-    budgetScore = Math.round((budgetValue / 100) * 25);
-    
+    budgetScore = Math.round((budgetValue / 100) * 20);
+
     if (budgetValue >= 90) budgetLabel = "Excellent";
     else if (budgetValue >= 70) budgetLabel = "Good";
     else if (budgetValue >= 50) budgetLabel = "Fair";
     else budgetLabel = "Over budget";
+
+    // Per-category adherence can look "Excellent" while overall spending
+    // still blows past the total budget through unbudgeted categories -
+    // dock points when that happens instead of missing it entirely.
+    const totalBudgetCap = budgets.reduce((sum, b) => sum + b.amount, 0);
+    if (totalBudgetCap > 0 && thisMonthExpense > totalBudgetCap * 1.2) {
+      budgetScore = Math.round(budgetScore * 0.6);
+      budgetLabel = "Overspending outside budgets";
+    }
   }
-  
-  // 3. Spending Consistency Score (0-25 points)
-  const expenseChange = lastMonthExpense > 0
-    ? Math.abs((thisMonthExpense - lastMonthExpense) / lastMonthExpense) * 100
+
+  // 3. Spending Consistency Score (0-20 points)
+  const hasConsistencyData = priorPeriodExpense > 0;
+  const expenseChange = hasConsistencyData
+    ? Math.abs((periodExpense - priorPeriodExpense) / priorPeriodExpense) * 100
     : 0;
-  
+
   let consistencyScore = 0;
-  let consistencyLabel = "";
-  
-  if (expenseChange <= 10) { consistencyScore = 25; consistencyLabel = "Very stable"; }
-  else if (expenseChange <= 20) { consistencyScore = 20; consistencyLabel = "Stable"; }
-  else if (expenseChange <= 30) { consistencyScore = 15; consistencyLabel = "Moderate"; }
-  else if (expenseChange <= 50) { consistencyScore = 10; consistencyLabel = "Variable"; }
-  else { consistencyScore = 5; consistencyLabel = "Volatile"; }
-  
-  // 4. Income Stability Score (0-20 points)
-  const incomeChange = lastMonthIncome > 0
-    ? Math.abs((thisMonthIncome - lastMonthIncome) / lastMonthIncome) * 100
+  let consistencyLabel = "Not enough data";
+
+  if (!hasConsistencyData) {
+    // leave as insufficient data
+  } else if (expenseChange <= 10) { consistencyScore = 20; consistencyLabel = "Very stable"; }
+  else if (expenseChange <= 20) { consistencyScore = 16; consistencyLabel = "Stable"; }
+  else if (expenseChange <= 30) { consistencyScore = 12; consistencyLabel = "Moderate"; }
+  else if (expenseChange <= 50) { consistencyScore = 8; consistencyLabel = "Variable"; }
+  else { consistencyScore = 4; consistencyLabel = "Volatile"; }
+
+  // 4. Income Stability Score (0-15 points)
+  const hasIncomeStabilityData = priorPeriodIncome > 0;
+  const incomeChange = hasIncomeStabilityData
+    ? Math.abs((periodIncome - priorPeriodIncome) / priorPeriodIncome) * 100
     : 0;
-  
+
   let incomeScore = 0;
-  let incomeLabel = "";
-  
-  if (incomeChange <= 5) { incomeScore = 20; incomeLabel = "Very stable"; }
-  else if (incomeChange <= 15) { incomeScore = 15; incomeLabel = "Stable"; }
-  else if (incomeChange <= 30) { incomeScore = 10; incomeLabel = "Moderate"; }
-  else { incomeScore = 5; incomeLabel = "Variable"; }
-  
-  // Calculate overall score
-  const overall = savingsScore + budgetScore + consistencyScore + incomeScore;
-  
+  let incomeLabel = "Not enough data";
+
+  if (!hasIncomeStabilityData) {
+    // leave as insufficient data
+  } else if (incomeChange <= 5) { incomeScore = 15; incomeLabel = "Very stable"; }
+  else if (incomeChange <= 15) { incomeScore = 11; incomeLabel = "Stable"; }
+  else if (incomeChange <= 30) { incomeScore = 7; incomeLabel = "Moderate"; }
+  else { incomeScore = 4; incomeLabel = "Variable"; }
+
+  // 5. Financial Cushion Score (0-20 points) - months of expenses covered
+  // by current balance minus outstanding debt owed to other people.
+  const outstandingDebt = calculateOutstandingDebt(transactions);
+  const netLiquidPosition = currentBalance - outstandingDebt;
+  const avgDailyExpense = periodExpense / 30;
+
+  let cushionScore: number;
+  let cushionLabel: string;
+  let cushionDays: number;
+
+  if (avgDailyExpense <= 0) {
+    cushionDays = netLiquidPosition > 0 ? Infinity : 0;
+    cushionScore = netLiquidPosition > 0 ? 20 : 4;
+    cushionLabel = netLiquidPosition > 0 ? "Excellent" : "Needs attention";
+  } else {
+    cushionDays = netLiquidPosition / avgDailyExpense;
+    if (netLiquidPosition <= 0) { cushionScore = 0; cushionLabel = "In the red"; }
+    else if (cushionDays >= 90) { cushionScore = 20; cushionLabel = "Excellent"; }
+    else if (cushionDays >= 60) { cushionScore = 16; cushionLabel = "Great"; }
+    else if (cushionDays >= 30) { cushionScore = 12; cushionLabel = "Good"; }
+    else if (cushionDays >= 14) { cushionScore = 8; cushionLabel = "Fair"; }
+    else { cushionScore = 4; cushionLabel = "Needs attention"; }
+  }
+
+  // Normalize the overall score across only the metrics that had enough
+  // data to measure, so a new account isn't penalized (or flattered) by
+  // metrics that are really just "unknown".
+  const metrics: { score: number; max: number; insufficient: boolean }[] = [
+    { score: savingsScore, max: 25, insufficient: !hasFlowData },
+    { score: budgetScore, max: 20, insufficient: false },
+    { score: consistencyScore, max: 20, insufficient: !hasConsistencyData },
+    { score: incomeScore, max: 15, insufficient: !hasIncomeStabilityData },
+    { score: cushionScore, max: 20, insufficient: false },
+  ];
+  const available = metrics.filter((m) => !m.insufficient);
+  const availableMax = available.reduce((sum, m) => sum + m.max, 0);
+  const overall = availableMax > 0
+    ? Math.round((available.reduce((sum, m) => sum + m.score, 0) / availableMax) * 100)
+    : 0;
+  // Budget adherence (defaults when no budgets are set) and financial
+  // cushion (computable from balance alone, even at ৳0) can both look
+  // "available" without a single real transaction ever happening - require
+  // at least one metric actually derived from transaction history too, or
+  // a brand-new account gets a confident-looking grade from nothing.
+  const hasRealFlowData = hasFlowData || hasConsistencyData || hasIncomeStabilityData;
+  const hasEnoughData = hasRealFlowData && available.length >= 2;
+
   // Determine grade
   let grade: "A" | "B" | "C" | "D" | "F";
   let emoji: string;
   let message: string;
-  
-  if (overall >= 85) {
+
+  if (!hasEnoughData) {
+    grade = "F"; emoji = "🌱"; message = "Add a few weeks of transactions to unlock a meaningful score.";
+  } else if (overall >= 85) {
     grade = "A"; emoji = "🌟"; message = "Outstanding! You're a financial superstar!";
   } else if (overall >= 70) {
     grade = "B"; emoji = "💪"; message = "Great job! Keep up the good habits!";
@@ -382,13 +491,15 @@ export function calculateFinancialHealth(
   } else {
     grade = "F"; emoji = "🚨"; message = "Time to take control of your finances!";
   }
-  
+
   return {
     overall,
-    savingsRate: { score: savingsScore, value: savingsRateValue, label: savingsLabel },
-    budgetAdherence: { score: budgetScore, value: budgetValue, label: budgetLabel },
-    spendingConsistency: { score: consistencyScore, value: 100 - expenseChange, label: consistencyLabel },
-    incomeStability: { score: incomeScore, value: 100 - incomeChange, label: incomeLabel },
+    hasEnoughData,
+    savingsRate: { score: savingsScore, maxScore: 25, value: savingsRateValue, label: savingsLabel, insufficientData: !hasFlowData },
+    budgetAdherence: { score: budgetScore, maxScore: 20, value: budgetValue, label: budgetLabel },
+    spendingConsistency: { score: consistencyScore, maxScore: 20, value: 100 - expenseChange, label: consistencyLabel, insufficientData: !hasConsistencyData },
+    incomeStability: { score: incomeScore, maxScore: 15, value: 100 - incomeChange, label: incomeLabel, insufficientData: !hasIncomeStabilityData },
+    financialCushion: { score: cushionScore, maxScore: 20, value: cushionDays === Infinity ? 999 : cushionDays, label: cushionLabel },
     grade,
     emoji,
     message,
@@ -628,6 +739,138 @@ export function generateInsights(transactions: Transaction[]): Insight[] {
   
   // Sort by priority (descending)
   return insights.sort((a, b) => b.priority - a.priority).slice(0, 4);
+}
+
+// ==========================================
+// CASH FLOW FORECAST
+// ==========================================
+
+export type CashFlowStatus =
+  | "insufficient-data"
+  | "growing"
+  | "stable"
+  | "declining"
+  | "critical";
+
+export interface CashFlowForecast {
+  status: CashFlowStatus;
+  currentBalance: number;
+  avgDailyNetChange: number;
+  daysOfHistory: number;
+  projectedDate: string | null;
+  daysRemaining: number | null;
+  message: string;
+}
+
+const FORECAST_WINDOW_DAYS = 30;
+const FORECAST_MIN_HISTORY_DAYS = 7;
+
+/**
+ * Projects when the user's total balance will run out (or how it'll grow)
+ * based on the trailing net daily cash flow across all their own accounts.
+ * Transfers between own accounts net to zero automatically since both the
+ * credit and debit side are included in the same sum.
+ */
+export function calculateCashFlowForecast(
+  transactions: Transaction[],
+  currentBalance: number,
+): CashFlowForecast {
+  const now = new Date();
+  const windowStart = new Date(now);
+  windowStart.setDate(windowStart.getDate() - FORECAST_WINDOW_DAYS);
+
+  const txTimes = transactions.map((tx) => new Date(tx.date).getTime());
+  const earliestTxTime = txTimes.length > 0 ? Math.min(...txTimes) : now.getTime();
+  const daysOfHistory = Math.min(
+    FORECAST_WINDOW_DAYS,
+    Math.max(0, Math.floor((now.getTime() - earliestTxTime) / (1000 * 60 * 60 * 24))),
+  );
+
+  if (daysOfHistory < FORECAST_MIN_HISTORY_DAYS) {
+    return {
+      status: "insufficient-data",
+      currentBalance,
+      avgDailyNetChange: 0,
+      daysOfHistory,
+      projectedDate: null,
+      daysRemaining: null,
+      message:
+        "Keep logging transactions - we need at least a week of history to forecast your cash flow.",
+    };
+  }
+
+  const windowTx = transactions.filter((tx) => {
+    const d = new Date(tx.date);
+    return d >= windowStart && d <= now;
+  });
+
+  const netChange = windowTx.reduce((sum, tx) => {
+    const amount = Number(tx.amount);
+    if (!Number.isFinite(amount)) return sum;
+    let delta = 0;
+    if (tx.to_account_id) delta += amount;
+    if (tx.from_account_id) delta -= amount;
+    return sum + delta;
+  }, 0);
+
+  const avgDailyNetChange = netChange / daysOfHistory;
+
+  if (avgDailyNetChange >= 0) {
+    const projectedGrowth = avgDailyNetChange * 30;
+    return {
+      status: avgDailyNetChange === 0 ? "stable" : "growing",
+      currentBalance,
+      avgDailyNetChange,
+      daysOfHistory,
+      projectedDate: null,
+      daysRemaining: null,
+      message:
+        avgDailyNetChange === 0
+          ? "Your balance has held steady recently - income and spending are roughly matched."
+          : `At this pace, your balance is on track to grow by ~৳${Math.round(projectedGrowth).toLocaleString()} over the next 30 days.`,
+    };
+  }
+
+  const burnRate = -avgDailyNetChange;
+  if (currentBalance <= 0) {
+    return {
+      status: "critical",
+      currentBalance,
+      avgDailyNetChange,
+      daysOfHistory,
+      projectedDate: null,
+      daysRemaining: 0,
+      message:
+        "Your balance is already at or below zero, and recent spending is outpacing income.",
+    };
+  }
+
+  const daysRemaining = Math.floor(currentBalance / burnRate);
+  const projectedDate = new Date(now);
+  projectedDate.setDate(projectedDate.getDate() + daysRemaining);
+
+  if (daysRemaining > 180) {
+    return {
+      status: "declining",
+      currentBalance,
+      avgDailyNetChange,
+      daysOfHistory,
+      projectedDate: projectedDate.toISOString(),
+      daysRemaining,
+      message:
+        "Spending is outpacing income slightly, but at this rate you have more than 6 months of runway - worth watching, not urgent.",
+    };
+  }
+
+  return {
+    status: daysRemaining <= 14 ? "critical" : "declining",
+    currentBalance,
+    avgDailyNetChange,
+    daysOfHistory,
+    projectedDate: projectedDate.toISOString(),
+    daysRemaining,
+    message: `At this rate, you'll run low by ${format(projectedDate, "MMM d")} (about ${daysRemaining} day${daysRemaining === 1 ? "" : "s"}) if nothing changes.`,
+  };
 }
 
 // ==========================================
