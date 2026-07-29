@@ -29,21 +29,51 @@ class MonthlyMoneySummary {
   };
 }
 
+/// A single income/expense line item, including its note - the monthly
+/// summaries above only carry category totals, so a question about a
+/// specific note (e.g. "how much on rickshaw") has nothing to match
+/// against without this.
+class RecentTransaction {
+  const RecentTransaction({
+    required this.date,
+    required this.type,
+    required this.amount,
+    required this.category,
+    required this.note,
+  });
+
+  final String date;
+  final String type;
+  final double amount;
+  final String category;
+  final String note;
+
+  Map<String, dynamic> toJson() => {
+    'date': date,
+    'type': type,
+    'amount': amount,
+    'category': category,
+    'note': note,
+  };
+}
+
 /// The bounded context handed to the "Ask Your Money" chat endpoint: current
-/// balances plus a trailing window of monthly summaries, rather than the
-/// full transaction list.
+/// balances, a trailing window of monthly summaries, and a capped window of
+/// recent line items - never the full transaction list.
 class MoneyChatContext {
   const MoneyChatContext({
     required this.currentBalance,
     required this.totalToReceive,
     required this.totalToPay,
     required this.monthlySummaries,
+    this.recentTransactions = const [],
   });
 
   final double currentBalance;
   final double totalToReceive;
   final double totalToPay;
   final List<MonthlyMoneySummary> monthlySummaries;
+  final List<RecentTransaction> recentTransactions;
 
   Map<String, dynamic> toJson() => {
     'currentBalance': currentBalance,
@@ -52,13 +82,21 @@ class MoneyChatContext {
     'monthlySummaries': [
       for (final summary in monthlySummaries) summary.toJson(),
     ],
+    'recentTransactions': [
+      for (final transaction in recentTransactions) transaction.toJson(),
+    ],
   };
 }
 
 const _monthlySummaryWindow = 6;
+const _recentTransactionWindowDays = 90;
+const _recentTransactionCap = 500;
 
 /// Groups the trailing [_monthlySummaryWindow] calendar months of
-/// transactions into per-month income/expense-by-category totals.
+/// transactions into per-month income/expense-by-category totals, and
+/// separately lists up to [_recentTransactionCap] individual income/expense
+/// transactions from the trailing [_recentTransactionWindowDays] days (most
+/// recent first) so note-level questions can be answered too.
 MoneyChatContext buildMoneyChatContext({required DashboardSnapshot snapshot}) {
   final now = DateTime.now();
   final months = [
@@ -92,11 +130,37 @@ MoneyChatContext buildMoneyChatContext({required DashboardSnapshot snapshot}) {
     );
   }).toList();
 
+  final recentWindowStart = now.subtract(
+    const Duration(days: _recentTransactionWindowDays),
+  );
+  final recentTransactions =
+      snapshot.transactions
+          .where(
+            (t) =>
+                (t.type == 'income' || t.type == 'expense') &&
+                !t.displayDate.isBefore(recentWindowStart) &&
+                !t.displayDate.isAfter(now),
+          )
+          .toList()
+        ..sort((a, b) => b.displayDate.compareTo(a.displayDate));
+
   return MoneyChatContext(
     currentBalance: snapshot.totalBalance,
     totalToReceive: snapshot.totalToReceive,
     totalToPay: snapshot.totalToPay,
     monthlySummaries: summaries,
+    recentTransactions: recentTransactions
+        .take(_recentTransactionCap)
+        .map(
+          (t) => RecentTransaction(
+            date: DateFormat('yyyy-MM-dd').format(t.displayDate),
+            type: t.type,
+            amount: t.amount,
+            category: _normalizedCategory(t.category),
+            note: t.note?.trim() ?? '',
+          ),
+        )
+        .toList(),
   );
 }
 

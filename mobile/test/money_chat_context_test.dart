@@ -122,6 +122,109 @@ void main() {
       expect(context.totalToReceive, 0);
       expect(context.totalToPay, 0);
     });
+
+    test(
+      'includes recent transactions with notes, newest first, within 90 days',
+      () {
+        final transactions = [
+          _tx(
+            id: 'income',
+            type: 'income',
+            amount: 50000,
+            date: now.subtract(const Duration(days: 5)),
+            toAccount: true,
+          ),
+          _tx(
+            id: 'rickshaw-1',
+            type: 'expense',
+            amount: 30,
+            date: now.subtract(const Duration(days: 3)),
+            category: 'Transport',
+            note: 'Rickshaw to office',
+          ),
+          _tx(
+            id: 'rickshaw-2',
+            type: 'expense',
+            amount: 40,
+            date: now.subtract(const Duration(days: 1)),
+            category: 'Transport',
+            note: 'Rickshaw home',
+          ),
+          _tx(
+            id: 'too-old',
+            type: 'expense',
+            amount: 999,
+            date: now.subtract(const Duration(days: 120)),
+            category: 'Food',
+            note: 'Outside the window',
+          ),
+        ];
+        final snapshot = DashboardSnapshot(
+          accounts: [account],
+          people: const [],
+          investments: const [],
+          budgets: const [],
+          transactions: transactions,
+        );
+
+        final context = buildMoneyChatContext(snapshot: snapshot);
+
+        expect(context.recentTransactions, hasLength(3));
+        expect(context.recentTransactions.first.note, 'Rickshaw home');
+        expect(context.recentTransactions[1].note, 'Rickshaw to office');
+        expect(
+          context.recentTransactions.map((t) => t.note),
+          isNot(contains('Outside the window')),
+        );
+      },
+    );
+
+    test('excludes loan/investment types from recent transactions', () {
+      final transactions = [
+        _tx(
+          id: 'lend-1',
+          type: 'lend',
+          amount: 500,
+          date: now.subtract(const Duration(days: 1)),
+          note: 'Lent to a friend',
+        ),
+      ];
+      final snapshot = DashboardSnapshot(
+        accounts: [account],
+        people: const [],
+        investments: const [],
+        budgets: const [],
+        transactions: transactions,
+      );
+
+      final context = buildMoneyChatContext(snapshot: snapshot);
+
+      expect(context.recentTransactions, isEmpty);
+    });
+
+    test('caps recent transactions at 500 entries', () {
+      final transactions = [
+        for (var i = 0; i < 510; i++)
+          _tx(
+            id: 'e$i',
+            type: 'expense',
+            amount: 10,
+            date: now.subtract(Duration(days: i % 89)),
+            category: 'Food',
+          ),
+      ];
+      final snapshot = DashboardSnapshot(
+        accounts: [account],
+        people: const [],
+        investments: const [],
+        budgets: const [],
+        transactions: transactions,
+      );
+
+      final context = buildMoneyChatContext(snapshot: snapshot);
+
+      expect(context.recentTransactions.length, 500);
+    });
   });
 }
 
@@ -132,6 +235,7 @@ TransactionRecord _tx({
   required DateTime date,
   bool toAccount = false,
   String? category,
+  String? note,
 }) {
   return TransactionRecord(
     id: id,
@@ -140,6 +244,7 @@ TransactionRecord _tx({
     toAccountId: toAccount ? 'account-1' : null,
     fromAccountId: toAccount ? null : 'account-1',
     category: category,
+    note: note,
     occurredAt: date,
     createdAt: date,
   );

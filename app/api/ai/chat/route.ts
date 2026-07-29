@@ -12,6 +12,14 @@ const MonthlySummarySchema = z.object({
   ),
 });
 
+const RecentTransactionSchema = z.object({
+  date: z.string(),
+  type: z.enum(["income", "expense"]),
+  amount: z.number().nonnegative(),
+  category: z.string(),
+  note: z.string(),
+});
+
 const RequestSchema = z.object({
   question: z.string().min(1),
   context: z.object({
@@ -19,6 +27,7 @@ const RequestSchema = z.object({
     totalToReceive: z.number().nonnegative(),
     totalToPay: z.number().nonnegative(),
     monthlySummaries: z.array(MonthlySummarySchema),
+    recentTransactions: z.array(RecentTransactionSchema).default([]),
   }),
   history: z
     .array(
@@ -73,6 +82,15 @@ export async function POST(request: Request) {
         ),
       ].join("\n"),
     ),
+    context.recentTransactions.length
+      ? [
+          `Individual transactions from the last ${context.recentTransactions.length <= 500 ? "90 days" : "recent period"} (most recent first, use these for anything about a specific note, item, or merchant):`,
+          ...context.recentTransactions.map(
+            (t) =>
+              `- ${t.date} ${t.type} ${t.amount} BDT [${t.category}]${t.note ? `: ${t.note}` : ""}`,
+          ),
+        ].join("\n")
+      : "No individual transaction records provided.",
     body.history.length
       ? [
           "Prior conversation so far:",
@@ -80,11 +98,15 @@ export async function POST(request: Request) {
         ].join("\n")
       : "No prior conversation.",
     `The user's new question: "${body.question}"`,
-    "Answer using only the numbers given above. Keep the answer to a few " +
-      "concise sentences, in BDT (Taka). If the question asks about a " +
-      "month or category that isn't covered by the data above, say " +
-      "plainly that you don't have enough data to answer it rather than " +
-      "guessing.",
+    "Answer using only the data given above. When the question mentions a " +
+      "specific item, note, or merchant (e.g. \"rickshaw\"), match it " +
+      "against the note text of the individual transactions, not just " +
+      "the category totals - sum whichever of those transactions " +
+      "reasonably match. Keep the answer to a few concise sentences, in " +
+      "BDT (Taka). If the question asks about something that isn't " +
+      "covered by the data above (a period or item with no matching " +
+      "transactions), say plainly that you don't have enough data to " +
+      "answer it rather than guessing.",
   ].join("\n");
 
   try {
