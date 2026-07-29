@@ -62,41 +62,6 @@ class AiSpendCutSuggestion {
   }
 }
 
-class AiParsedTransaction {
-  const AiParsedTransaction({
-    required this.type,
-    required this.amount,
-    required this.category,
-    required this.note,
-  });
-
-  final String type;
-  final double amount;
-  final String category;
-  final String note;
-
-  factory AiParsedTransaction.fromJson(Map<String, dynamic> json) {
-    final rawType = json['type']?.toString();
-    if (rawType != 'income' && rawType != 'expense') {
-      throw const AiServiceException(
-        'Unexpected response from the AI service.',
-      );
-    }
-    final amount = json['amount'];
-    if (amount is! num || amount <= 0) {
-      throw const AiServiceException(
-        'Unexpected response from the AI service.',
-      );
-    }
-    return AiParsedTransaction(
-      type: rawType!,
-      amount: amount.toDouble(),
-      category: json['category']?.toString() ?? 'Uncategorized',
-      note: json['note']?.toString() ?? '',
-    );
-  }
-}
-
 /// One turn of prior conversation sent back to the chat endpoint so it can
 /// answer follow-up questions with context.
 class AiChatTurn {
@@ -189,19 +154,6 @@ class AiService {
               AiSpendCutSuggestion.fromJson(Map<String, dynamic>.from(row)),
         );
     return rows.toList();
-  }
-
-  Future<AiParsedTransaction> parseTransactionText({
-    required String text,
-    required List<String> incomeCategories,
-    required List<String> expenseCategories,
-  }) async {
-    final json = await _post('/api/ai/parse-transaction', {
-      'text': text,
-      'incomeCategories': incomeCategories,
-      'expenseCategories': expenseCategories,
-    });
-    return AiParsedTransaction.fromJson(json);
   }
 
   Future<String> askAboutMoney({

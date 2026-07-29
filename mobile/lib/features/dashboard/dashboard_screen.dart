@@ -26,7 +26,7 @@ enum DashboardTab { activity, ledger, budget, investments }
 
 enum ActivityMode { daily, monthly }
 
-enum _QuickAction { income, expense, transfer, investment, describe }
+enum _QuickAction { income, expense, transfer, investment }
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -154,39 +154,17 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _showEntrySheet(
     TransactionEntryKind kind,
-    DashboardSnapshot snapshot, {
-    double? initialAmount,
-    String? initialCategory,
-    String? initialNote,
-  }) async {
+    DashboardSnapshot snapshot,
+  ) async {
     final saved = await showTransactionEntrySheet(
       context: context,
       kind: kind,
       accounts: snapshot.accountBalances,
       dataSource: widget.dataSource,
-      initialAmount: initialAmount,
-      initialCategory: initialCategory,
-      initialNote: initialNote,
     );
 
     if (!mounted || saved != true) return;
     await _refreshAfterMutation('Transaction saved');
-  }
-
-  Future<void> _showNaturalLanguageEntry(DashboardSnapshot snapshot) async {
-    final parsed = await showNaturalLanguageTransactionDialog(
-      context: context,
-      aiService: _aiService,
-    );
-
-    if (!mounted || parsed == null) return;
-    await _showEntrySheet(
-      parsed.kind,
-      snapshot,
-      initialAmount: parsed.amount,
-      initialCategory: parsed.category,
-      initialNote: parsed.note,
-    );
   }
 
   Future<void> _showAccountSheet(AccountBalance accountBalance) async {
@@ -857,7 +835,6 @@ class _DashboardScreenState extends State<DashboardScreen>
           onTransfer: () => Navigator.of(context).pop(_QuickAction.transfer),
           onInvestment: () =>
               Navigator.of(context).pop(_QuickAction.investment),
-          onDescribe: () => Navigator.of(context).pop(_QuickAction.describe),
         );
       },
     );
@@ -873,8 +850,6 @@ class _DashboardScreenState extends State<DashboardScreen>
         await _showEntrySheet(TransactionEntryKind.transfer, snapshot);
       case _QuickAction.investment:
         await _showInvestmentSheet(snapshot);
-      case _QuickAction.describe:
-        await _showNaturalLanguageEntry(snapshot);
     }
   }
 }
@@ -4992,14 +4967,12 @@ class _QuickActionsSheet extends StatelessWidget {
     required this.onExpense,
     required this.onTransfer,
     required this.onInvestment,
-    required this.onDescribe,
   });
 
   final VoidCallback onIncome;
   final VoidCallback onExpense;
   final VoidCallback onTransfer;
   final VoidCallback onInvestment;
-  final VoidCallback onDescribe;
 
   @override
   Widget build(BuildContext context) {
@@ -5068,13 +5041,6 @@ class _QuickActionsSheet extends StatelessWidget {
                       icon: Icons.trending_up,
                       color: AppTheme.neonAmber,
                       onPressed: onInvestment,
-                    ),
-                    const SizedBox(height: 10),
-                    _SheetActionButton(
-                      label: 'Describe It',
-                      icon: Icons.auto_awesome_outlined,
-                      color: AppTheme.teal,
-                      onPressed: onDescribe,
                     ),
                   ],
                 ),

@@ -75,6 +75,11 @@ export async function POST(request: Request) {
         mime_type: "application/json",
         schema: RESPONSE_JSON_SCHEMA,
       },
+      // Lower thinking effort noticeably cuts latency for this kind of
+      // short structured output, which doesn't need multi-step reasoning.
+      // max_output_tokens is a generous safety ceiling, not a tight cap -
+      // capping too low truncates the JSON before it completes.
+      generation_config: { thinking_level: "low", max_output_tokens: 1200 },
     });
 
     const text = interaction.output_text;
