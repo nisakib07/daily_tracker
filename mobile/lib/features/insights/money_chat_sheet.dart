@@ -85,15 +85,10 @@ class _MoneyChatSheetState extends State<MoneyChatSheet> {
         _entries.add(_ChatEntry(role: 'assistant', text: answer));
         _isSending = false;
       });
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
       setState(() {
-        _entries.add(
-          const _ChatEntry(
-            role: 'error',
-            text: "Couldn't reach the AI service — try again in a moment.",
-          ),
-        );
+        _entries.add(_ChatEntry(role: 'error', text: error.toString()));
         _isSending = false;
       });
     }

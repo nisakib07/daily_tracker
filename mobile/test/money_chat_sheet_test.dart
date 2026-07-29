@@ -103,10 +103,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('money-chat-send')));
     await tester.pumpAndSettle();
 
-    expect(
-      find.text("Couldn't reach the AI service — try again in a moment."),
-      findsOneWidget,
-    );
+    expect(find.text('AI service returned an error (503).'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
