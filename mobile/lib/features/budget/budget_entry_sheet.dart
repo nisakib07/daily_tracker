@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/formatters.dart';
+import '../../data/ai_service.dart';
+import '../../data/budget_advisor.dart';
 import '../../data/money_repository.dart';
+import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_dialogs.dart';
 import '../../shared/widgets/app_form_page.dart';
@@ -26,7 +29,9 @@ Future<bool?> showBudgetEntrySheet({
   required DateTime month,
   required List<String> categories,
   required Map<String, double> existingBudgets,
+  required List<TransactionRecord> transactions,
   MoneyDataSource? dataSource,
+  AiService? aiService,
 }) {
   return Navigator.of(context).push<bool>(
     MaterialPageRoute(
@@ -35,7 +40,9 @@ Future<bool?> showBudgetEntrySheet({
         month: month,
         categories: categories,
         existingBudgets: existingBudgets,
+        transactions: transactions,
         dataSource: dataSource,
+        aiService: aiService,
       ),
     ),
   );
@@ -47,13 +54,17 @@ class BudgetEntrySheet extends StatefulWidget {
     required this.month,
     required this.categories,
     required this.existingBudgets,
+    required this.transactions,
     this.dataSource,
+    this.aiService,
   });
 
   final DateTime month;
   final List<String> categories;
   final Map<String, double> existingBudgets;
+  final List<TransactionRecord> transactions;
   final MoneyDataSource? dataSource;
+  final AiService? aiService;
 
   @override
   State<BudgetEntrySheet> createState() => _BudgetEntrySheetState();
@@ -62,8 +73,10 @@ class BudgetEntrySheet extends StatefulWidget {
 class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
   final _newCategoryController = TextEditingController();
   final _controllers = <String, TextEditingController>{};
+  late final AiService _aiService = widget.aiService ?? AiService();
   late List<String> _categories;
   bool _isSaving = false;
+  bool _isSuggesting = false;
   String? _error;
   String? _categoryError;
 
@@ -111,6 +124,56 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
       _newCategoryController.clear();
       _categoryError = null;
     });
+  }
+
+  Future<void> _suggestBudgets() async {
+    final history = summarizeBudgetHistory(transactions: widget.transactions);
+    if (!history.hasEnoughData) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(history.insufficientDataMessage)));
+      return;
+    }
+
+    setState(() => _isSuggesting = true);
+
+    String summary;
+    Map<String, double> amounts;
+    try {
+      final ai = await _aiService.suggestBudgets(
+        avgMonthlyIncome: history.avgMonthlyIncome,
+        avgCategorySpending: history.avgCategorySpending,
+        categories: _categories,
+      );
+      summary = ai.summary;
+      amounts = ai.amounts;
+    } catch (_) {
+      // AI unavailable (no key configured, offline, rate limited, etc.) -
+      // fall back to the on-device estimate rather than leaving the user
+      // with nothing.
+      final fallback = suggestBudgets(transactions: widget.transactions);
+      summary = '${fallback.summary} (AI unavailable — on-device estimate.)';
+      amounts = fallback.amounts;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSuggesting = false;
+      for (final entry in amounts.entries) {
+        final controller = _controllers.putIfAbsent(entry.key, () {
+          _categories = [..._categories, entry.key]
+            ..sort((a, b) => a.compareTo(b));
+          return TextEditingController();
+        });
+        controller.text = _initialText(entry.value);
+      }
+      _error = null;
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(summary)));
   }
 
   double get _plannedTotal {
@@ -201,11 +264,28 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
       title: 'Set Budgets',
       accent: AppTheme.neonCyan,
       actions: [
+        IconButton(
+          key: const ValueKey('budget-suggest'),
+          tooltip: 'Suggest budgets from my history',
+          onPressed: (_isSaving || _isSuggesting) ? null : _suggestBudgets,
+          icon: _isSuggesting
+              ? const SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppTheme.neonAmber,
+                  ),
+                )
+              : const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: AppTheme.neonAmber,
+                ),
+        ),
         if (widget.existingBudgets.isNotEmpty)
           IconButton(
             key: const ValueKey('budget-clear-month'),
             tooltip: 'Clear month budgets',
-            onPressed: _isSaving ? null : _clearMonth,
+            onPressed: (_isSaving || _isSuggesting) ? null : _clearMonth,
             icon: const Icon(Icons.delete_outline, color: AppTheme.neonRose),
           ),
         const SizedBox(width: 4),
@@ -315,7 +395,7 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
           AppFormActionBar(
             accent: AppTheme.neonCyan,
             saveLabel: 'Save Budgets',
-            isSaving: _isSaving,
+            isSaving: _isSaving || _isSuggesting,
             onCancel: () => Navigator.of(context).pop(false),
             onSave: _save,
           ),

@@ -1,5 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:money_master/data/ai_service.dart';
 import 'package:money_master/data/money_repository.dart';
 import 'package:money_master/features/transactions/transaction_entry_sheet.dart';
 import 'package:money_master/models/money_models.dart';
@@ -115,6 +120,129 @@ void main() {
 
       expect(find.text('৳999'), findsNothing);
       expect(find.text('Lunch'), findsNWidgets(2));
+    },
+  );
+
+  testWidgets(
+    'Initial values from AI parsing pre-fill amount, category, and note',
+    (tester) async {
+      await _pump(
+        tester,
+        TransactionEntrySheet(
+          kind: TransactionEntryKind.expense,
+          accounts: _accountBalances,
+          initialAmount: 500,
+          initialCategory: 'Pizza Hut', // not in the default category list
+          initialNote: 'Lunch at Pizza Hut',
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('৳500'), findsOneWidget);
+      expect(find.text('Pizza Hut'), findsOneWidget);
+      expect(find.text('Lunch at Pizza Hut'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Describe It dialog parses text and returns the parsed transaction',
+    (tester) async {
+      final aiService = AiService(
+        client: MockClient(
+          (request) async => http.Response(
+            jsonEncode({
+              'type': 'expense',
+              'amount': 500,
+              'category': 'Food',
+              'note': 'Lunch at Pizza Hut',
+            }),
+            200,
+          ),
+        ),
+        tokenProvider: () => 'fake-token',
+      );
+      ParsedTransactionEntry? result;
+
+      await _pump(
+        tester,
+        Scaffold(
+          body: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () async {
+                result = await showNaturalLanguageTransactionDialog(
+                  context: context,
+                  aiService: aiService,
+                );
+              },
+              child: const Text('Describe It'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Describe It'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('nl-entry-text')),
+        '500 on lunch at Pizza Hut',
+      );
+      await tester.tap(find.byKey(const ValueKey('nl-entry-parse')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(result, isNotNull);
+      expect(result!.kind, TransactionEntryKind.expense);
+      expect(result!.amount, 500);
+      expect(result!.category, 'Food');
+      expect(result!.note, 'Lunch at Pizza Hut');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Describe It dialog shows a retryable error without crashing on failure',
+    (tester) async {
+      final aiService = AiService(
+        client: MockClient(
+          (request) async => http.Response('Service Unavailable', 503),
+        ),
+        tokenProvider: () => 'fake-token',
+      );
+
+      await _pump(
+        tester,
+        Scaffold(
+          body: Builder(
+            builder: (context) => FilledButton(
+              onPressed: () => showNaturalLanguageTransactionDialog(
+                context: context,
+                aiService: aiService,
+              ),
+              child: const Text('Describe It'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Describe It'));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const ValueKey('nl-entry-text')),
+        'not enough info',
+      );
+      await tester.tap(find.byKey(const ValueKey('nl-entry-parse')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining("Couldn't understand that"), findsOneWidget);
+      expect(find.byType(AlertDialog), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
     },
   );
 

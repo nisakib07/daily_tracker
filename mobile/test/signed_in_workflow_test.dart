@@ -179,6 +179,7 @@ void main() {
         month: DateTime(2026, 7),
         categories: const ['Food'],
         existingBudgets: const {},
+        transactions: const [],
         dataSource: dataSource,
       ),
     );
@@ -198,6 +199,7 @@ void main() {
         month: DateTime(2026, 7),
         categories: const ['Food'],
         existingBudgets: const {'Food': 1200},
+        transactions: const [],
         dataSource: dataSource,
       ),
     );

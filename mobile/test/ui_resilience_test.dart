@@ -53,6 +53,7 @@ void main() {
             month: DateTime(2026, 7),
             categories: const [_veryLongCategory],
             existingBudgets: const {'Food': 123456789},
+            transactions: const [],
           ),
           action: 'Save Budgets',
         ),

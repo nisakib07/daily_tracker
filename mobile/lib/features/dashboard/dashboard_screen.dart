@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/formatters.dart';
+import '../../data/ai_service.dart';
 import '../../data/cached_money_data_source.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
@@ -25,7 +26,7 @@ enum DashboardTab { activity, ledger, budget, investments }
 
 enum ActivityMode { daily, monthly }
 
-enum _QuickAction { income, expense, transfer, investment }
+enum _QuickAction { income, expense, transfer, investment, describe }
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({
@@ -33,11 +34,13 @@ class DashboardScreen extends StatefulWidget {
     required this.user,
     this.snapshotLoader,
     this.dataSource,
+    this.aiService,
   });
 
   final User user;
   final Future<DashboardSnapshot> Function()? snapshotLoader;
   final MoneyDataSource? dataSource;
+  final AiService? aiService;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -67,6 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   MoneyDataSource get _dataSource =>
       widget.dataSource ?? MoneyRepository(Supabase.instance.client);
+  late final AiService _aiService = widget.aiService ?? AiService();
 
   @override
   void initState() {
@@ -150,17 +154,39 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   Future<void> _showEntrySheet(
     TransactionEntryKind kind,
-    DashboardSnapshot snapshot,
-  ) async {
+    DashboardSnapshot snapshot, {
+    double? initialAmount,
+    String? initialCategory,
+    String? initialNote,
+  }) async {
     final saved = await showTransactionEntrySheet(
       context: context,
       kind: kind,
       accounts: snapshot.accountBalances,
       dataSource: widget.dataSource,
+      initialAmount: initialAmount,
+      initialCategory: initialCategory,
+      initialNote: initialNote,
     );
 
     if (!mounted || saved != true) return;
     await _refreshAfterMutation('Transaction saved');
+  }
+
+  Future<void> _showNaturalLanguageEntry(DashboardSnapshot snapshot) async {
+    final parsed = await showNaturalLanguageTransactionDialog(
+      context: context,
+      aiService: _aiService,
+    );
+
+    if (!mounted || parsed == null) return;
+    await _showEntrySheet(
+      parsed.kind,
+      snapshot,
+      initialAmount: parsed.amount,
+      initialCategory: parsed.category,
+      initialNote: parsed.note,
+    );
   }
 
   Future<void> _showAccountSheet(AccountBalance accountBalance) async {
@@ -181,7 +207,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       final snapshot = await _snapshotFuture;
       if (!mounted) return;
-      await showAnalyticsSheet(context: context, snapshot: snapshot);
+      await showAnalyticsSheet(
+        context: context,
+        snapshot: snapshot,
+        aiService: _aiService,
+      );
     } catch (_) {
       if (!mounted) return;
       _showSnack('Analytics will open after dashboard data loads.');
@@ -302,6 +332,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       month: _selectedMonth,
       categories: budgetRows.map((row) => row.category).toList(),
       existingBudgets: existingBudgets,
+      transactions: snapshot.transactions,
       dataSource: widget.dataSource,
     );
 
@@ -826,6 +857,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           onTransfer: () => Navigator.of(context).pop(_QuickAction.transfer),
           onInvestment: () =>
               Navigator.of(context).pop(_QuickAction.investment),
+          onDescribe: () => Navigator.of(context).pop(_QuickAction.describe),
         );
       },
     );
@@ -841,6 +873,8 @@ class _DashboardScreenState extends State<DashboardScreen>
         await _showEntrySheet(TransactionEntryKind.transfer, snapshot);
       case _QuickAction.investment:
         await _showInvestmentSheet(snapshot);
+      case _QuickAction.describe:
+        await _showNaturalLanguageEntry(snapshot);
     }
   }
 }
@@ -4958,12 +4992,14 @@ class _QuickActionsSheet extends StatelessWidget {
     required this.onExpense,
     required this.onTransfer,
     required this.onInvestment,
+    required this.onDescribe,
   });
 
   final VoidCallback onIncome;
   final VoidCallback onExpense;
   final VoidCallback onTransfer;
   final VoidCallback onInvestment;
+  final VoidCallback onDescribe;
 
   @override
   Widget build(BuildContext context) {
@@ -5032,6 +5068,13 @@ class _QuickActionsSheet extends StatelessWidget {
                       icon: Icons.trending_up,
                       color: AppTheme.neonAmber,
                       onPressed: onInvestment,
+                    ),
+                    const SizedBox(height: 10),
+                    _SheetActionButton(
+                      label: 'Describe It',
+                      icon: Icons.auto_awesome_outlined,
+                      color: AppTheme.teal,
+                      onPressed: onDescribe,
                     ),
                   ],
                 ),

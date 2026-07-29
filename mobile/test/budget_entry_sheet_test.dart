@@ -1,6 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:money_master/data/ai_service.dart';
 import 'package:money_master/features/budget/budget_entry_sheet.dart';
+import 'package:money_master/models/money_models.dart';
 import 'package:money_master/shared/theme/app_theme.dart';
 
 void main() {
@@ -15,6 +21,7 @@ void main() {
           'A household category with an exceptionally long display name',
         ],
         existingBudgets: const {'Food': 1250, 'Transport': 800},
+        transactions: const [],
       ),
     );
     await tester.pumpAndSettle();
@@ -46,6 +53,7 @@ void main() {
         month: DateTime(2026, 7),
         categories: const [],
         existingBudgets: const {'Food': 1250},
+        transactions: const [],
       ),
     );
     await tester.pumpAndSettle();
@@ -78,6 +86,7 @@ void main() {
           month: DateTime(2026, 7),
           categories: const [],
           existingBudgets: const {'Food': 1250},
+          transactions: const [],
         ),
       );
       await tester.pumpAndSettle();
@@ -112,6 +121,7 @@ void main() {
         month: DateTime(2026, 7),
         categories: const [],
         existingBudgets: const {'Food': 1250},
+        transactions: const [],
       ),
     );
     await tester.pumpAndSettle();
@@ -138,6 +148,190 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('AI Suggest fills budget fields from real spending history', (
+    tester,
+  ) async {
+    final transactions = [
+      _tx(
+        id: 'income',
+        type: 'income',
+        amount: 60000,
+        daysAgo: 25,
+        toAccount: true,
+      ),
+      for (var i = 1; i <= 30; i++)
+        _tx(
+          id: 'e$i',
+          type: 'expense',
+          amount: 500,
+          daysAgo: i,
+          category: 'Food',
+        ),
+    ];
+
+    await _pumpOnPhone(
+      tester,
+      BudgetEntrySheet(
+        month: DateTime(2026, 7),
+        categories: const ['Food'],
+        existingBudgets: const {},
+        transactions: transactions,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('budget-suggest')));
+    await tester.pumpAndSettle();
+
+    final foodField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey('budget-amount-Food')),
+    );
+    expect(foodField.controller?.text, '15000');
+    expect(find.textContaining('already keep you'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('AI Suggest fills budget fields from the AI response', (
+    tester,
+  ) async {
+    final transactions = [
+      _tx(
+        id: 'income',
+        type: 'income',
+        amount: 60000,
+        daysAgo: 25,
+        toAccount: true,
+      ),
+      for (var i = 1; i <= 30; i++)
+        _tx(
+          id: 'e$i',
+          type: 'expense',
+          amount: 500,
+          daysAgo: i,
+          category: 'Food',
+        ),
+    ];
+    final aiService = AiService(
+      client: MockClient(
+        (request) async => http.Response(
+          jsonEncode({
+            'summary': 'Gemini says trim Food to 9000 BDT this month.',
+            'suggestions': [
+              {
+                'category': 'Food',
+                'amount': 9000,
+                'rationale': 'Well above your typical spend.',
+              },
+            ],
+          }),
+          200,
+        ),
+      ),
+      tokenProvider: () => 'fake-token',
+    );
+
+    await _pumpOnPhone(
+      tester,
+      BudgetEntrySheet(
+        month: DateTime(2026, 7),
+        categories: const ['Food'],
+        existingBudgets: const {},
+        transactions: transactions,
+        aiService: aiService,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('budget-suggest')));
+    await tester.pumpAndSettle();
+
+    final foodField = tester.widget<TextFormField>(
+      find.byKey(const ValueKey('budget-amount-Food')),
+    );
+    expect(foodField.controller?.text, '9000');
+    expect(
+      find.text('Gemini says trim Food to 9000 BDT this month.'),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'AI Suggest falls back to the on-device estimate when the AI call fails',
+    (tester) async {
+      final transactions = [
+        _tx(
+          id: 'income',
+          type: 'income',
+          amount: 60000,
+          daysAgo: 25,
+          toAccount: true,
+        ),
+        for (var i = 1; i <= 30; i++)
+          _tx(
+            id: 'e$i',
+            type: 'expense',
+            amount: 500,
+            daysAgo: i,
+            category: 'Food',
+          ),
+      ];
+      final aiService = AiService(
+        client: MockClient(
+          (request) async => http.Response('Service Unavailable', 503),
+        ),
+        tokenProvider: () => 'fake-token',
+      );
+
+      await _pumpOnPhone(
+        tester,
+        BudgetEntrySheet(
+          month: DateTime(2026, 7),
+          categories: const ['Food'],
+          existingBudgets: const {},
+          transactions: transactions,
+          aiService: aiService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('budget-suggest')));
+      await tester.pumpAndSettle();
+
+      final foodField = tester.widget<TextFormField>(
+        find.byKey(const ValueKey('budget-amount-Food')),
+      );
+      expect(foodField.controller?.text, '15000');
+      expect(
+        find.textContaining('(AI unavailable — on-device estimate.)'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'AI Suggest shows a notice instead of guessing without enough history',
+    (tester) async {
+      await _pumpOnPhone(
+        tester,
+        BudgetEntrySheet(
+          month: DateTime(2026, 7),
+          categories: const [],
+          existingBudgets: const {},
+          transactions: const [],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('budget-suggest')));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('Not enough history yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('Budget helper opens the editor as a full-page route', (
     tester,
   ) async {
@@ -154,6 +348,7 @@ void main() {
                   month: DateTime(2026, 7),
                   categories: const [],
                   existingBudgets: const {},
+                  transactions: const [],
                 );
               },
               child: const Text('Open budgets'),
@@ -181,4 +376,25 @@ Future<void> _pumpOnPhone(WidgetTester tester, Widget child) async {
   addTearDown(tester.view.resetPhysicalSize);
   addTearDown(tester.view.resetDevicePixelRatio);
   await tester.pumpWidget(MaterialApp(theme: AppTheme.light(), home: child));
+}
+
+TransactionRecord _tx({
+  required String id,
+  required String type,
+  required double amount,
+  required int daysAgo,
+  bool toAccount = false,
+  String? category,
+}) {
+  final date = DateTime.now().subtract(Duration(days: daysAgo));
+  return TransactionRecord(
+    id: id,
+    type: type,
+    amount: amount,
+    toAccountId: toAccount ? 'account-1' : null,
+    fromAccountId: toAccount ? null : 'account-1',
+    category: category,
+    occurredAt: date,
+    createdAt: date,
+  );
 }

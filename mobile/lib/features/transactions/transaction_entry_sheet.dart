@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../data/ai_service.dart';
 import '../../data/category_store.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
@@ -74,6 +75,9 @@ Future<bool?> showTransactionEntrySheet({
   required TransactionEntryKind kind,
   required List<AccountBalance> accounts,
   MoneyDataSource? dataSource,
+  double? initialAmount,
+  String? initialCategory,
+  String? initialNote,
 }) {
   return Navigator.of(context).push<bool>(
     MaterialPageRoute(
@@ -83,10 +87,162 @@ Future<bool?> showTransactionEntrySheet({
           kind: kind,
           accounts: accounts,
           dataSource: dataSource,
+          initialAmount: initialAmount,
+          initialCategory: initialCategory,
+          initialNote: initialNote,
         );
       },
     ),
   );
+}
+
+/// A parsed result from [showNaturalLanguageTransactionDialog], describing
+/// which kind of entry sheet to open and how to pre-fill it. The user still
+/// reviews everything in the normal entry sheet before saving - this never
+/// saves a transaction directly.
+class ParsedTransactionEntry {
+  const ParsedTransactionEntry({
+    required this.kind,
+    required this.amount,
+    required this.category,
+    required this.note,
+  });
+
+  final TransactionEntryKind kind;
+  final double amount;
+  final String category;
+  final String note;
+}
+
+/// Lets the user describe a transaction in plain text (e.g. "500 on lunch
+/// at Pizza Hut") and has Gemini parse it into a kind/amount/category/note.
+/// There's no local fallback for this - free-text parsing has no sensible
+/// rule-based equivalent - so a failure is shown honestly and the dialog
+/// stays open for the user to retry or cancel.
+Future<ParsedTransactionEntry?> showNaturalLanguageTransactionDialog({
+  required BuildContext context,
+  required AiService aiService,
+}) {
+  return showDialog<ParsedTransactionEntry>(
+    context: context,
+    builder: (context) => _NaturalLanguageEntryDialog(aiService: aiService),
+  );
+}
+
+class _NaturalLanguageEntryDialog extends StatefulWidget {
+  const _NaturalLanguageEntryDialog({required this.aiService});
+
+  final AiService aiService;
+
+  @override
+  State<_NaturalLanguageEntryDialog> createState() =>
+      _NaturalLanguageEntryDialogState();
+}
+
+class _NaturalLanguageEntryDialogState
+    extends State<_NaturalLanguageEntryDialog> {
+  final _controller = TextEditingController();
+  bool _isParsing = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _parse() async {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = 'Type something first, e.g. "500 on lunch".');
+      return;
+    }
+
+    setState(() {
+      _isParsing = true;
+      _error = null;
+    });
+
+    try {
+      final incomeCategories = await CategoryStore().loadMerged(
+        CategoryKind.income,
+      );
+      final expenseCategories = await CategoryStore().loadMerged(
+        CategoryKind.expense,
+      );
+      final parsed = await widget.aiService.parseTransactionText(
+        text: text,
+        incomeCategories: incomeCategories,
+        expenseCategories: expenseCategories,
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(
+        ParsedTransactionEntry(
+          kind: parsed.type == 'income'
+              ? TransactionEntryKind.income
+              : TransactionEntryKind.expense,
+          amount: parsed.amount,
+          category: parsed.category,
+          note: parsed.note,
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error =
+            "Couldn't understand that — try rephrasing, or enter it manually.";
+        _isParsing = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Describe It'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const ValueKey('nl-entry-text'),
+            controller: _controller,
+            autofocus: true,
+            minLines: 1,
+            maxLines: 3,
+            enabled: !_isParsing,
+            decoration: const InputDecoration(
+              hintText: 'e.g. 500 on lunch at Pizza Hut',
+            ),
+            onSubmitted: (_) => _parse(),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isParsing ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('nl-entry-parse'),
+          onPressed: _isParsing ? null : _parse,
+          child: _isParsing
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Parse'),
+        ),
+      ],
+    );
+  }
 }
 
 Future<bool?> showEditTransactionSheet({
@@ -117,11 +273,17 @@ class TransactionEntrySheet extends StatefulWidget {
     required this.kind,
     required this.accounts,
     this.dataSource,
+    this.initialAmount,
+    this.initialCategory,
+    this.initialNote,
   });
 
   final TransactionEntryKind kind;
   final List<AccountBalance> accounts;
   final MoneyDataSource? dataSource;
+  final double? initialAmount;
+  final String? initialCategory;
+  final String? initialNote;
 
   @override
   State<TransactionEntrySheet> createState() => _TransactionEntrySheetState();
@@ -177,9 +339,20 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
         _toAccountId = widget.accounts[1].account.id;
       }
     }
+    if (widget.initialAmount != null) {
+      _amountController.text = _amountText(widget.initialAmount!);
+    }
+    if (widget.initialNote != null) {
+      _noteController.text = widget.initialNote!;
+    }
     if (!_isTransfer) {
-      _categories = _defaultCategories;
-      _category = _categories.first;
+      final defaults = _defaultCategories;
+      final initialCategory = widget.initialCategory;
+      _categories =
+          initialCategory != null && !defaults.contains(initialCategory)
+          ? [initialCategory, ...defaults]
+          : defaults;
+      _category = initialCategory ?? _categories.first;
       _loadCategories();
     }
   }
@@ -202,8 +375,11 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
     final categories = await CategoryStore().loadMerged(kind);
     if (!mounted) return;
     setState(() {
-      _categories = categories;
-      _category ??= categories.isEmpty ? null : categories.first;
+      final initial = widget.initialCategory;
+      _categories = initial != null && !categories.contains(initial)
+          ? [initial, ...categories]
+          : categories;
+      _category ??= _categories.isEmpty ? null : _categories.first;
     });
   }
 
