@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
+import { corsJson, corsPreflight } from "@/lib/ai/cors";
 import { GEMINI_MODEL, getGeminiClient } from "@/lib/ai/gemini-client";
 import { verifyUser } from "@/lib/ai/verify-user";
 
@@ -29,17 +29,21 @@ const RESPONSE_JSON_SCHEMA = {
   required: ["explanation"],
 };
 
+export async function OPTIONS(request: Request) {
+  return corsPreflight(request);
+}
+
 export async function POST(request: Request) {
   const user = await verifyUser(request);
   if (!user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return corsJson(request, { error: "Unauthorized" }, { status: 401 });
   }
 
   let body: z.infer<typeof RequestSchema>;
   try {
     body = RequestSchema.parse(await request.json());
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return corsJson(request, { error: "Invalid request body" }, { status: 400 });
   }
 
   const prompt = [
@@ -75,19 +79,17 @@ export async function POST(request: Request) {
 
     const text = interaction.output_text;
     if (!text) {
-      return NextResponse.json(
-        { error: "Empty response from AI" },
-        { status: 502 },
-      );
+      return corsJson(request, { error: "Empty response from AI" }, { status: 502 });
     }
 
     const parsed = ExplanationSchema.parse(JSON.parse(text));
-    return NextResponse.json(parsed);
+    return corsJson(request, parsed);
   } catch (error) {
     console.error("health-explanation error:", error);
     const message = error instanceof Error ? error.message : "";
     const status = message.includes("GEMINI_API_KEY") ? 503 : 502;
-    return NextResponse.json(
+    return corsJson(
+      request,
       { error: "Could not generate an explanation." },
       { status },
     );
