@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_lock_controller.dart';
 import '../../core/daily_reminder_controller.dart';
+import '../../core/formatters.dart';
 import '../../core/theme_mode_controller.dart';
 import '../../data/category_store.dart';
+import '../../data/money_repository.dart';
+import '../../data/quick_add_shortcut_store.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_dialogs.dart';
 import '../../shared/widgets/app_state_widgets.dart';
@@ -13,19 +16,25 @@ import '../../shared/widgets/aurora_background.dart';
 Future<void> showSettingsSheet({
   required BuildContext context,
   required String? email,
+  List<AccountBalance> accounts = const [],
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (context) => SettingsSheet(email: email),
+      builder: (context) => SettingsSheet(email: email, accounts: accounts),
     ),
   );
 }
 
 class SettingsSheet extends ConsumerStatefulWidget {
-  const SettingsSheet({super.key, required this.email});
+  const SettingsSheet({
+    super.key,
+    required this.email,
+    this.accounts = const [],
+  });
 
   final String? email;
+  final List<AccountBalance> accounts;
 
   @override
   ConsumerState<SettingsSheet> createState() => _SettingsSheetState();
@@ -35,10 +44,13 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
   final _incomeController = TextEditingController();
   final _expenseController = TextEditingController();
   final _store = CategoryStore();
+  final _quickAddStore = QuickAddShortcutStore();
 
   List<String> _incomeCategories = const [];
   List<String> _expenseCategories = const [];
+  List<QuickAddShortcut> _quickAddShortcuts = const [];
   final Set<CategoryKind> _updatingKinds = {};
+  bool _isUpdatingQuickAdd = false;
   bool _isLoading = true;
   String? _error;
   String? _incomeInputError;
@@ -61,10 +73,12 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     try {
       final income = await _store.loadCustom(CategoryKind.income);
       final expense = await _store.loadCustom(CategoryKind.expense);
+      final quickAdd = await _quickAddStore.load();
       if (!mounted) return;
       setState(() {
         _incomeCategories = income;
         _expenseCategories = expense;
+        _quickAddShortcuts = quickAdd;
         _isLoading = false;
         _error = null;
       });
@@ -74,6 +88,91 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
         _isLoading = false;
         _error = 'Could not load settings. ${error.toString()}';
       });
+    }
+  }
+
+  Future<void> _addQuickAddShortcut({
+    required String category,
+    required String subCategory,
+    required String accountId,
+    double? amount,
+  }) async {
+    if (_isUpdatingQuickAdd) return;
+    setState(() {
+      _isUpdatingQuickAdd = true;
+      _error = null;
+    });
+
+    try {
+      await _quickAddStore.add(
+        QuickAddShortcut(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          category: category,
+          subCategory: subCategory,
+          accountId: accountId,
+          amount: amount,
+        ),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error = 'Could not save quick add shortcut. ${error.toString()}',
+      );
+    } finally {
+      if (mounted) setState(() => _isUpdatingQuickAdd = false);
+    }
+  }
+
+  Future<void> _updateQuickAddShortcut(QuickAddShortcut shortcut) async {
+    if (_isUpdatingQuickAdd) return;
+    setState(() {
+      _isUpdatingQuickAdd = true;
+      _error = null;
+    });
+
+    try {
+      await _quickAddStore.update(shortcut);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () =>
+            _error = 'Could not update quick add shortcut. ${error.toString()}',
+      );
+    } finally {
+      if (mounted) setState(() => _isUpdatingQuickAdd = false);
+    }
+  }
+
+  Future<void> _deleteQuickAddShortcut(QuickAddShortcut shortcut) async {
+    if (_isUpdatingQuickAdd) return;
+    final confirmed = await showAppDestructiveConfirmation(
+      context: context,
+      title: 'Delete Quick Add?',
+      message:
+          'Remove "${shortcut.subCategory}" from your quick add shortcuts?',
+      confirmLabel: 'Delete Quick Add',
+      icon: Icons.flash_off_outlined,
+    );
+
+    if (!mounted || !confirmed) return;
+    setState(() {
+      _isUpdatingQuickAdd = true;
+      _error = null;
+    });
+
+    try {
+      await _quickAddStore.delete(shortcut.id);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () =>
+            _error = 'Could not delete quick add shortcut. ${error.toString()}',
+      );
+    } finally {
+      if (mounted) setState(() => _isUpdatingQuickAdd = false);
     }
   }
 
@@ -267,6 +366,15 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
                                 ],
                               );
                             },
+                          ),
+                          const SizedBox(height: 14),
+                          _QuickAddSettingsSection(
+                            accounts: widget.accounts,
+                            shortcuts: _quickAddShortcuts,
+                            isUpdating: _isUpdatingQuickAdd,
+                            onAdd: _addQuickAddShortcut,
+                            onUpdate: _updateQuickAddShortcut,
+                            onDelete: _deleteQuickAddShortcut,
                           ),
                         ],
                       ],
@@ -882,4 +990,466 @@ class _CategorySettingsSection extends StatelessWidget {
       ),
     );
   }
+}
+
+class _QuickAddSettingsSection extends StatefulWidget {
+  const _QuickAddSettingsSection({
+    required this.accounts,
+    required this.shortcuts,
+    required this.isUpdating,
+    required this.onAdd,
+    required this.onUpdate,
+    required this.onDelete,
+  });
+
+  final List<AccountBalance> accounts;
+  final List<QuickAddShortcut> shortcuts;
+  final bool isUpdating;
+  final Future<void> Function({
+    required String category,
+    required String subCategory,
+    required String accountId,
+    double? amount,
+  })
+  onAdd;
+  final Future<void> Function(QuickAddShortcut shortcut) onUpdate;
+  final ValueChanged<QuickAddShortcut> onDelete;
+
+  @override
+  State<_QuickAddSettingsSection> createState() =>
+      _QuickAddSettingsSectionState();
+}
+
+class _QuickAddSettingsSectionState extends State<_QuickAddSettingsSection> {
+  static const _color = AppTheme.neonAmber;
+
+  final _subCategoryController = TextEditingController();
+  final _amountController = TextEditingController();
+  List<String> _categories = const [];
+  String? _category;
+  String? _accountId;
+  String? _formError;
+  String? _editingId;
+
+  bool get _isEditing => _editingId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _accountId = widget.accounts.isEmpty
+        ? null
+        : widget.accounts.first.account.id;
+    _loadCategories();
+  }
+
+  @override
+  void didUpdateWidget(covariant _QuickAddSettingsSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final stillValid = widget.accounts.any(
+      (item) => item.account.id == _accountId,
+    );
+    if (!stillValid) {
+      _accountId = widget.accounts.isEmpty
+          ? null
+          : widget.accounts.first.account.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _subCategoryController.dispose();
+    _amountController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadCategories() async {
+    final categories = await CategoryStore().loadMerged(CategoryKind.expense);
+    if (!mounted) return;
+    setState(() {
+      _categories = categories;
+      _category ??= categories.isEmpty ? null : categories.first;
+    });
+  }
+
+  void _startEdit(QuickAddShortcut shortcut) {
+    setState(() {
+      _editingId = shortcut.id;
+      _formError = null;
+      _subCategoryController.text = shortcut.subCategory;
+      _amountController.text = shortcut.amount == null
+          ? ''
+          : _amountInputText(shortcut.amount!);
+      if (!_categories.contains(shortcut.category)) {
+        _categories = [shortcut.category, ..._categories];
+      }
+      _category = shortcut.category;
+      _accountId =
+          widget.accounts.any((item) => item.account.id == shortcut.accountId)
+          ? shortcut.accountId
+          : _accountId;
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingId = null;
+      _formError = null;
+      _subCategoryController.clear();
+      _amountController.clear();
+      _category = _categories.isEmpty ? null : _categories.first;
+      _accountId = widget.accounts.isEmpty
+          ? null
+          : widget.accounts.first.account.id;
+    });
+  }
+
+  Future<void> _submit() async {
+    final subCategory = _subCategoryController.text.trim();
+    final category = _category;
+    final accountId = _accountId;
+
+    if (category == null || accountId == null || subCategory.isEmpty) {
+      setState(
+        () => _formError = 'Fill in account, category, and sub category.',
+      );
+      return;
+    }
+
+    double? amount;
+    final amountText = _amountController.text.trim();
+    if (amountText.isNotEmpty) {
+      amount = double.tryParse(amountText);
+      if (amount == null || amount <= 0) {
+        setState(
+          () => _formError = 'Amount must be greater than 0, or left blank.',
+        );
+        return;
+      }
+    }
+
+    setState(() => _formError = null);
+    final editingId = _editingId;
+    if (editingId != null) {
+      await widget.onUpdate(
+        QuickAddShortcut(
+          id: editingId,
+          category: category,
+          subCategory: subCategory,
+          accountId: accountId,
+          amount: amount,
+        ),
+      );
+    } else {
+      await widget.onAdd(
+        category: category,
+        subCategory: subCategory,
+        accountId: accountId,
+        amount: amount,
+      );
+    }
+    if (!mounted) return;
+    _editingId = null;
+    _subCategoryController.clear();
+    _amountController.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      key: const ValueKey('settings-quick-add-section'),
+      elevation: 10,
+      shadowColor: _color.withValues(alpha: 0.3),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.bolt_outlined,
+                    color: _color,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Quick Add Shortcuts',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Buttons shown on the Add Expense form',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  constraints: const BoxConstraints(minWidth: 28),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(
+                    '${widget.shortcuts.length}',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: _color,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (widget.accounts.isEmpty)
+              const AppInlineNotice(
+                icon: Icons.account_balance_wallet_outlined,
+                message: 'Add an account first to create quick add shortcuts.',
+                color: AppTheme.neonRose,
+              )
+            else ...[
+              TextField(
+                key: const ValueKey('settings-quick-add-subcategory-input'),
+                controller: _subCategoryController,
+                enabled: !widget.isUpdating,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Sub category',
+                  hintText: 'e.g. Rickshaw, Movie tickets',
+                  prefixIcon: Icon(Icons.label_outline),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                key: const ValueKey('settings-quick-add-amount-input'),
+                controller: _amountController,
+                enabled: !widget.isUpdating,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: const InputDecoration(
+                  labelText: 'Amount',
+                  hintText: 'Optional',
+                  prefixText: '৳ ',
+                ),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                key: const ValueKey('settings-quick-add-account-dropdown'),
+                initialValue: _accountId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'From account',
+                  prefixIcon: Icon(Icons.account_balance_wallet_outlined),
+                ),
+                items: widget.accounts.map((item) {
+                  return DropdownMenuItem(
+                    value: item.account.id,
+                    child: Text(
+                      item.account.name,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: widget.isUpdating
+                    ? null
+                    : (value) => setState(() => _accountId = value),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                key: const ValueKey('settings-quick-add-category-dropdown'),
+                initialValue: _category,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  prefixIcon: Icon(Icons.sell_outlined),
+                ),
+                items: _categories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Text(category, overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
+                onChanged: widget.isUpdating
+                    ? null
+                    : (value) => setState(() => _category = value),
+              ),
+              if (_formError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _formError!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 10),
+              Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_isEditing)
+                    TextButton(
+                      key: const ValueKey('settings-quick-add-cancel-edit'),
+                      onPressed: widget.isUpdating ? null : _cancelEdit,
+                      child: const Text('Cancel'),
+                    ),
+                  FilledButton.icon(
+                    key: const ValueKey('settings-quick-add-submit'),
+                    onPressed: widget.isUpdating || _categories.isEmpty
+                        ? null
+                        : _submit,
+                    icon: widget.isUpdating
+                        ? const SizedBox.square(
+                            dimension: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(_isEditing ? Icons.check : Icons.add, size: 18),
+                    label: Text(_isEditing ? 'Save changes' : 'Add shortcut'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (widget.shortcuts.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'No quick add shortcuts yet',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                Column(
+                  children: widget.shortcuts.map((shortcut) {
+                    final match = widget.accounts.where(
+                      (item) => item.account.id == shortcut.accountId,
+                    );
+                    final accountName = match.isEmpty
+                        ? 'Unknown account'
+                        : match.first.account.name;
+                    final isEditingThis = _editingId == shortcut.id;
+                    return Padding(
+                      key: ValueKey('settings-quick-add-item-${shortcut.id}'),
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(8),
+                          border: isEditingThis
+                              ? Border.all(color: _color.withValues(alpha: 0.5))
+                              : null,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.bolt_outlined,
+                              size: 18,
+                              color: _color,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    shortcut.subCategory,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleSmall
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  Text(
+                                    [
+                                      shortcut.category,
+                                      accountName,
+                                      if (shortcut.amount != null)
+                                        formatMoney(shortcut.amount!),
+                                    ].join(' · '),
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              key: ValueKey(
+                                'settings-quick-add-edit-${shortcut.id}',
+                              ),
+                              tooltip: 'Edit',
+                              onPressed: widget.isUpdating
+                                  ? null
+                                  : () => _startEdit(shortcut),
+                              icon: const Icon(Icons.edit_outlined, size: 18),
+                            ),
+                            IconButton(
+                              key: ValueKey(
+                                'settings-quick-add-delete-${shortcut.id}',
+                              ),
+                              tooltip: 'Delete',
+                              onPressed: widget.isUpdating
+                                  ? null
+                                  : () => widget.onDelete(shortcut),
+                              icon: const Icon(Icons.close, size: 18),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String _amountInputText(double value) {
+  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
+  return value.toString();
 }

@@ -196,6 +196,22 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  Future<void> _showSettings() async {
+    var accounts = const <AccountBalance>[];
+    try {
+      accounts = (await _snapshotFuture).accountBalances;
+    } catch (_) {
+      // Settings still opens without accounts; the quick-add section just
+      // shows its "add an account first" notice in that case.
+    }
+    if (!mounted) return;
+    await showSettingsSheet(
+      context: context,
+      email: widget.user.email,
+      accounts: accounts,
+    );
+  }
+
   Future<void> _showPersonSheet() async {
     final saved = await showPersonEntrySheet(
       context,
@@ -530,9 +546,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           _refresh(forceRemote: true);
         },
         onAnalytics: _showAnalytics,
-        onSettings: () {
-          showSettingsSheet(context: context, email: widget.user.email);
-        },
+        onSettings: _showSettings,
         onSignOut: _signOut,
       ),
       body: Stack(
@@ -3035,26 +3049,9 @@ class _LedgerTab extends StatelessWidget {
           color: AppTheme.neonAmber,
         ),
         const SizedBox(height: 14),
-        Row(
-          children: [
-            Expanded(
-              child: _LedgerSummaryCard(
-                label: 'To Receive',
-                value: formatMoney(snapshot.totalToReceive),
-                color: AppTheme.neonEmerald,
-                icon: Icons.call_received,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _LedgerSummaryCard(
-                label: 'To Pay',
-                value: formatMoney(snapshot.totalToPay),
-                color: AppTheme.neonAmber,
-                icon: Icons.call_made,
-              ),
-            ),
-          ],
+        _LedgerNetCard(
+          totalToReceive: snapshot.totalToReceive,
+          totalToPay: snapshot.totalToPay,
         ),
         const SizedBox(height: 10),
         Row(
@@ -3074,19 +3071,29 @@ class _LedgerTab extends StatelessWidget {
                     : () => onLoanAction(LoanAction.borrow, null),
                 icon: const Icon(Icons.handshake_outlined),
                 label: const Text('Borrow'),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: AppTheme.neonAmber.withValues(alpha: 0.12),
+                  foregroundColor: AppTheme.neonAmber,
+                  side: BorderSide(
+                    color: AppTheme.neonAmber.withValues(alpha: 0.3),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 10),
-            IconButton.filledTonal(
-              tooltip: 'Give loan',
-              onPressed: snapshot.people.isEmpty
-                  ? null
-                  : () => onLoanAction(LoanAction.lend, null),
-              icon: const Icon(Icons.volunteer_activism_outlined),
-              style: IconButton.styleFrom(
-                minimumSize: const Size(48, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: snapshot.people.isEmpty
+                    ? null
+                    : () => onLoanAction(LoanAction.lend, null),
+                icon: const Icon(Icons.volunteer_activism_outlined),
+                label: const Text('Lend'),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: AppTheme.neonEmerald.withValues(alpha: 0.12),
+                  foregroundColor: AppTheme.neonEmerald,
+                  side: BorderSide(
+                    color: AppTheme.neonEmerald.withValues(alpha: 0.3),
+                  ),
                 ),
               ),
             ),
@@ -3140,64 +3147,156 @@ class _LedgerTab extends StatelessWidget {
   }
 }
 
-class _LedgerSummaryCard extends StatelessWidget {
-  const _LedgerSummaryCard({
-    required this.label,
-    required this.value,
-    required this.color,
-    required this.icon,
+/// The Ledger tab's hero card: leads with the single net figure (what's
+/// actually owed, on net) instead of two equal-weight "To Receive"/"To Pay"
+/// boxes that made the reader do the subtraction themselves, plus a slim
+/// proportion bar and the receive/pay breakdown underneath for anyone who
+/// wants the detail.
+class _LedgerNetCard extends StatelessWidget {
+  const _LedgerNetCard({
+    required this.totalToReceive,
+    required this.totalToPay,
   });
 
-  final String label;
-  final String value;
-  final Color color;
-  final IconData icon;
+  final double totalToReceive;
+  final double totalToPay;
 
   @override
   Widget build(BuildContext context) {
+    final net = totalToReceive - totalToPay;
+    final total = totalToReceive + totalToPay;
+    final hasBalance = total > 0;
+    final neutral = Theme.of(context).colorScheme.onSurface;
+    final color = net > 0
+        ? AppTheme.neonEmerald
+        : net < 0
+        ? AppTheme.neonAmber
+        : neutral;
+    final label = net > 0
+        ? 'owed to you'
+        : net < 0
+        ? 'you owe overall'
+        : 'all settled';
+    final receiveFlex = hasBalance
+        ? (totalToReceive / total * 1000).round().clamp(0, 1000)
+        : 500;
+
     return Container(
-      padding: const EdgeInsets.all(13),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.13)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.1),
+            AppTheme.nebula.withValues(alpha: 0.4),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
+          Text(
+            'NET LEDGER POSITION',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              letterSpacing: 0.6,
             ),
-            child: Icon(icon, color: color, size: 17),
           ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                FittedBox(
+          const SizedBox(height: 6),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Flexible(
+                child: FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    '${net > 0
+                        ? '+'
+                        : net < 0
+                        ? '-'
+                        : ''}${formatMoney(net.abs())}',
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       color: color,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-              ],
+              ),
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: SizedBox(
+              height: 8,
+              child: !hasBalance
+                  ? Container(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.onSurfaceVariant.withValues(alpha: 0.15),
+                    )
+                  : Row(
+                      children: [
+                        Expanded(
+                          flex: receiveFlex,
+                          child: Container(color: AppTheme.neonEmerald),
+                        ),
+                        Expanded(
+                          flex: 1000 - receiveFlex,
+                          child: Container(
+                            color: AppTheme.neonAmber.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.call_received,
+                      size: 13,
+                      color: AppTheme.neonEmerald,
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        'To receive ${formatMoney(totalToReceive)}',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(color: AppTheme.neonEmerald),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'To pay ${formatMoney(totalToPay)}',
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -3227,100 +3326,140 @@ class _LedgerTile extends StatelessWidget {
     final status = receive ? 'They owe you' : 'You owe';
     final action = receive ? LoanAction.receive : LoanAction.repay;
     final actionLabel = receive ? 'Receive' : 'Repay';
+    // Most people only ever owe in one direction. Only spell out both sides
+    // of the ledger when there's genuinely two-way activity to disambiguate
+    // - otherwise the two mini boxes just restate the headline number and
+    // crowd out a clear single call to action.
+    final hasBothDirections = entry.theyOwe > 0 && entry.youOwe > 0;
 
     return Card(
       elevation: 10,
       shadowColor: color.withValues(alpha: 0.3),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.14),
-                  foregroundColor: color,
-                  child: Text(
-                    entry.person.name.isEmpty
-                        ? '?'
-                        : entry.person.name[0].toUpperCase(),
-                    style: const TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        entry.person.name,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
+            Container(width: 4, color: color),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: color.withValues(alpha: 0.4),
+                          width: 1.5,
                         ),
                       ),
-                      Text(
-                        [
-                          status,
-                          if (entry.lastActivityAt != null)
-                            'Last ${formatShortDate(entry.lastActivityAt!)}',
-                        ].join(' | '),
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      child: CircleAvatar(
+                        backgroundColor: color.withValues(alpha: 0.14),
+                        foregroundColor: color,
+                        child: Text(
+                          entry.person.name.isEmpty
+                              ? '?'
+                              : entry.person.name[0].toUpperCase(),
+                          style: const TextStyle(fontWeight: FontWeight.w900),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    '${receive ? '+' : '-'}${formatMoney(entry.netBalance.abs())}',
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.end,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w900,
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  entry.person.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleSmall
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                '${receive ? '+' : '-'}${formatMoney(entry.netBalance.abs())}',
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
+                                      color: color,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            [
+                              status,
+                              if (entry.lastActivityAt != null)
+                                'Last ${formatShortDate(entry.lastActivityAt!)}',
+                            ].join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                          const SizedBox(height: 10),
+                          if (hasBothDirections) ...[
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _MiniLedgerValue(
+                                    label: 'They owe',
+                                    value: formatMoney(entry.theyOwe),
+                                    color: AppTheme.neonEmerald,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: _MiniLedgerValue(
+                                    label: 'You owe',
+                                    value: formatMoney(entry.youOwe),
+                                    color: AppTheme.neonAmber,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          Row(
+                            children: [
+                              Expanded(
+                                child: FilledButton(
+                                  onPressed: () => onSettle(action),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: color,
+                                    minimumSize: const Size(0, 44),
+                                  ),
+                                  child: Text(actionLabel),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              _PersonActionMenu(
+                                onView: onView,
+                                onEdit: onEdit,
+                                onDelete: onDelete,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 2),
-                _PersonActionMenu(
-                  onView: onView,
-                  onEdit: onEdit,
-                  onDelete: onDelete,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: _MiniLedgerValue(
-                    label: 'They owe',
-                    value: formatMoney(entry.theyOwe),
-                    color: AppTheme.neonEmerald,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _MiniLedgerValue(
-                    label: 'You owe',
-                    value: formatMoney(entry.youOwe),
-                    color: AppTheme.neonAmber,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                FilledButton(
-                  onPressed: () => onSettle(action),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: color,
-                    minimumSize: const Size(84, 48),
-                  ),
-                  child: Text(actionLabel),
-                ),
-              ],
+              ),
             ),
           ],
         ),

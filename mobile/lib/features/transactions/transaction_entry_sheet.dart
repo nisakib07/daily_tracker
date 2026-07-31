@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/category_store.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
+import '../../data/quick_add_shortcut_store.dart';
 import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_form_page.dart';
@@ -12,61 +13,13 @@ import '../../shared/widgets/app_state_widgets.dart';
 
 enum TransactionEntryKind { income, expense, transfer }
 
-class _QuickAddShortcut {
-  const _QuickAddShortcut({
-    required this.label,
-    required this.icon,
-    required this.category,
-    required this.color,
-    this.defaultAmount,
-  });
-
-  final String label;
-  final IconData icon;
-  final String category;
-  final Color color;
-  final double? defaultAmount;
-}
-
-const _quickAddShortcuts = [
-  _QuickAddShortcut(
-    label: 'Breakfast',
-    icon: Icons.free_breakfast_outlined,
-    category: 'Food',
-    color: AppTheme.neonAmber,
-    defaultAmount: 45,
-  ),
-  _QuickAddShortcut(
-    label: 'Lunch',
-    icon: Icons.lunch_dining_outlined,
-    category: 'Food',
-    color: AppTheme.neonAmber,
-  ),
-  _QuickAddShortcut(
-    label: 'Dinner',
-    icon: Icons.dinner_dining_outlined,
-    category: 'Food',
-    color: AppTheme.neonAmber,
-  ),
-  _QuickAddShortcut(
-    label: 'Rickshaw',
-    icon: Icons.pedal_bike_outlined,
-    category: 'Transport',
-    color: AppTheme.neonCyan,
-    defaultAmount: 30,
-  ),
-  _QuickAddShortcut(
-    label: 'Shopping',
-    icon: Icons.shopping_bag_outlined,
-    category: 'Shopping',
-    color: AppTheme.neonRose,
-  ),
-  _QuickAddShortcut(
-    label: 'Snacks',
-    icon: Icons.icecream_outlined,
-    category: 'Food',
-    color: AppTheme.teal,
-  ),
+const _quickAddShortcutColors = [
+  AppTheme.neonAmber,
+  AppTheme.neonCyan,
+  AppTheme.neonRose,
+  AppTheme.teal,
+  AppTheme.neonEmerald,
+  AppTheme.neonViolet,
 ];
 
 Future<bool?> showTransactionEntrySheet({
@@ -136,6 +89,7 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
   String? _toAccountId;
   String? _category;
   List<String> _categories = const [];
+  List<QuickAddShortcut> _quickAddShortcuts = const [];
   DateTime _selectedDate = DateTime.now();
   bool _isSaving = false;
   String? _error;
@@ -182,6 +136,9 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
       _category = _categories.first;
       _loadCategories();
     }
+    if (_isExpense) {
+      _loadQuickAddShortcuts();
+    }
   }
 
   @override
@@ -205,6 +162,12 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
       _categories = categories;
       _category ??= categories.isEmpty ? null : categories.first;
     });
+  }
+
+  Future<void> _loadQuickAddShortcuts() async {
+    final shortcuts = await QuickAddShortcutStore().load();
+    if (!mounted) return;
+    setState(() => _quickAddShortcuts = shortcuts);
   }
 
   Future<void> _save() async {
@@ -280,21 +243,20 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
     }
   }
 
-  void _applyShortcut(_QuickAddShortcut shortcut) {
+  void _applyShortcut(QuickAddShortcut shortcut) {
     setState(() {
       if (_categories.contains(shortcut.category)) {
         _category = shortcut.category;
       }
-      _noteController.text = shortcut.label;
-      _amountController.text = shortcut.defaultAmount == null
+      _noteController.text = shortcut.subCategory;
+      _amountController.text = shortcut.amount == null
           ? ''
-          : _amountText(shortcut.defaultAmount!);
+          : _amountText(shortcut.amount!);
 
-      for (final item in widget.accounts) {
-        if (item.account.name.toLowerCase() == 'cash') {
-          _primaryAccountId = item.account.id;
-          break;
-        }
+      if (widget.accounts.any(
+        (item) => item.account.id == shortcut.accountId,
+      )) {
+        _primaryAccountId = shortcut.accountId;
       }
     });
   }
@@ -364,9 +326,12 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
                         ],
                       ],
                       if (!_isTransfer) ...[
-                        if (_isExpense) ...[
+                        if (_isExpense && _quickAddShortcuts.isNotEmpty) ...[
                           const SizedBox(height: 14),
-                          _QuickAddShortcuts(onSelect: _applyShortcut),
+                          _QuickAddShortcuts(
+                            shortcuts: _quickAddShortcuts,
+                            onSelect: _applyShortcut,
+                          ),
                         ],
                         const SizedBox(height: 12),
                         _CategoryDropdown(
@@ -1072,9 +1037,10 @@ class _PersonDropdown extends StatelessWidget {
 }
 
 class _QuickAddShortcuts extends StatelessWidget {
-  const _QuickAddShortcuts({required this.onSelect});
+  const _QuickAddShortcuts({required this.shortcuts, required this.onSelect});
 
-  final ValueChanged<_QuickAddShortcut> onSelect;
+  final List<QuickAddShortcut> shortcuts;
+  final ValueChanged<QuickAddShortcut> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -1092,21 +1058,41 @@ class _QuickAddShortcuts extends StatelessWidget {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _quickAddShortcuts.map((shortcut) {
-            return ActionChip(
-              avatar: Icon(shortcut.icon, size: 16, color: shortcut.color),
-              label: Text(shortcut.label),
-              labelStyle: TextStyle(
-                color: shortcut.color,
-                fontWeight: FontWeight.w800,
+          children: [
+            for (var i = 0; i < shortcuts.length; i++)
+              _QuickAddChip(
+                shortcut: shortcuts[i],
+                color:
+                    _quickAddShortcutColors[i % _quickAddShortcutColors.length],
+                onSelect: onSelect,
               ),
-              backgroundColor: shortcut.color.withValues(alpha: 0.1),
-              side: BorderSide(color: shortcut.color.withValues(alpha: 0.24)),
-              onPressed: () => onSelect(shortcut),
-            );
-          }).toList(),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _QuickAddChip extends StatelessWidget {
+  const _QuickAddChip({
+    required this.shortcut,
+    required this.color,
+    required this.onSelect,
+  });
+
+  final QuickAddShortcut shortcut;
+  final Color color;
+  final ValueChanged<QuickAddShortcut> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: Icon(Icons.bolt_outlined, size: 16, color: color),
+      label: Text(shortcut.subCategory),
+      labelStyle: TextStyle(color: color, fontWeight: FontWeight.w800),
+      backgroundColor: color.withValues(alpha: 0.1),
+      side: BorderSide(color: color.withValues(alpha: 0.24)),
+      onPressed: () => onSelect(shortcut),
     );
   }
 }

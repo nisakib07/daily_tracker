@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:money_master/data/ai_service.dart';
-import 'package:money_master/data/money_chat_context.dart';
 
 void main() {
   group('AiService.suggestBudgets', () {
@@ -207,70 +206,6 @@ void main() {
       );
 
       expect(result, isEmpty);
-    });
-  });
-
-  group('AiService.askAboutMoney', () {
-    const context = MoneyChatContext(
-      currentBalance: 10000,
-      totalToReceive: 0,
-      totalToPay: 0,
-      monthlySummaries: [],
-    );
-
-    test('returns the answer on a successful response', () async {
-      final client = MockClient((request) async {
-        expect(request.url.path, '/api/ai/chat');
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        expect(body['question'], 'How much did I spend on Food?');
-        expect(body['history'], isEmpty);
-        return http.Response(
-          jsonEncode({'answer': 'You spent 8000 BDT on Food last month.'}),
-          200,
-        );
-      });
-      final service = AiService(client: client, tokenProvider: () => 'token');
-
-      final answer = await service.askAboutMoney(
-        question: 'How much did I spend on Food?',
-        context: context,
-        history: const [],
-      );
-
-      expect(answer, 'You spent 8000 BDT on Food last month.');
-    });
-
-    test('sends prior history turns in the request body', () async {
-      final client = MockClient((request) async {
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        final history = body['history'] as List;
-        expect(history, hasLength(1));
-        expect(history.single, {'role': 'user', 'text': 'hi'});
-        return http.Response(jsonEncode({'answer': 'Hello!'}), 200);
-      });
-      final service = AiService(client: client, tokenProvider: () => 'token');
-
-      await service.askAboutMoney(
-        question: 'follow up',
-        context: context,
-        history: const [AiChatTurn(role: 'user', text: 'hi')],
-      );
-    });
-
-    test('throws when the response has no answer field', () async {
-      final client = MockClient(
-        (request) async => http.Response(jsonEncode({}), 200),
-      );
-      final service = AiService(client: client, tokenProvider: () => 'token');
-
-      expect(
-        () => service.askAboutMoney(
-          question: 'q',
-          context: context,
-          history: const [],
-        ),
-        throwsA(isA<AiServiceException>()),
-      );
     });
   });
 

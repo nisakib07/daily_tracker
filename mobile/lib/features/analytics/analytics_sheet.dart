@@ -9,7 +9,6 @@ import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_state_widgets.dart';
 import '../../shared/widgets/aurora_background.dart';
-import '../insights/money_chat_sheet.dart';
 
 Future<void> showAnalyticsSheet({
   required BuildContext context,
@@ -43,18 +42,6 @@ class AnalyticsSheet extends StatelessWidget {
           icon: const Icon(Icons.close),
         ),
         title: const Text('Analytics'),
-        actions: [
-          IconButton(
-            key: const ValueKey('analytics-ask-your-money'),
-            tooltip: 'Ask your money',
-            onPressed: () => showMoneyChatSheet(
-              context: context,
-              snapshot: snapshot,
-              aiService: aiService,
-            ),
-            icon: const Icon(Icons.chat_bubble_outline),
-          ),
-        ],
       ),
       body: Stack(
         children: [

@@ -1,14 +1,30 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:money_master/data/money_repository.dart';
 import 'package:money_master/features/settings/settings_sheet.dart';
+import 'package:money_master/models/money_models.dart';
 import 'package:money_master/shared/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _incomeKey = 'dmt_custom_income_categories';
 const _expenseKey = 'dmt_custom_expense_categories';
+const _quickAddKey = 'dmt_quick_add_shortcuts';
 const _longCategory =
     'A consulting and professional services category with an exceptionally long display name';
+
+final _testAccountCreatedAt = DateTime(2026, 1, 1);
+final _testCashAccount = Account(
+  id: 'cash-1',
+  name: 'Cash',
+  type: 'cash',
+  createdAt: _testAccountCreatedAt,
+);
+final _testAccounts = [
+  AccountBalance(account: _testCashAccount, balance: 1000),
+];
 
 void main() {
   setUp(() {
@@ -239,6 +255,138 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets(
+    'Settings shows a notice when there are no accounts for quick add shortcuts',
+    (tester) async {
+      await _pumpAtSize(
+        tester,
+        const Size(320, 568),
+        const SettingsSheet(email: 'user@example.com'),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollToCategories(tester, find.text('Quick Add Shortcuts'));
+      expect(
+        find.text('Add an account first to create quick add shortcuts.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Settings adds and deletes a quick add shortcut', (tester) async {
+    await _pumpAtSize(
+      tester,
+      const Size(320, 568),
+      SettingsSheet(email: 'user@example.com', accounts: _testAccounts),
+    );
+    await tester.pumpAndSettle();
+
+    final subCategoryInput = find.byKey(
+      const ValueKey('settings-quick-add-subcategory-input'),
+    );
+    await _scrollToCategories(tester, subCategoryInput);
+    await tester.enterText(subCategoryInput, 'Rickshaw');
+    await tester.pump();
+
+    await tester.tap(find.byKey(const ValueKey('settings-quick-add-submit')));
+    await tester.pumpAndSettle();
+
+    var prefs = await SharedPreferences.getInstance();
+    var saved = jsonDecode(prefs.getString(_quickAddKey) ?? '[]') as List;
+    expect(saved, hasLength(1));
+    expect(saved.single['subCategory'], 'Rickshaw');
+    expect(saved.single['accountId'], _testCashAccount.id);
+
+    final itemId = saved.single['id'] as String;
+    expect(
+      find.byKey(ValueKey('settings-quick-add-item-$itemId')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(ValueKey('settings-quick-add-delete-$itemId')));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete Quick Add?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete Quick Add'));
+    await tester.pumpAndSettle();
+
+    prefs = await SharedPreferences.getInstance();
+    saved = jsonDecode(prefs.getString(_quickAddKey) ?? '[]') as List;
+    expect(saved, isEmpty);
+    expect(
+      find.byKey(ValueKey('settings-quick-add-item-$itemId')),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Settings edits an existing quick add shortcut in place', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      _quickAddKey: jsonEncode([
+        {
+          'id': 'qa-edit',
+          'category': 'Food',
+          'subCategory': 'Lunch',
+          'accountId': _testCashAccount.id,
+          'amount': 100,
+        },
+      ]),
+    });
+
+    await _pumpAtSize(
+      tester,
+      const Size(320, 568),
+      SettingsSheet(email: 'user@example.com', accounts: _testAccounts),
+    );
+    await tester.pumpAndSettle();
+
+    final scrollView = find.byKey(const ValueKey('settings-scroll-view'));
+    final editButton = find.byKey(
+      const ValueKey('settings-quick-add-edit-qa-edit'),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.drag(scrollView, const Offset(0, -300));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    await tester.tap(editButton);
+    await tester.pumpAndSettle();
+
+    final subCategoryInput = find.byKey(
+      const ValueKey('settings-quick-add-subcategory-input'),
+    );
+    expect(
+      tester.widget<TextField>(subCategoryInput).controller?.text,
+      'Lunch',
+    );
+    expect(find.text('Save changes'), findsOneWidget);
+
+    await tester.enterText(subCategoryInput, 'Brunch');
+    await tester.pump();
+    final submitButton = find.byKey(
+      const ValueKey('settings-quick-add-submit'),
+    );
+    for (var i = 0; i < 8; i++) {
+      await tester.drag(scrollView, const Offset(0, -300));
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+    await tester.tap(submitButton);
+    await tester.pumpAndSettle();
+
+    final prefs = await SharedPreferences.getInstance();
+    final saved = jsonDecode(prefs.getString(_quickAddKey) ?? '[]') as List;
+    expect(saved, hasLength(1));
+    expect(saved.single['id'], 'qa-edit');
+    expect(saved.single['subCategory'], 'Brunch');
+    expect(find.text('Brunch'), findsOneWidget);
+    expect(find.text('Add shortcut'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Settings helper opens and closes a full-page route', (
     tester,

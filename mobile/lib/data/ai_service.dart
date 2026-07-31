@@ -5,7 +5,6 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/app_config.dart';
-import 'money_chat_context.dart';
 
 /// Thrown for any failure calling the AI backend - network, auth, timeout,
 /// or a malformed/error response. Callers are expected to catch this and
@@ -60,17 +59,6 @@ class AiSpendCutSuggestion {
           .toDouble(),
     );
   }
-}
-
-/// One turn of prior conversation sent back to the chat endpoint so it can
-/// answer follow-up questions with context.
-class AiChatTurn {
-  const AiChatTurn({required this.role, required this.text});
-
-  final String role;
-  final String text;
-
-  Map<String, dynamic> toJson() => {'role': role, 'text': text};
 }
 
 /// A single health-score metric, sent to the health-explanation endpoint.
@@ -154,25 +142,6 @@ class AiService {
               AiSpendCutSuggestion.fromJson(Map<String, dynamic>.from(row)),
         );
     return rows.toList();
-  }
-
-  Future<String> askAboutMoney({
-    required String question,
-    required MoneyChatContext context,
-    required List<AiChatTurn> history,
-  }) async {
-    final json = await _post('/api/ai/chat', {
-      'question': question,
-      'context': context.toJson(),
-      'history': history.map((turn) => turn.toJson()).toList(),
-    });
-    final answer = json['answer'];
-    if (answer is! String) {
-      throw const AiServiceException(
-        'Unexpected response from the AI service.',
-      );
-    }
-    return answer;
   }
 
   Future<String> explainHealthScore({

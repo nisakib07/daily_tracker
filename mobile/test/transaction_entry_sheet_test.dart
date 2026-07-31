@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:money_master/data/money_repository.dart';
@@ -5,6 +7,8 @@ import 'package:money_master/features/transactions/transaction_entry_sheet.dart'
 import 'package:money_master/models/money_models.dart';
 import 'package:money_master/shared/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+const _quickAddKey = 'dmt_quick_add_shortcuts';
 
 void main() {
   setUp(() {
@@ -62,6 +66,21 @@ void main() {
     expect(find.text('Note'), findsOneWidget);
   });
 
+  testWidgets('Quick add section is hidden when no shortcuts are saved', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      TransactionEntrySheet(
+        kind: TransactionEntryKind.expense,
+        accounts: _accountBalances,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('QUICK ADD'), findsNothing);
+  });
+
   testWidgets('Quick add shortcuts fill category, note, amount, and account', (
     tester,
   ) async {
@@ -69,6 +88,18 @@ void main() {
       AccountBalance(account: _card, balance: 500),
       AccountBalance(account: _cash, balance: 1000),
     ];
+
+    SharedPreferences.setMockInitialValues({
+      _quickAddKey: jsonEncode([
+        {
+          'id': 'qa-rickshaw',
+          'category': 'Transport',
+          'subCategory': 'Rickshaw',
+          'accountId': _cash.id,
+          'amount': 30,
+        },
+      ]),
+    });
 
     await _pump(
       tester,
@@ -94,6 +125,17 @@ void main() {
   testWidgets(
     'Quick add shortcuts without a preset amount clear a typed value',
     (tester) async {
+      SharedPreferences.setMockInitialValues({
+        _quickAddKey: jsonEncode([
+          {
+            'id': 'qa-lunch',
+            'category': 'Food',
+            'subCategory': 'Lunch',
+            'accountId': _cash.id,
+          },
+        ]),
+      });
+
       await _pump(
         tester,
         TransactionEntrySheet(

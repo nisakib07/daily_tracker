@@ -173,24 +173,6 @@ void main() {
     },
   );
 
-  testWidgets('Ask your money icon opens the money chat screen', (
-    tester,
-  ) async {
-    await _pumpAtSize(
-      tester,
-      const Size(320, 568),
-      AnalyticsSheet(snapshot: _snapshot),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('analytics-ask-your-money')));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Ask Your Money'), findsOneWidget);
-    expect(find.text('Ask about your money'), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets(
     'Spend-cut suggestions flag a category that grew sharply this month',
     (tester) async {
