@@ -1,11 +1,6 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:intl/intl.dart';
-import 'package:money_master/data/ai_service.dart';
 import 'package:money_master/data/money_repository.dart';
 import 'package:money_master/features/analytics/analytics_sheet.dart';
 import 'package:money_master/models/money_models.dart';
@@ -109,70 +104,6 @@ void main() {
     },
   );
 
-  testWidgets('Explain with AI replaces the fixed health message on success', (
-    tester,
-  ) async {
-    final aiService = AiService(
-      client: MockClient(
-        (request) async => http.Response(
-          jsonEncode({
-            'explanation':
-                'Your Financial Cushion is excellent, keeping your score high.',
-          }),
-          200,
-        ),
-      ),
-      tokenProvider: () => 'fake-token',
-    );
-
-    await _pumpAtSize(
-      tester,
-      const Size(320, 568),
-      AnalyticsSheet(snapshot: _healthySnapshot, aiService: aiService),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('health-explain-ai')));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.text(
-        'Your Financial Cushion is excellent, keeping your score high.',
-      ),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets(
-    'Explain with AI keeps the fixed message and shows a notice on failure',
-    (tester) async {
-      final aiService = AiService(
-        client: MockClient(
-          (request) async => http.Response('Service Unavailable', 503),
-        ),
-        tokenProvider: () => 'fake-token',
-      );
-
-      await _pumpAtSize(
-        tester,
-        const Size(320, 568),
-        AnalyticsSheet(snapshot: _healthySnapshot, aiService: aiService),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('health-explain-ai')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.text('AI unavailable — showing the default summary instead.'),
-        findsOneWidget,
-      );
-      expect(find.textContaining('Excellent'), findsWidgets);
-      expect(tester.takeException(), isNull);
-    },
-  );
-
   testWidgets(
     'Spend-cut suggestions flag a category that grew sharply this month',
     (tester) async {
@@ -187,90 +118,6 @@ void main() {
       final card = find.byKey(const ValueKey('analytics-spend-cuts-card'));
       expect(
         find.descendant(of: card, matching: find.textContaining('save ~')),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(of: card, matching: find.textContaining('up 100%')),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'Get AI suggestions replaces the local list with the AI response',
-    (tester) async {
-      final aiService = AiService(
-        client: MockClient(
-          (request) async => http.Response(
-            jsonEncode({
-              'suggestions': [
-                {
-                  'category': 'Food',
-                  'message': 'Gemini: Food spending doubled this month.',
-                  'estimatedMonthlySaving': 4000,
-                },
-              ],
-            }),
-            200,
-          ),
-        ),
-        tokenProvider: () => 'fake-token',
-      );
-
-      await _pumpAtSize(
-        tester,
-        const Size(320, 568),
-        AnalyticsSheet(snapshot: _spendCutSnapshot, aiService: aiService),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('spend-cuts-ask-ai')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('spend-cuts-ask-ai')));
-      await tester.pumpAndSettle();
-
-      final card = find.byKey(const ValueKey('analytics-spend-cuts-card'));
-      expect(
-        find.descendant(
-          of: card,
-          matching: find.text('Gemini: Food spending doubled this month.'),
-        ),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'Get AI suggestions shows an error and keeps the local suggestions when the AI call fails',
-    (tester) async {
-      final aiService = AiService(
-        client: MockClient(
-          (request) async => http.Response('Service Unavailable', 503),
-        ),
-        tokenProvider: () => 'fake-token',
-      );
-
-      await _pumpAtSize(
-        tester,
-        const Size(320, 568),
-        AnalyticsSheet(snapshot: _spendCutSnapshot, aiService: aiService),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.ensureVisible(
-        find.byKey(const ValueKey('spend-cuts-ask-ai')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('spend-cuts-ask-ai')));
-      await tester.pumpAndSettle();
-
-      final card = find.byKey(const ValueKey('analytics-spend-cuts-card'));
-      expect(
-        find.text('AI unavailable — showing the on-device estimate instead.'),
         findsOneWidget,
       );
       expect(

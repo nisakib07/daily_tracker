@@ -6,7 +6,6 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/formatters.dart';
-import '../../data/ai_service.dart';
 import '../../data/cached_money_data_source.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
@@ -34,13 +33,11 @@ class DashboardScreen extends StatefulWidget {
     required this.user,
     this.snapshotLoader,
     this.dataSource,
-    this.aiService,
   });
 
   final User user;
   final Future<DashboardSnapshot> Function()? snapshotLoader;
   final MoneyDataSource? dataSource;
-  final AiService? aiService;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -70,7 +67,6 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   MoneyDataSource get _dataSource =>
       widget.dataSource ?? MoneyRepository(Supabase.instance.client);
-  late final AiService _aiService = widget.aiService ?? AiService();
 
   @override
   void initState() {
@@ -185,11 +181,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       final snapshot = await _snapshotFuture;
       if (!mounted) return;
-      await showAnalyticsSheet(
-        context: context,
-        snapshot: snapshot,
-        aiService: _aiService,
-      );
+      await showAnalyticsSheet(context: context, snapshot: snapshot);
     } catch (_) {
       if (!mounted) return;
       _showSnack('Analytics will open after dashboard data loads.');
@@ -2284,77 +2276,67 @@ class _ActivityTab extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
+        Card(
+          elevation: 10,
+          shadowColor: AppTheme.neonCyan.withValues(alpha: 0.3),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Cash flow',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 210,
+                      child: _ActivityModeSwitcher(
+                        mode: mode,
+                        onChanged: onModeChanged,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _ActivityPeriodNavigator(
+                  mode: mode,
+                  selectedDay: selectedDay,
+                  selectedMonth: selectedMonth,
+                  onPreviousDay: onPreviousDay,
+                  onNextDay: onNextDay,
+                  onPickDay: onPickDay,
+                  onToday: onToday,
+                  onPreviousMonth: onPreviousMonth,
+                  onNextMonth: onNextMonth,
+                  onPickMonth: onPickMonth,
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ActivitySummaryCard(
+                        label: 'Money in',
+                        value: '+${formatMoney(moneyIn)}',
+                        color: AppTheme.neonEmerald,
+                        icon: Icons.south_west,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _ActivitySummaryCard(
+                        label: 'Money out',
+                        value: '-${formatMoney(moneyOut)}',
+                        color: AppTheme.neonRose,
+                        icon: Icons.north_east,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Cash flow',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 210,
-                    child: _ActivityModeSwitcher(
-                      mode: mode,
-                      onChanged: onModeChanged,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              _ActivityPeriodNavigator(
-                mode: mode,
-                selectedDay: selectedDay,
-                selectedMonth: selectedMonth,
-                onPreviousDay: onPreviousDay,
-                onNextDay: onNextDay,
-                onPickDay: onPickDay,
-                onToday: onToday,
-                onPreviousMonth: onPreviousMonth,
-                onNextMonth: onNextMonth,
-                onPickMonth: onPickMonth,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActivitySummaryCard(
-                      label: 'Money in',
-                      value: '+${formatMoney(moneyIn)}',
-                      color: AppTheme.neonEmerald,
-                      icon: Icons.south_west,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _ActivitySummaryCard(
-                      label: 'Money out',
-                      value: '-${formatMoney(moneyOut)}',
-                      color: AppTheme.neonRose,
-                      icon: Icons.north_east,
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ),
         ),
         const SizedBox(height: 14),
@@ -3724,75 +3706,68 @@ class _BudgetTab extends StatelessWidget {
           color: AppTheme.neonCyan,
         ),
         const SizedBox(height: 14),
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.outlineVariant,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.14),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  IconButton.outlined(
-                    tooltip: 'Previous month',
-                    onPressed: onPreviousMonth,
-                    icon: const Icon(Icons.chevron_left),
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+        Card(
+          elevation: 10,
+          shadowColor: AppTheme.neonCyan.withValues(alpha: 0.3),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    IconButton.outlined(
+                      tooltip: 'Previous month',
+                      onPressed: onPreviousMonth,
+                      icon: const Icon(Icons.chevron_left),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: null,
-                      icon: const Icon(Icons.calendar_month_outlined, size: 16),
-                      label: Text(
-                        formatMonth(selectedMonth),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 48),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.outlined(
-                    tooltip: 'Next month',
-                    onPressed: atCurrentMonth ? null : onNextMonth,
-                    icon: const Icon(Icons.chevron_right),
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(
+                          Icons.calendar_month_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          formatMonth(selectedMonth),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: onSetBudgets,
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Set Budgets'),
+                    const SizedBox(width: 8),
+                    IconButton.outlined(
+                      tooltip: 'Next month',
+                      onPressed: atCurrentMonth ? null : onNextMonth,
+                      icon: const Icon(Icons.chevron_right),
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: onSetBudgets,
+                    icon: const Icon(Icons.tune),
+                    label: const Text('Set Budgets'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
         const SizedBox(height: 12),
@@ -4262,88 +4237,105 @@ class _InvestmentSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final profit = summary.netProfitLoss >= 0;
+    final hasInvestments = summary.totalInvested > 0;
+    final color = hasInvestments
+        ? (profit ? AppTheme.neonEmerald : AppTheme.neonRose)
+        : AppTheme.neonCyan;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.neonCyan.withValues(alpha: 0.08),
-        border: Border.all(color: AppTheme.neonCyan.withValues(alpha: 0.14)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.analytics_outlined, color: AppTheme.neonCyan),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Investment Portfolio',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    color: AppTheme.neonCyan,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-              if (summary.totalInvested > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: (profit ? AppTheme.neonEmerald : AppTheme.neonRose)
-                        .withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
+    return Card(
+      key: const ValueKey('investment-summary-card'),
+      elevation: 10,
+      shadowColor: color.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.analytics_outlined, color: AppTheme.neonCyan),
+                const SizedBox(width: 8),
+                Expanded(
                   child: Text(
-                    '${profit ? '+' : ''}${summary.roi.toStringAsFixed(1)}% ROI',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: profit ? AppTheme.neonEmerald : AppTheme.neonRose,
+                    'Investment Portfolio',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: AppTheme.neonCyan,
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                 ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              return GridView.count(
-                crossAxisCount: 2,
-                childAspectRatio: constraints.maxWidth < 340 ? 2.1 : 2.7,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
-                children: [
-                  _InvestmentMetric(
-                    label: 'Active',
-                    value: '${summary.activeCount}',
-                    color: AppTheme.neonCyan,
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'NET PROFIT / LOSS',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                letterSpacing: 0.6,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      hasInvestments
+                          ? '${profit ? '+' : '-'}${formatMoney(summary.netProfitLoss.abs())}'
+                          : formatMoney(0),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(color: color, fontWeight: FontWeight.w900),
+                    ),
                   ),
-                  _InvestmentMetric(
+                ),
+                if (hasInvestments) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                    child: Text(
+                      '${profit ? '+' : ''}${summary.roi.toStringAsFixed(1)}% ROI',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: color,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                Expanded(
+                  child: _InvestmentMetric(
                     label: 'Invested',
                     value: formatMoney(summary.totalInvested),
                     color: AppTheme.neonViolet,
                   ),
-                  _InvestmentMetric(
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _InvestmentMetric(
                     label: 'Returns',
                     value: formatMoney(summary.totalReturns),
                     color: AppTheme.neonEmerald,
                   ),
-                  _InvestmentMetric(
-                    label: 'Profit / Loss',
-                    value:
-                        '${profit ? '+' : '-'}${formatMoney(summary.netProfitLoss.abs())}',
-                    color: profit ? AppTheme.neonEmerald : AppTheme.neonRose,
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

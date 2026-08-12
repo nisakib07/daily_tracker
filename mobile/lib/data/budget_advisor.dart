@@ -33,9 +33,8 @@ const _budgetWindowDays = 90;
 const _budgetMinHistoryDays = 14;
 const _targetSavingsRate = 0.2;
 
-/// The trailing-90-day aggregation both the local budget suggestion and the
-/// AI-backed one are built from - computed once so neither has to
-/// re-derive it from raw transactions.
+/// The trailing-90-day aggregation the local budget suggestion is built
+/// from.
 class BudgetHistorySummary {
   const BudgetHistorySummary({
     required this.hasEnoughData,
@@ -174,8 +173,7 @@ BudgetSuggestion suggestBudgets({
   );
 }
 
-/// This-month vs last-month spending, shared by the local spend-cut
-/// suggestion and the AI-backed one.
+/// This-month vs last-month spending, used to derive spend-cut suggestions.
 class SpendCutContext {
   const SpendCutContext({
     required this.thisMonthIncome,

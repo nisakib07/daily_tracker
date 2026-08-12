@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/formatters.dart';
-import '../../data/ai_service.dart';
 import '../../data/budget_advisor.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
@@ -13,22 +12,19 @@ import '../../shared/widgets/aurora_background.dart';
 Future<void> showAnalyticsSheet({
   required BuildContext context,
   required DashboardSnapshot snapshot,
-  AiService? aiService,
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (context) =>
-          AnalyticsSheet(snapshot: snapshot, aiService: aiService),
+      builder: (context) => AnalyticsSheet(snapshot: snapshot),
     ),
   );
 }
 
 class AnalyticsSheet extends StatelessWidget {
-  const AnalyticsSheet({super.key, required this.snapshot, this.aiService});
+  const AnalyticsSheet({super.key, required this.snapshot});
 
   final DashboardSnapshot snapshot;
-  final AiService? aiService;
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +62,7 @@ class AnalyticsSheet extends StatelessWidget {
                       children: [
                         const _AnalyticsHeader(),
                         const SizedBox(height: 18),
-                        _AnalyticsReportLayout(
-                          analytics: analytics,
-                          aiService: aiService,
-                        ),
+                        _AnalyticsReportLayout(analytics: analytics),
                       ],
                     ),
                   ),
@@ -84,20 +77,16 @@ class AnalyticsSheet extends StatelessWidget {
 }
 
 class _AnalyticsReportLayout extends StatelessWidget {
-  const _AnalyticsReportLayout({required this.analytics, this.aiService});
+  const _AnalyticsReportLayout({required this.analytics});
 
   final _AnalyticsData analytics;
-  final AiService? aiService;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 760;
-        final health = _HealthScoreCard(
-          health: analytics.health,
-          aiService: aiService,
-        );
+        final health = _HealthScoreCard(health: analytics.health);
         final flow = _MonthlyFlowCard(analytics: analytics);
         final forecast = _CashFlowForecastCard(
           forecast: analytics.cashFlowForecast,
@@ -105,8 +94,6 @@ class _AnalyticsReportLayout extends StatelessWidget {
         final insights = _InsightsCard(insights: analytics.insights);
         final spendCuts = _SpendCutSuggestionsCard(
           suggestions: analytics.spendCutSuggestions,
-          spendContext: analytics.spendCutContext,
-          aiService: aiService,
         );
         final categories = _CategorySpendingCard(rows: analytics.categoryRows);
         final heatmap = _SpendingHeatmapCard(analytics: analytics);
@@ -234,68 +221,13 @@ class _AnalyticsHeader extends StatelessWidget {
   }
 }
 
-class _HealthScoreCard extends StatefulWidget {
-  const _HealthScoreCard({required this.health, this.aiService});
+class _HealthScoreCard extends StatelessWidget {
+  const _HealthScoreCard({required this.health});
 
   final _HealthScore health;
-  final AiService? aiService;
-
-  @override
-  State<_HealthScoreCard> createState() => _HealthScoreCardState();
-}
-
-class _HealthScoreCardState extends State<_HealthScoreCard> {
-  late final AiService _aiService = widget.aiService ?? AiService();
-  String? _aiExplanation;
-  bool _isLoading = false;
-  String? _error;
-
-  Future<void> _fetchExplanation() async {
-    final health = widget.health;
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final explanation = await _aiService.explainHealthScore(
-        overall: health.overall,
-        grade: health.grade,
-        metrics: [
-          _metricInput(health.savingsRate),
-          _metricInput(health.budgetAdherence),
-          _metricInput(health.spendingConsistency),
-          _metricInput(health.incomeStability),
-          _metricInput(health.financialCushion),
-        ],
-      );
-      if (!mounted) return;
-      setState(() {
-        _aiExplanation = explanation;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'AI unavailable — showing the default summary instead.';
-        _isLoading = false;
-      });
-    }
-  }
-
-  AiHealthMetricInput _metricInput(_HealthMetric metric) {
-    return AiHealthMetricInput(
-      label: metric.label,
-      score: metric.score,
-      maxScore: metric.maxScore,
-      status: metric.status,
-      insufficientData: metric.insufficientData,
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    final health = widget.health;
     final color = _scoreColor(health.overall);
 
     return Card(
@@ -348,37 +280,14 @@ class _HealthScoreCardState extends State<_HealthScoreCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Financial Health',
-                              style: Theme.of(context).textTheme.titleMedium
-                                  ?.copyWith(fontWeight: FontWeight.w900),
-                            ),
-                          ),
-                          IconButton(
-                            key: const ValueKey('health-explain-ai'),
-                            tooltip: 'Explain with AI',
-                            onPressed: _isLoading ? null : _fetchExplanation,
-                            icon: _isLoading
-                                ? const SizedBox.square(
-                                    dimension: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.auto_awesome_outlined,
-                                    size: 20,
-                                  ),
-                          ),
-                        ],
+                      Text(
+                        'Financial Health',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.w900),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        _aiExplanation ?? health.message,
+                        health.message,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -388,14 +297,6 @@ class _HealthScoreCardState extends State<_HealthScoreCard> {
                 ),
               ],
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 10),
-              AppInlineNotice(
-                icon: Icons.info_outline,
-                message: _error!,
-                color: AppTheme.neonAmber,
-              ),
-            ],
             const SizedBox(height: 16),
             _ScoreBar(metric: health.savingsRate),
             const SizedBox(height: 10),
@@ -768,60 +669,13 @@ class _EmptyInsight extends StatelessWidget {
   }
 }
 
-class _SpendCutSuggestionsCard extends StatefulWidget {
-  const _SpendCutSuggestionsCard({
-    required this.suggestions,
-    required this.spendContext,
-    this.aiService,
-  });
+class _SpendCutSuggestionsCard extends StatelessWidget {
+  const _SpendCutSuggestionsCard({required this.suggestions});
 
   final List<SpendCutSuggestion> suggestions;
-  final SpendCutContext spendContext;
-  final AiService? aiService;
-
-  @override
-  State<_SpendCutSuggestionsCard> createState() =>
-      _SpendCutSuggestionsCardState();
-}
-
-class _SpendCutSuggestionsCardState extends State<_SpendCutSuggestionsCard> {
-  late final AiService _aiService = widget.aiService ?? AiService();
-  List<AiSpendCutSuggestion>? _aiSuggestions;
-  bool _isLoading = false;
-  String? _error;
-
-  Future<void> _fetchAiSuggestions() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final result = await _aiService.suggestSpendingCuts(
-        income: widget.spendContext.thisMonthIncome,
-        thisMonthCategorySpending:
-            widget.spendContext.thisMonthCategorySpending,
-        lastMonthCategorySpending:
-            widget.spendContext.lastMonthCategorySpending,
-      );
-      if (!mounted) return;
-      setState(() {
-        _aiSuggestions = result;
-        _isLoading = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _error = 'AI unavailable — showing the on-device estimate instead.';
-        _isLoading = false;
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
-    final aiSuggestions = _aiSuggestions;
-
     return Card(
       key: const ValueKey('analytics-spend-cuts-card'),
       elevation: 10,
@@ -831,65 +685,14 @@ class _SpendCutSuggestionsCardState extends State<_SpendCutSuggestionsCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Expanded(
-                  child: _CardTitle(
-                    icon: Icons.savings_outlined,
-                    title: 'Where You Could Save',
-                    subtitle: 'Based on your spending patterns',
-                    color: AppTheme.neonEmerald,
-                  ),
-                ),
-                IconButton(
-                  key: const ValueKey('spend-cuts-ask-ai'),
-                  tooltip: 'Get AI suggestions',
-                  onPressed: _isLoading ? null : _fetchAiSuggestions,
-                  icon: _isLoading
-                      ? const SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppTheme.neonEmerald,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.auto_awesome_outlined,
-                          color: AppTheme.neonEmerald,
-                        ),
-                ),
-              ],
+            const _CardTitle(
+              icon: Icons.savings_outlined,
+              title: 'Where You Could Save',
+              subtitle: 'Based on your spending patterns',
+              color: AppTheme.neonEmerald,
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 8),
-              AppInlineNotice(
-                icon: Icons.info_outline,
-                message: _error!,
-                color: AppTheme.neonAmber,
-              ),
-            ],
             const SizedBox(height: 12),
-            if (aiSuggestions != null)
-              if (aiSuggestions.isEmpty)
-                const AppInlineNotice(
-                  icon: Icons.thumb_up_outlined,
-                  message:
-                      'No obvious cuts to suggest — your spending looks steady.',
-                  color: AppTheme.neonEmerald,
-                )
-              else
-                ...aiSuggestions.map(
-                  (suggestion) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _SpendCutTile(
-                      category: suggestion.category,
-                      message: suggestion.message,
-                      estimatedMonthlySaving: suggestion.estimatedMonthlySaving,
-                    ),
-                  ),
-                )
-            else if (widget.suggestions.isEmpty)
+            if (suggestions.isEmpty)
               const AppInlineNotice(
                 icon: Icons.thumb_up_outlined,
                 message:
@@ -897,7 +700,7 @@ class _SpendCutSuggestionsCardState extends State<_SpendCutSuggestionsCard> {
                 color: AppTheme.neonEmerald,
               )
             else
-              ...widget.suggestions.map(
+              ...suggestions.map(
                 (suggestion) => Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: _SpendCutTile(
@@ -1527,7 +1330,6 @@ class _AnalyticsData {
     required this.health,
     required this.cashFlowForecast,
     required this.spendCutSuggestions,
-    required this.spendCutContext,
     required this.insights,
     required this.categoryRows,
     required this.dailySpending,
@@ -1541,7 +1343,6 @@ class _AnalyticsData {
   final _HealthScore health;
   final _CashFlowForecast cashFlowForecast;
   final List<SpendCutSuggestion> spendCutSuggestions;
-  final SpendCutContext spendCutContext;
   final List<_Insight> insights;
   final List<_CategorySpend> categoryRows;
   final Map<String, double> dailySpending;
@@ -1607,15 +1408,11 @@ class _AnalyticsData {
     final spendCutSuggestions = suggestSpendingCuts(
       transactions: snapshot.transactions,
     );
-    final spendCutContext = summarizeSpendCutContext(
-      transactions: snapshot.transactions,
-    );
 
     return _AnalyticsData(
       health: health,
       cashFlowForecast: cashFlowForecast,
       spendCutSuggestions: spendCutSuggestions,
-      spendCutContext: spendCutContext,
       insights: insights,
       categoryRows: categoryRows,
       dailySpending: dailySpending,

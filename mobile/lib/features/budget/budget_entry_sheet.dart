@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/formatters.dart';
-import '../../data/ai_service.dart';
 import '../../data/budget_advisor.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
@@ -31,7 +30,6 @@ Future<bool?> showBudgetEntrySheet({
   required Map<String, double> existingBudgets,
   required List<TransactionRecord> transactions,
   MoneyDataSource? dataSource,
-  AiService? aiService,
 }) {
   return Navigator.of(context).push<bool>(
     MaterialPageRoute(
@@ -42,7 +40,6 @@ Future<bool?> showBudgetEntrySheet({
         existingBudgets: existingBudgets,
         transactions: transactions,
         dataSource: dataSource,
-        aiService: aiService,
       ),
     ),
   );
@@ -56,7 +53,6 @@ class BudgetEntrySheet extends StatefulWidget {
     required this.existingBudgets,
     required this.transactions,
     this.dataSource,
-    this.aiService,
   });
 
   final DateTime month;
@@ -64,7 +60,6 @@ class BudgetEntrySheet extends StatefulWidget {
   final Map<String, double> existingBudgets;
   final List<TransactionRecord> transactions;
   final MoneyDataSource? dataSource;
-  final AiService? aiService;
 
   @override
   State<BudgetEntrySheet> createState() => _BudgetEntrySheetState();
@@ -73,7 +68,6 @@ class BudgetEntrySheet extends StatefulWidget {
 class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
   final _newCategoryController = TextEditingController();
   final _controllers = <String, TextEditingController>{};
-  late final AiService _aiService = widget.aiService ?? AiService();
   late List<String> _categories;
   bool _isSaving = false;
   bool _isSuggesting = false;
@@ -137,24 +131,9 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
 
     setState(() => _isSuggesting = true);
 
-    String summary;
-    Map<String, double> amounts;
-    try {
-      final ai = await _aiService.suggestBudgets(
-        avgMonthlyIncome: history.avgMonthlyIncome,
-        avgCategorySpending: history.avgCategorySpending,
-        categories: _categories,
-      );
-      summary = ai.summary;
-      amounts = ai.amounts;
-    } catch (_) {
-      // AI unavailable (no key configured, offline, rate limited, etc.) -
-      // fall back to the on-device estimate rather than leaving the user
-      // with nothing.
-      final fallback = suggestBudgets(transactions: widget.transactions);
-      summary = '${fallback.summary} (AI unavailable — on-device estimate.)';
-      amounts = fallback.amounts;
-    }
+    final suggestion = suggestBudgets(transactions: widget.transactions);
+    final summary = suggestion.summary;
+    final amounts = suggestion.amounts;
 
     if (!mounted) return;
     setState(() {
@@ -276,10 +255,7 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
                     color: AppTheme.neonAmber,
                   ),
                 )
-              : const Icon(
-                  Icons.auto_awesome_outlined,
-                  color: AppTheme.neonAmber,
-                ),
+              : const Icon(Icons.lightbulb_outline, color: AppTheme.neonAmber),
         ),
         if (widget.existingBudgets.isNotEmpty)
           IconButton(

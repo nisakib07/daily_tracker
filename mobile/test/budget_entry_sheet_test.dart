@@ -1,10 +1,5 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
-import 'package:money_master/data/ai_service.dart';
 import 'package:money_master/features/budget/budget_entry_sheet.dart';
 import 'package:money_master/models/money_models.dart';
 import 'package:money_master/shared/theme/app_theme.dart';
@@ -148,7 +143,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('AI Suggest fills budget fields from real spending history', (
+  testWidgets('Suggest fills budget fields from real spending history', (
     tester,
   ) async {
     final transactions = [
@@ -191,127 +186,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('AI Suggest fills budget fields from the AI response', (
-    tester,
-  ) async {
-    final transactions = [
-      _tx(
-        id: 'income',
-        type: 'income',
-        amount: 60000,
-        daysAgo: 25,
-        toAccount: true,
-      ),
-      for (var i = 1; i <= 30; i++)
-        _tx(
-          id: 'e$i',
-          type: 'expense',
-          amount: 500,
-          daysAgo: i,
-          category: 'Food',
-        ),
-    ];
-    final aiService = AiService(
-      client: MockClient(
-        (request) async => http.Response(
-          jsonEncode({
-            'summary': 'Gemini says trim Food to 9000 BDT this month.',
-            'suggestions': [
-              {
-                'category': 'Food',
-                'amount': 9000,
-                'rationale': 'Well above your typical spend.',
-              },
-            ],
-          }),
-          200,
-        ),
-      ),
-      tokenProvider: () => 'fake-token',
-    );
-
-    await _pumpOnPhone(
-      tester,
-      BudgetEntrySheet(
-        month: DateTime(2026, 7),
-        categories: const ['Food'],
-        existingBudgets: const {},
-        transactions: transactions,
-        aiService: aiService,
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('budget-suggest')));
-    await tester.pumpAndSettle();
-
-    final foodField = tester.widget<TextFormField>(
-      find.byKey(const ValueKey('budget-amount-Food')),
-    );
-    expect(foodField.controller?.text, '9000');
-    expect(
-      find.text('Gemini says trim Food to 9000 BDT this month.'),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-  });
-
   testWidgets(
-    'AI Suggest falls back to the on-device estimate when the AI call fails',
-    (tester) async {
-      final transactions = [
-        _tx(
-          id: 'income',
-          type: 'income',
-          amount: 60000,
-          daysAgo: 25,
-          toAccount: true,
-        ),
-        for (var i = 1; i <= 30; i++)
-          _tx(
-            id: 'e$i',
-            type: 'expense',
-            amount: 500,
-            daysAgo: i,
-            category: 'Food',
-          ),
-      ];
-      final aiService = AiService(
-        client: MockClient(
-          (request) async => http.Response('Service Unavailable', 503),
-        ),
-        tokenProvider: () => 'fake-token',
-      );
-
-      await _pumpOnPhone(
-        tester,
-        BudgetEntrySheet(
-          month: DateTime(2026, 7),
-          categories: const ['Food'],
-          existingBudgets: const {},
-          transactions: transactions,
-          aiService: aiService,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const ValueKey('budget-suggest')));
-      await tester.pumpAndSettle();
-
-      final foodField = tester.widget<TextFormField>(
-        find.byKey(const ValueKey('budget-amount-Food')),
-      );
-      expect(foodField.controller?.text, '15000');
-      expect(
-        find.textContaining('(AI unavailable — on-device estimate.)'),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
-
-  testWidgets(
-    'AI Suggest shows a notice instead of guessing without enough history',
+    'Suggest shows a notice instead of guessing without enough history',
     (tester) async {
       await _pumpOnPhone(
         tester,
