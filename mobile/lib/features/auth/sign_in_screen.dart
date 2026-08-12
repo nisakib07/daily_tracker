@@ -84,15 +84,7 @@ class _SignInScreenState extends State<SignInScreen> {
                             width: 52,
                             height: 52,
                             decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors: [
-                                  AppTheme.neonEmerald,
-                                  AppTheme.neonCyan,
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(14),
+                              shape: BoxShape.circle,
                               boxShadow: [
                                 BoxShadow(
                                   color: AppTheme.neonEmerald.withValues(
@@ -103,10 +95,8 @@ class _SignInScreenState extends State<SignInScreen> {
                                 ),
                               ],
                             ),
-                            child: Icon(
-                              Icons.bolt_rounded,
-                              color: colorScheme.onPrimary,
-                              size: 24,
+                            child: ClipOval(
+                              child: Image.asset('assets/icon/icon_mark.png'),
                             ),
                           ),
                           const SizedBox(width: 14),

@@ -965,12 +965,7 @@ class _DashboardTopBar extends StatelessWidget implements PreferredSizeWidget {
                   width: compact ? 36 : 40,
                   height: compact ? 36 : 40,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppTheme.neonEmerald, AppTheme.neonCyan],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
+                    shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
                         color: AppTheme.neonEmerald.withValues(alpha: 0.45),
@@ -979,10 +974,8 @@ class _DashboardTopBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.bolt_rounded,
-                    color: Color(0xFF04231A),
-                    size: 22,
+                  child: ClipOval(
+                    child: Image.asset('assets/icon/icon_mark.png'),
                   ),
                 ),
                 SizedBox(width: compact ? 9 : 12),
