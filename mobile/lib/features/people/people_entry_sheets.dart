@@ -186,11 +186,10 @@ class _PersonEntrySheetState extends State<PersonEntrySheet> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      AppInlineNotice(
+                        icon: Icons.error_outline,
+                        message: _error!,
+                        color: AppTheme.neonRose,
                       ),
                     ],
                   ],
@@ -334,11 +333,10 @@ class _PersonEditSheetState extends State<PersonEditSheet> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      AppInlineNotice(
+                        icon: Icons.error_outline,
+                        message: _error!,
+                        color: AppTheme.neonRose,
                       ),
                     ],
                   ],
@@ -623,11 +621,10 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
                     ),
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      AppInlineNotice(
+                        icon: Icons.error_outline,
+                        message: _error!,
+                        color: AppTheme.neonRose,
                       ),
                     ],
                   ],

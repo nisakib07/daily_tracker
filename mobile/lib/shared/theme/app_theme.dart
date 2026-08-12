@@ -28,6 +28,28 @@ class AppTheme {
   static const Color textOnDark = Color(0xFFF2F5FA);
   static const Color textMutedOnDark = Color(0xFF8A94AC);
 
+  /// A cycle of the neon accents used to give list items (categories,
+  /// people) a stable, distinct color by identity rather than everything
+  /// sharing one flat tone - the same trick contact apps and pie charts
+  /// use so a list is scannable by color, not just by reading every label.
+  static const List<Color> identityPalette = [
+    neonEmerald,
+    neonViolet,
+    neonAmber,
+    neonCyan,
+    neonRose,
+    teal,
+  ];
+
+  /// Deterministic: the same label always maps to the same color, so a
+  /// category or person keeps its color across app restarts and screens.
+  static Color colorForLabel(String label) {
+    final normalized = label.trim().toLowerCase();
+    if (normalized.isEmpty) return identityPalette.first;
+    final hash = normalized.codeUnits.fold<int>(0, (sum, unit) => sum + unit);
+    return identityPalette[hash % identityPalette.length];
+  }
+
   static ThemeData light() {
     const scheme = ColorScheme.light(
       brightness: Brightness.light,

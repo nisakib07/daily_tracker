@@ -832,11 +832,18 @@ class _CategoryBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = maxAmount <= 0 ? 0.0 : row.amount / maxAmount;
+    final color = AppTheme.colorForLabel(row.category);
 
     return Column(
       children: [
         Row(
           children: [
+            Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+            ),
             Expanded(
               child: Text(
                 row.category,
@@ -849,7 +856,7 @@ class _CategoryBar extends StatelessWidget {
             Text(
               formatMoney(row.amount),
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                color: AppTheme.neonRose,
+                color: color,
                 fontWeight: FontWeight.w900,
               ),
             ),
@@ -861,8 +868,8 @@ class _CategoryBar extends StatelessWidget {
           child: LinearProgressIndicator(
             minHeight: 8,
             value: progress.clamp(0, 1).toDouble(),
-            backgroundColor: AppTheme.neonRose.withValues(alpha: 0.1),
-            valueColor: const AlwaysStoppedAnimation(AppTheme.neonRose),
+            backgroundColor: color.withValues(alpha: 0.1),
+            valueColor: AlwaysStoppedAnimation(color),
           ),
         ),
       ],

@@ -3471,6 +3471,7 @@ class _PersonDirectoryTile extends StatelessWidget {
       if (person.phone?.isNotEmpty != true && person.note?.isNotEmpty != true)
         'No open balance',
     ].join(' | ');
+    final avatarColor = AppTheme.colorForLabel(person.name);
 
     return Semantics(
       button: true,
@@ -3486,8 +3487,8 @@ class _PersonDirectoryTile extends StatelessWidget {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: AppTheme.neonCyan.withValues(alpha: 0.12),
-                  foregroundColor: AppTheme.neonCyan,
+                  backgroundColor: avatarColor.withValues(alpha: 0.12),
+                  foregroundColor: avatarColor,
                   child: Text(
                     person.name.isEmpty ? '?' : person.name[0].toUpperCase(),
                     style: const TextStyle(fontWeight: FontWeight.w900),

@@ -5,6 +5,7 @@ import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_form_page.dart';
+import '../../shared/widgets/app_state_widgets.dart';
 
 Future<bool?> showAccountEditSheet({
   required BuildContext context,
@@ -262,11 +263,10 @@ class _AccountEditSheetState extends State<AccountEditSheet> {
                     ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      AppInlineNotice(
+                        icon: Icons.error_outline,
+                        message: _error!,
+                        color: AppTheme.neonRose,
                       ),
                     ],
                   ],

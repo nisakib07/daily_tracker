@@ -282,8 +282,11 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _SheetHeader(
+                    AppFormHeader(
                       title: _title,
+                      subtitle: DateFormat(
+                        'EEEE, MMM d',
+                      ).format(DateTime.now()),
                       icon: _heroIcon,
                       color: _accent,
                     ),
@@ -363,11 +366,10 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
                     ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      AppInlineNotice(
+                        icon: Icons.error_outline,
+                        message: _error!,
+                        color: AppTheme.neonRose,
                       ),
                     ],
                   ],
@@ -648,8 +650,11 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _SheetHeader(
+                    AppFormHeader(
                       title: 'Edit Transaction',
+                      subtitle: DateFormat(
+                        'EEEE, MMM d',
+                      ).format(DateTime.now()),
                       icon: _heroIcon,
                       color: _accent,
                     ),
@@ -739,11 +744,10 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
                     ],
                     if (_error != null) ...[
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
+                      AppInlineNotice(
+                        icon: Icons.error_outline,
+                        message: _error!,
+                        color: AppTheme.neonRose,
                       ),
                     ],
                   ],
@@ -800,57 +804,6 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
   bool _hasPerson(String? personId) {
     return personId != null &&
         widget.people.any((person) => person.id == personId);
-  }
-}
-
-class _SheetHeader extends StatelessWidget {
-  const _SheetHeader({
-    required this.title,
-    required this.icon,
-    required this.color,
-  });
-
-  final String title;
-  final IconData icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: color),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              Text(
-                DateFormat('EEEE, MMM d').format(DateTime.now()),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 }
 
