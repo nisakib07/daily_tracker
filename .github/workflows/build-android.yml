@@ -11,6 +11,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: mobile
@@ -42,17 +44,51 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Build release APK
+      - name: Decode signing keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: echo "$KEYSTORE_BASE64" | base64 -d > android/upload-keystore.jks
+
+      - name: Write key.properties
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+
+      - name: Build signed release APK
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           flutter build apk --release \
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
-            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
+            --dart-define=APP_BUILD_NUMBER="$GITHUB_RUN_NUMBER"
 
       - uses: actions/upload-artifact@v4
         with:
           name: money-master-release-apk
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
+
+      # Published as a GitHub Release (not just a workflow artifact) so the
+      # app itself can find it: AppUpdateChecker polls the GitHub Releases
+      # API for a "build-N" tag newer than the running app's own build
+      # number, embedded above via APP_BUILD_NUMBER. This is what lets the
+      # app prompt "update available" instead of requiring a manual
+      # rebuild-and-reinstall every time - there's no $25 Play Store
+      # account behind this app, so this is the free equivalent.
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: Build ${{ github.run_number }}
+          make_latest: true
+          files: mobile/build/app/outputs/flutter-apk/app-release.apk

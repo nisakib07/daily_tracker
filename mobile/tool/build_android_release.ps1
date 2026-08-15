@@ -8,6 +8,7 @@ $mobileRoot = Split-Path -Parent $PSScriptRoot
 $repoRoot = Split-Path -Parent $mobileRoot
 $envFile = Join-Path $repoRoot ".env.local"
 $flutter = Join-Path $env:USERPROFILE "development\flutter\bin\flutter.bat"
+$keyProperties = Join-Path $mobileRoot "android\key.properties"
 
 if (!(Test-Path $flutter)) {
   throw "Flutter was not found at $flutter"
@@ -15,6 +16,10 @@ if (!(Test-Path $flutter)) {
 
 if (!(Test-Path $envFile)) {
   throw "Missing $envFile"
+}
+
+if (!(Test-Path $keyProperties)) {
+  throw "Missing android\key.properties - the release build will fall back to debug signing, which won't update in place on a phone that already has a signed release installed. See android/key.properties.example."
 }
 
 $values = @{}
@@ -35,8 +40,6 @@ if (!$supabaseUrl -or !$supabaseAnonKey) {
   throw ".env.local must contain NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY"
 }
 
-# Release builds are signed with the debug key (see android/app/build.gradle.kts),
-# which is fine for installing on your own device but not for Play Store distribution.
 $arguments = @(
   "build",
   "apk",
@@ -50,3 +53,6 @@ if ($NoPub) {
 }
 
 & $flutter @arguments
+
+Write-Host ""
+Write-Host "Signed release APK: mobile\build\app\outputs\flutter-apk\app-release.apk"

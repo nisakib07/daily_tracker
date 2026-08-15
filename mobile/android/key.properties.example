@@ -1,0 +1,9 @@
+# Copy this file to key.properties (gitignored, never commit real values)
+# and fill in the real keystore credentials. Used by android/app/build.gradle.kts
+# to sign release builds with a consistent key instead of the debug key, so
+# a new build installs as an update on a device that already has a signed
+# release installed, instead of requiring an uninstall first.
+storePassword=REPLACE_ME
+keyPassword=REPLACE_ME
+keyAlias=upload
+storeFile=upload-keystore.jks

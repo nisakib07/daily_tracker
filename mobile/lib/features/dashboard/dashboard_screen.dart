@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/formatters.dart';
+import '../../data/app_update_checker.dart';
 import '../../data/cached_money_data_source.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
@@ -64,6 +66,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     DateTime.now().month,
   );
   DateTime _selectedMonth = DateTime(DateTime.now().year, DateTime.now().month);
+  AppUpdateInfo? _updateInfo;
 
   MoneyDataSource get _dataSource =>
       widget.dataSource ?? MoneyRepository(Supabase.instance.client);
@@ -84,6 +87,21 @@ class _DashboardScreenState extends State<DashboardScreen>
       _cacheStatusSubscription = dataSource.statusChanges.listen((_) {
         if (mounted) setState(() {});
       });
+    }
+    _checkForUpdate();
+  }
+
+  Future<void> _checkForUpdate() async {
+    final info = await AppUpdateChecker().checkForUpdate();
+    if (!mounted || info == null) return;
+    setState(() => _updateInfo = info);
+  }
+
+  Future<void> _launchUpdate(String url) async {
+    final uri = Uri.parse(url);
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched && mounted) {
+      _showSnack('Could not open the download link.');
     }
   }
 
@@ -544,6 +562,19 @@ class _DashboardScreenState extends State<DashboardScreen>
       body: Stack(
         children: [
           const Positioned.fill(child: AuroraBackground()),
+          if (_updateInfo != null)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: SafeArea(
+                bottom: false,
+                child: _UpdateBanner(
+                  onUpdate: () => _launchUpdate(_updateInfo!.downloadUrl),
+                  onDismiss: () => setState(() => _updateInfo = null),
+                ),
+              ),
+            ),
           Positioned.fill(
             child: AbsorbPointer(
               absorbing: _isMutating,
@@ -924,6 +955,83 @@ class _AnimatedMoneyState extends State<_AnimatedMoney>
           style: widget.style,
         );
       },
+    );
+  }
+}
+
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.onUpdate, required this.onDismiss});
+
+  final VoidCallback onUpdate;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: AppTheme.neonEmerald.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: AppTheme.neonEmerald.withValues(alpha: 0.35),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.neonEmerald.withValues(alpha: 0.2),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.system_update_alt_rounded,
+              color: AppTheme.neonEmerald,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Update available',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.neonEmerald,
+                    ),
+                  ),
+                  Text(
+                    'A newer build is ready to install.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: onUpdate,
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.neonEmerald,
+              ),
+              child: const Text('Update'),
+            ),
+            IconButton(
+              tooltip: 'Dismiss',
+              onPressed: onDismiss,
+              icon: const Icon(Icons.close, size: 18),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
