@@ -1,11 +1,11 @@
 {
-    "name": "money_master",
-    "short_name": "money_master",
+    "name": "Money Master",
+    "short_name": "Money Master",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#05070c",
     "theme_color": "#05070c",
-    "description": "A new Flutter project.",
+    "description": "Personal finance tracker for income, expenses, loans, budgets, and investments.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
