@@ -1084,3 +1084,21 @@ September 27, 2026 (night, #9)
 - Fixed flaw #9: 17 form and settings messages appended error.toString(), so people saw text like "Could not save. PostgrestException(message: ..., code: 23503, ...)". New mobile/lib/core/error_messages.dart: friendlyErrorMessage(error) gives one plain sentence (no internet / server too slow / something it uses no longer exists / details not valid / session expired / generic retry; Supabase Auth messages pass through) and logs the raw error with AppLogger for debugging. Every error.toString() in the UI now goes through it.
 - Tests: new error_messages_test.dart (connection problems, database codes, auth pass-through, generic fallback, and an expense form whose save fails showing the friendly text and not the raw exception).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (night, #10)
+- Fixed flaw #10: the mobile app had no way to export or back up data (share_plus was a dependency but unused). Settings now has a "Your data" section with "Export transactions (CSV)" and "Full backup", both handed to the phone's share sheet (save to Files/Drive, email...).
+- New mobile/lib/data/data_export.dart: transactionsCsv (UTF-8 BOM for Excel, CRLF, Date/Time/Type/Amount/Category/From/To/Person/Investment/Note with names instead of ids, RFC 4180 quoting, and formula-looking text prefixed with ' so spreadsheets don't run it) and backupJson in the website's backup format ({version: 1, exportedAt, data: {accounts, people, transactions, budgets, customCategories}}) plus investments, every row carrying user_id and UTC timestamps so the website's Import Data can restore it under row-level security.
+- CachedMoneyDataSource.snapshotForExport returns the server's data (fresh when online, else the last synced copy) without changes still waiting to sync; the export says when it's offline data and how many pending changes aren't included.
+- Caught before CI: XFile.fromData ignores its name on Android/iOS, so shared files would have been named randomly; the name is now passed through ShareParams.fileNameOverrides via a small ExportFile type.
+- Restoring a backup inside the mobile app is not implemented; the website's Import Data does it.
+- Tests: new data_export_test.dart (CSV content/quoting/formula guard, backup shape and user_id on every row, Settings exports through the share sheet, backup includes custom categories, offline export says so).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (night, #11)
+- Fixed flaw #11: custom categories and quick-add shortcuts lived only in the phone's SharedPreferences, so reinstalling (as the Build 19 -> 26 signing mix-up required) or switching phones lost them. New mobile/lib/data/preferences_sync.dart keeps a copy in the user's Supabase auth metadata (key money_master_preferences) - no table or migration, and only that user can read or change it.
+- The phone's copy is always written first (works offline); CategoryStore and QuickAddShortcutStore call PreferencesSync.localChanged() after each change, which uploads it or leaves it marked unsynced for the next pull. AuthGate pulls when the app starts signed in and whenever a different user signs in. Newest copy wins; the first sync after this update merges phone and account copies; an empty account receives the phone's copy; data left on the phone by a different user (tracked by an owner id) is replaced, never uploaded into the new account.
+- The website still keeps its categories in localStorage; this syncs between phones only.
+- Tests: new preferences_sync_test.dart (new phone, empty account, first-sync merge, instant upload, offline change uploaded later, newer account copy wins, another user's leftovers not uploaded, offline/signed-out pull does nothing).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

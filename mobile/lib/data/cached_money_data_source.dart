@@ -61,6 +61,26 @@ class CachedMoneyDataSource
     return server == null ? null : _withPending(server);
   }
 
+  /// The data as saved on the server, for exports and backups: fetched now
+  /// when possible, else the last copy synced to this phone ([fresh] is
+  /// false then). Changes still waiting to sync are left out, since they
+  /// don't exist anywhere else yet and have no real ids.
+  Future<({DashboardSnapshot snapshot, DateTime? syncedAt, bool fresh})>
+  snapshotForExport() async {
+    await _hydrate();
+    await _mutationQueue.load();
+    // Falls back to the last synced copy when offline; throws only when
+    // there is none.
+    await refresh();
+    final server = _snapshot;
+    if (server == null) throw StateError('No data has been loaded yet.');
+    return (
+      snapshot: server,
+      syncedAt: _lastSyncedAt,
+      fresh: _lastSyncError == null,
+    );
+  }
+
   /// Whether the most recent change was kept on this device to sync later,
   /// rather than saved to the server straight away.
   bool get lastMutationQueued => _lastMutationQueued;

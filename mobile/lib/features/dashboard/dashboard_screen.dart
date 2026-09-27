@@ -222,10 +222,13 @@ class _DashboardScreenState extends State<DashboardScreen>
       // shows its "add an account first" notice in that case.
     }
     if (!mounted) return;
+    final dataSource = widget.dataSource;
     await showSettingsSheet(
       context: context,
       email: widget.user.email,
       accounts: accounts,
+      userId: widget.user.id,
+      exportSource: dataSource is CachedMoneyDataSource ? dataSource : null,
     );
   }
 

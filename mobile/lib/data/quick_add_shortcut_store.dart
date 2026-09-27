@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'preferences_sync.dart';
+
 /// A user-defined quick-add shortcut for the expense entry form. Selecting
 /// one fills the category, note (from [subCategory]), account, and
 /// optionally the amount in a single tap - replacing the old hardcoded
@@ -51,12 +53,14 @@ class QuickAddShortcut {
   }
 }
 
+/// Quick-add shortcuts, kept on the phone and synced to the account by
+/// [PreferencesSync].
 class QuickAddShortcutStore {
-  static const _key = 'dmt_quick_add_shortcuts';
+  static const key = 'dmt_quick_add_shortcuts';
 
   Future<List<QuickAddShortcut>> load() async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
+    final raw = prefs.getString(key);
     if (raw == null || raw.isEmpty) return const [];
 
     try {
@@ -80,9 +84,10 @@ class QuickAddShortcutStore {
     final current = await load();
     final updated = [...current, shortcut];
     await prefs.setString(
-      _key,
+      key,
       jsonEncode(updated.map((item) => item.toJson()).toList()),
     );
+    await PreferencesSync.instance.localChanged();
   }
 
   Future<void> delete(String id) async {
@@ -90,9 +95,10 @@ class QuickAddShortcutStore {
     final current = await load();
     final updated = current.where((item) => item.id != id).toList();
     await prefs.setString(
-      _key,
+      key,
       jsonEncode(updated.map((item) => item.toJson()).toList()),
     );
+    await PreferencesSync.instance.localChanged();
   }
 
   Future<void> update(QuickAddShortcut shortcut) async {
@@ -103,8 +109,9 @@ class QuickAddShortcutStore {
         if (item.id == shortcut.id) shortcut else item,
     ];
     await prefs.setString(
-      _key,
+      key,
       jsonEncode(updated.map((item) => item.toJson()).toList()),
     );
+    await PreferencesSync.instance.localChanged();
   }
 }

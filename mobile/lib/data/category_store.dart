@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'preferences_sync.dart';
+
 const defaultIncomeCategories = [
   'Salary',
   'Freelance',
@@ -25,9 +27,11 @@ const defaultExpenseCategories = [
 
 enum CategoryKind { income, expense }
 
+/// Custom categories, kept on the phone and synced to the account by
+/// [PreferencesSync].
 class CategoryStore {
-  static const _incomeKey = 'dmt_custom_income_categories';
-  static const _expenseKey = 'dmt_custom_expense_categories';
+  static const incomeKey = 'dmt_custom_income_categories';
+  static const expenseKey = 'dmt_custom_expense_categories';
 
   Future<List<String>> loadCustom(CategoryKind kind) async {
     final prefs = await SharedPreferences.getInstance();
@@ -51,6 +55,7 @@ class CategoryStore {
     final custom = await loadCustom(kind);
     final updated = _unique([...custom, trimmed]);
     await prefs.setStringList(_keyFor(kind), updated);
+    await PreferencesSync.instance.localChanged();
   }
 
   Future<void> deleteCustom(CategoryKind kind, String category) async {
@@ -58,12 +63,13 @@ class CategoryStore {
     final custom = await loadCustom(kind);
     final updated = custom.where((item) => item != category).toList();
     await prefs.setStringList(_keyFor(kind), updated);
+    await PreferencesSync.instance.localChanged();
   }
 
   String _keyFor(CategoryKind kind) {
     return switch (kind) {
-      CategoryKind.income => _incomeKey,
-      CategoryKind.expense => _expenseKey,
+      CategoryKind.income => incomeKey,
+      CategoryKind.expense => expenseKey,
     };
   }
 }

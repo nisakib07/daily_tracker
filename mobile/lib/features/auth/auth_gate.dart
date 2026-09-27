@@ -6,6 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/app_config.dart';
 import '../../data/cached_money_data_source.dart';
 import '../../data/money_repository.dart';
+import '../../data/preferences_sync.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'sign_in_screen.dart';
 
@@ -30,6 +31,7 @@ class _AuthGateState extends State<AuthGate> {
     _user = client.auth.currentUser;
     if (_user != null) {
       _dataSource = _createDataSource(_user!);
+      unawaited(PreferencesSync.instance.pull());
     }
     _subscription = client.auth.onAuthStateChange.listen((event) {
       final nextUser = event.session?.user;
@@ -37,6 +39,10 @@ class _AuthGateState extends State<AuthGate> {
         if (mounted) setState(() => _user = nextUser);
         return;
       }
+
+      // A different (or new) signed-in user: bring their categories and
+      // quick-add shortcuts from their account.
+      if (nextUser != null) unawaited(PreferencesSync.instance.pull());
 
       final previousDataSource = _dataSource;
       final nextDataSource = nextUser == null
