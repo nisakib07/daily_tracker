@@ -6,8 +6,8 @@ name: Build Android APK
 on:
   workflow_dispatch: {}
   # Every branch runs the checks job. Other branches also build a web
-  # preview; only main goes on to build and publish a release (see each
-  # job's `if`). This lets changes be tested on a branch without pushing an
+  # preview and compile the Android app; only main goes on to build and
+  # publish a release (see each job's `if`). This lets changes be tested on a branch without pushing an
   # update to installed apps.
   push:
     paths:
@@ -100,6 +100,45 @@ jobs:
           path: mobile/build/web
           retention-days: 7
 
+  # The dev machine has no Android SDK, so Kotlin/Gradle changes would
+  # otherwise first be compiled by a release on main. A debug build needs no
+  # signing secrets and catches those problems on the branch instead.
+  android-check:
+    name: Compile Android app
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      # Exercises the apksigner lookup that the release job's certificate
+      # check relies on, so a runner image change surfaces here first.
+      - name: Read debug APK signature
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$apksigner" verify --print-certs build/app/outputs/flutter-apk/app-debug.apk | grep -i "certificate SHA-256 digest"
+
   release:
     name: Build and publish signed APK
     needs: checks
@@ -158,6 +197,21 @@ jobs:
             --dart-define=SUPABASE_URL="$SUPABASE_URL" \
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=APP_BUILD_NUMBER="$GITHUB_RUN_NUMBER"
+
+      # Android only installs an update signed with the same key as the app
+      # already installed, and otherwise just says "App not installed". Build
+      # 19 shipped with a stale keystore that way. Refuse to publish if the
+      # signing certificate ever differs from the one Builds 24+ use.
+      - name: Verify signing certificate
+        env:
+          EXPECTED_CERT_SHA256: c71da223101cc703663b862ea3c40bb36d8094ce62dbe30de5bc0ef2623bacdc
+        run: |
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          "$apksigner" verify --print-certs build/app/outputs/flutter-apk/app-release.apk | tee signers.txt
+          grep -qi "certificate SHA-256 digest: $EXPECTED_CERT_SHA256" signers.txt || {
+            echo "::error::APK is signed with an unexpected certificate; installed apps could not update to it."
+            exit 1
+          }
 
       - uses: actions/upload-artifact@v7
         with:

@@ -1,18 +1,39 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/app_config.dart';
 import '../../core/app_lock_controller.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/aurora_background.dart';
 
-/// Wraps the signed-in app with an optional biometric/device-credential
-/// lock screen. Locks on cold start (if enabled) and whenever the app
-/// returns from being fully backgrounded.
+/// Covers the whole app with a biometric/device-credential lock screen while
+/// someone is signed in and app lock is on. Locks on cold start and whenever
+/// the app returns from the background.
+///
+/// It wraps the Navigator (see MoneyMasterApp's builder) rather than a page:
+/// a lock inside the dashboard page left every screen pushed above it
+/// (Analytics, Settings, forms, dialogs) visible on return. While locked the
+/// app underneath is not painted, hit-tested, focused or read out.
 class AppLockGate extends ConsumerStatefulWidget {
-  const AppLockGate({super.key, required this.child});
+  const AppLockGate({
+    super.key,
+    required this.child,
+    required this.navigatorKey,
+    this.signedIn,
+  });
 
   final Widget child;
+
+  /// Used to close every open screen when the user signs out, so nothing
+  /// from the previous session stays on top of the sign-in screen.
+  final GlobalKey<NavigatorState> navigatorKey;
+
+  /// Whether someone is signed in. Defaults to following Supabase auth.
+  final ValueListenable<bool>? signedIn;
 
   @override
   ConsumerState<AppLockGate> createState() => _AppLockGateState();
@@ -20,6 +41,9 @@ class AppLockGate extends ConsumerStatefulWidget {
 
 class _AppLockGateState extends ConsumerState<AppLockGate>
     with WidgetsBindingObserver {
+  late final ValueListenable<bool> _signedIn;
+  _SupabaseSignedIn? _ownedSignedIn;
+  late bool _wasSignedIn;
   bool _locked = false;
   bool _appliedInitialState = false;
   bool _authenticating = false;
@@ -28,18 +52,39 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   @override
   void initState() {
     super.initState();
+    _signedIn = widget.signedIn ?? (_ownedSignedIn = _SupabaseSignedIn());
+    _wasSignedIn = _signedIn.value;
+    _signedIn.addListener(_onSessionChanged);
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _signedIn.removeListener(_onSessionChanged);
+    _ownedSignedIn?.dispose();
     super.dispose();
+  }
+
+  void _onSessionChanged() {
+    final signedIn = _signedIn.value;
+    if (signedIn == _wasSignedIn) return;
+    _wasSignedIn = signedIn;
+    if (!signedIn) {
+      widget.navigatorKey.currentState?.popUntil((route) => route.isFirst);
+    }
+    // Signing in has just proved who this is, so don't ask again straight
+    // away; signing out leaves nothing to protect.
+    setState(() {
+      _appliedInitialState = true;
+      _locked = false;
+      _pendingRelock = false;
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!ref.read(appLockProvider).enabled) return;
+    if (!_signedIn.value || !ref.read(appLockProvider).enabled) return;
 
     if (state == AppLifecycleState.paused) {
       _pendingRelock = true;
@@ -74,32 +119,78 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
   Future<void> _signOut() async {
     // The one way out if biometrics/device credential stop working while
     // app-lock is enabled — signing out ends the local session (Supabase
-    // auth + RLS remain the real security boundary), and AuthGate swaps
-    // this whole screen out for SignInScreen once the session clears.
+    // auth + RLS remain the real security boundary), and _onSessionChanged
+    // then closes every open screen and removes the lock.
     await Supabase.instance.client.auth.signOut();
   }
 
   @override
   Widget build(BuildContext context) {
-    final settings = ref.watch(appLockProvider);
+    final signedIn = _signedIn.value;
+    Widget? cover;
 
-    if (!settings.loaded) {
-      return const _AppLockSplash();
+    // Settings are only read while signed in: nobody signed out needs a
+    // lock, and it keeps platform lookups out of the signed-out app.
+    if (signedIn) {
+      final settings = ref.watch(appLockProvider);
+      if (!settings.loaded) {
+        // Don't flash balances before it's known whether to lock them.
+        cover = const _AppLockSplash();
+      } else {
+        if (!_appliedInitialState) {
+          _appliedInitialState = true;
+          _locked = settings.enabled;
+          if (_locked) _promptSoon();
+        }
+        if (_locked) {
+          cover = _LockScreen(
+            isAuthenticating: _authenticating,
+            onUnlock: _unlock,
+            onSignOut: _signOut,
+          );
+        }
+      }
     }
 
-    if (!_appliedInitialState) {
-      _appliedInitialState = true;
-      _locked = settings.enabled;
-      if (_locked) _promptSoon();
-    }
-
-    if (!_locked) return widget.child;
-
-    return _LockScreen(
-      isAuthenticating: _authenticating,
-      onUnlock: _unlock,
-      onSignOut: _signOut,
+    final hidden = cover != null;
+    // The app stays at the same place in the tree whether covered or not, so
+    // the Navigator and every open screen keep their state across locking.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ExcludeFocus(
+          excluding: hidden,
+          child: Visibility(
+            visible: !hidden,
+            maintainState: true,
+            child: widget.child,
+          ),
+        ),
+        ?cover,
+      ],
     );
+  }
+}
+
+/// Follows whether a Supabase session exists.
+class _SupabaseSignedIn extends ValueNotifier<bool> {
+  _SupabaseSignedIn()
+    : super(
+        AppConfig.hasSupabaseConfig &&
+            Supabase.instance.client.auth.currentSession != null,
+      ) {
+    if (!AppConfig.hasSupabaseConfig) return;
+    _subscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+      (event) => value = event.session != null,
+    );
+  }
+
+  StreamSubscription<AuthState>? _subscription;
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
   }
 }
 
