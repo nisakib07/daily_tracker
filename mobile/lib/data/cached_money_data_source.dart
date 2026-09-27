@@ -63,6 +63,23 @@ class CachedMoneyDataSource
 
   int get failedMutationCount => _mutationQueue.failedCount;
 
+  List<QueuedMoneyMutation> get failedMutations =>
+      _mutationQueue.failedMutations;
+
+  /// Puts failed changes back in the sync queue and tries to sync now. With
+  /// [id], only that change. One that fails again for good returns to the
+  /// failed list.
+  Future<void> retryFailedMutations({String? id}) async {
+    await _mutationQueue.retryFailed(id: id);
+    _notifyStatus();
+    await _drainQueue();
+  }
+
+  Future<void> discardFailedMutation(String id) async {
+    await _mutationQueue.discardFailed(id);
+    _notifyStatus();
+  }
+
   bool get hasStaleData {
     final syncedAt = _lastSyncedAt;
     return _snapshot != null &&
@@ -192,7 +209,9 @@ class CachedMoneyDataSource
     _notifyStatus();
   }
 
-  void _drainQueueInBackground() {
+  void _drainQueueInBackground() => unawaited(_drainQueue());
+
+  Future<void> _drainQueue() async {
     final executor = remote;
     if (executor is! IdempotentMoneyMutationExecutor ||
         _mutationQueue.pendingCount == 0) {
@@ -200,21 +219,18 @@ class CachedMoneyDataSource
     }
     final mutationExecutor = executor as IdempotentMoneyMutationExecutor;
 
-    unawaited(() async {
-      try {
-        final applied = await _mutationQueue.drain(mutationExecutor);
-        if (applied > 0) {
-          _needsRemoteRefresh = true;
-          await refresh();
-        }
-      } catch (_) {
-        // Truly unexpected errors only; non-retryable mutation failures are
-        // already moved to the queue's failed list by drain() and don't
-        // throw here.
-      } finally {
-        _notifyStatus();
+    try {
+      final applied = await _mutationQueue.drain(mutationExecutor);
+      if (applied > 0) {
+        _needsRemoteRefresh = true;
+        await refresh();
       }
-    }());
+    } catch (_) {
+      // Truly unexpected errors only; mutation failures are either kept
+      // queued or moved to the failed list by drain() and don't throw here.
+    } finally {
+      _notifyStatus();
+    }
   }
 
   void _notifyStatus() {

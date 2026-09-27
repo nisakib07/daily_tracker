@@ -855,6 +855,7 @@ class MoneyRepository
     if (updatedRows.isEmpty) {
       throw const PostgrestException(
         message: 'No matching transaction was updated.',
+        code: 'P0002',
       );
     }
   }
@@ -946,6 +947,7 @@ class MoneyRepository
     if (deletedRows.isEmpty) {
       throw const PostgrestException(
         message: 'No matching transaction was deleted.',
+        code: 'P0002',
       );
     }
   }
