@@ -5,9 +5,10 @@ name: Build Android APK
 
 on:
   workflow_dispatch: {}
-  # Every branch runs the checks job; only main goes on to build and
-  # publish a release (see the release job's `if`). This lets changes be
-  # tested on a branch without pushing an update to installed apps.
+  # Every branch runs the checks job. Other branches also build a web
+  # preview; only main goes on to build and publish a release (see each
+  # job's `if`). This lets changes be tested on a branch without pushing an
+  # update to installed apps.
   push:
     paths:
       - "mobile/**"
@@ -54,6 +55,50 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  # Local Flutter builds are blocked on the main dev machine (Windows Smart
+  # App Control rejects the SDK's unsigned impellerc.exe), so branch builds
+  # of the web app are made here and served locally with
+  # mobile/tool/preview_ci_web.py. Runs alongside checks, not after them, so
+  # a preview is available even while a test is failing.
+  web-preview:
+    name: Build web preview
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter build web --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: money-master-web-preview
+          path: mobile/build/web
+          retention-days: 7
 
   release:
     name: Build and publish signed APK
