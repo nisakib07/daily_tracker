@@ -163,7 +163,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     try {
       await _refresh();
       if (!mounted) return;
-      _showSnack(message);
+      _showSavedSnack(message);
     } finally {
       if (mounted) setState(() => _isMutating = false);
     }
@@ -199,7 +199,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Account updated');
+    _showSavedSnack('Account updated');
   }
 
   Future<void> _showAnalytics() async {
@@ -238,7 +238,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Person added');
+    _showSavedSnack('Person added');
   }
 
   Future<void> _showPersonEditSheet(Person person) async {
@@ -251,7 +251,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Person updated');
+    _showSavedSnack('Person updated');
   }
 
   Future<void> _showPersonHistorySheet(
@@ -283,7 +283,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       await _refresh();
 
       if (!mounted) return;
-      _showSnack('Person deleted');
+      _showSavedSnack('Person deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete person. Please try again.');
@@ -310,7 +310,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Loan entry saved');
+    _showSavedSnack('Loan entry saved');
   }
 
   Future<void> _showEditTransactionSheet(
@@ -351,7 +351,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Budgets updated');
+    _showSavedSnack('Budgets updated');
   }
 
   Future<void> _showInvestmentSheet(DashboardSnapshot snapshot) async {
@@ -365,7 +365,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Investment created');
+    _showSavedSnack('Investment created');
   }
 
   Future<void> _showInvestmentFundsSheet(
@@ -383,7 +383,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Investment funds added');
+    _showSavedSnack('Investment funds added');
   }
 
   Future<void> _showInvestmentReturnSheet(
@@ -405,7 +405,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     await _refresh();
 
     if (!mounted) return;
-    _showSnack('Investment return recorded');
+    _showSavedSnack('Investment return recorded');
   }
 
   Future<void> _deleteInvestment(Investment investment) async {
@@ -426,7 +426,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       await _refresh();
 
       if (!mounted) return;
-      _showSnack('Investment deleted');
+      _showSavedSnack('Investment deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete investment. Please try again.');
@@ -516,6 +516,19 @@ class _DashboardScreenState extends State<DashboardScreen>
     } finally {
       if (mounted) setState(() => _isMutating = false);
     }
+  }
+
+  /// Confirms a change, and says so when it was kept on this phone to sync
+  /// later because the server couldn't be reached.
+  void _showSavedSnack(String message) {
+    final dataSource = widget.dataSource;
+    final queued =
+        dataSource is CachedMoneyDataSource && dataSource.lastMutationQueued;
+    _showSnack(
+      queued
+          ? '$message on this phone. It will sync when you are back online.'
+          : message,
+    );
   }
 
   void _showSnack(String message) {
@@ -2579,8 +2592,12 @@ class _ActivityTab extends StatelessWidget {
                         ) ...[
                           _TransactionTile(
                             transaction: group.items[index],
-                            onEdit: onEditTransaction,
-                            onDelete: onDeleteTransaction,
+                            onEdit: group.items[index].existsOnServer
+                                ? onEditTransaction
+                                : null,
+                            onDelete: group.items[index].existsOnServer
+                                ? onDeleteTransaction
+                                : null,
                           ),
                           if (index < group.items.length - 1)
                             const Divider(height: 1, indent: 66),
@@ -4902,6 +4919,32 @@ class _TransactionTile extends StatelessWidget {
             color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
+        if (transaction.pending)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.cloud_upload_outlined,
+                  size: 14,
+                  color: AppTheme.neonAmber,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'Waiting to sync',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.neonAmber,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
     final amount = Text(
@@ -4978,7 +5021,7 @@ class _TransactionTile extends StatelessWidget {
     final semanticContent = Semantics(
       button: onEdit != null,
       label:
-          '${transaction.category ?? transaction.type}, ${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}',
+          '${transaction.category ?? transaction.type}, ${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
       hint: onEdit != null
           ? 'Open to edit. More transaction actions are available.'
           : null,

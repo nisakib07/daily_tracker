@@ -109,6 +109,10 @@ class OfflineMutationQueue {
 
   int get pendingCount => _mutations.length;
 
+  /// Mutations waiting to sync, oldest first.
+  List<QueuedMoneyMutation> get pendingMutations =>
+      List.unmodifiable(_mutations);
+
   /// Mutations that can't succeed as written (e.g. the referenced row was
   /// deleted before the queued mutation could be applied), or that kept
   /// failing. Kept out of the active queue so one bad mutation can't block

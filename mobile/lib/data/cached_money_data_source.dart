@@ -5,6 +5,7 @@ import '../core/date_times.dart';
 import 'money_repository.dart';
 import '../models/money_models.dart';
 import 'offline_mutation_queue.dart';
+import 'pending_mutations.dart';
 import 'secure_cache_store.dart';
 
 /// Keeps the last dashboard snapshot available while Supabase is contacted
@@ -47,13 +48,22 @@ class CachedMoneyDataSource
   Object? _lastSyncError;
   bool _needsRemoteRefresh = false;
   bool _closed = false;
+  bool _lastMutationQueued = false;
   int _statusRevision = 0;
 
   Stream<DashboardSnapshot> get snapshots => _snapshotChanges.stream;
 
   Stream<int> get statusChanges => _statusChanges.stream;
 
-  DashboardSnapshot? get snapshot => _snapshot;
+  /// The last snapshot, with changes still waiting to sync applied.
+  DashboardSnapshot? get snapshot {
+    final server = _snapshot;
+    return server == null ? null : _withPending(server);
+  }
+
+  /// Whether the most recent change was kept on this device to sync later,
+  /// rather than saved to the server straight away.
+  bool get lastMutationQueued => _lastMutationQueued;
 
   DateTime? get lastSyncedAt => _lastSyncedAt;
 
@@ -98,7 +108,7 @@ class CachedMoneyDataSource
     if (cached != null) {
       if (_needsRemoteRefresh) return refresh();
       if (hasStaleData) _refreshInBackground();
-      return cached;
+      return _withPending(cached);
     }
 
     return refresh();
@@ -126,15 +136,32 @@ class CachedMoneyDataSource
       _needsRemoteRefresh = false;
       await _persist(fresh);
       _notifyStatus();
-      if (!_closed) _snapshotChanges.add(fresh);
-      return fresh;
+      final shown = _withPending(fresh);
+      if (!_closed) _snapshotChanges.add(shown);
+      return shown;
     } catch (error) {
       _lastSyncError = error;
       _needsRemoteRefresh = true;
       _notifyStatus();
       final cached = _snapshot;
-      if (cached != null) return cached;
+      if (cached != null) return _withPending(cached);
       rethrow;
+    }
+  }
+
+  // Only the server's own snapshot is persisted; pending changes live in the
+  // queue and are applied on top whenever a snapshot is handed out.
+  DashboardSnapshot _withPending(DashboardSnapshot server) {
+    return applyPendingMutations(server, _mutationQueue.pendingMutations);
+  }
+
+  /// Sends the current snapshot, with pending changes applied, to listeners.
+  /// Needed whenever the queue changes without a successful refresh, which
+  /// is the only other thing that sends one.
+  void _publish() {
+    final server = _snapshot;
+    if (server != null && !_closed) {
+      _snapshotChanges.add(_withPending(server));
     }
   }
 
@@ -200,9 +227,13 @@ class CachedMoneyDataSource
     final mutation = _mutationQueue.create(kind, payload);
     try {
       await executor.executeMutation(mutation);
+      _lastMutationQueued = false;
     } catch (error) {
       if (!isRetryableMutationError(error)) rethrow;
       await _mutationQueue.enqueue(mutation);
+      _lastMutationQueued = true;
+      // Show it right away; the refresh that follows will fail offline.
+      _publish();
     }
 
     _needsRemoteRefresh = true;
@@ -229,6 +260,8 @@ class CachedMoneyDataSource
       // Truly unexpected errors only; mutation failures are either kept
       // queued or moved to the failed list by drain() and don't throw here.
     } finally {
+      // Changes moved to the failed list are no longer shown as pending.
+      _publish();
       _notifyStatus();
     }
   }
