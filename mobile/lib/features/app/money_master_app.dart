@@ -4,7 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/daily_reminder_controller.dart';
 import '../../core/theme_mode_controller.dart';
 import '../../shared/theme/app_theme.dart';
+import '../auth/app_lock_gate.dart';
 import '../auth/auth_gate.dart';
+
+final _navigatorKey = GlobalKey<NavigatorState>();
 
 class MoneyMasterApp extends ConsumerWidget {
   const MoneyMasterApp({super.key});
@@ -21,6 +24,10 @@ class MoneyMasterApp extends ConsumerWidget {
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: themeMode,
+      navigatorKey: _navigatorKey,
+      // Above the Navigator, so the lock covers every screen and dialog.
+      builder: (context, child) =>
+          AppLockGate(navigatorKey: _navigatorKey, child: child!),
       home: const AuthGate(),
     );
   }

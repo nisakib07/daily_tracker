@@ -1033,3 +1033,12 @@ September 27, 2026 (later still)
 - Added a dashboard test at 320x568 that shows the banner, checks a tap on Update reaches the button, and dismisses it.
 - Builds 19-24 all carry the broken banner, so the build with this fix has to be installed by hand once; updates work from the banner after that.
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (evening)
+- Fixed the app lock gap (flaw #3). AppLockGate was built inside the dashboard page, so every screen pushed above it (Analytics, Settings, forms, dialogs) stayed visible when the app locked on return from the background. It now wraps the Navigator through MaterialApp.builder, so the lock covers everything; while locked the app underneath is kept alive but not painted, hit-tested, focused or read by screen readers (Visibility maintainState + ExcludeFocus). It follows Supabase auth itself (injectable signedIn for tests): no lock right after a fresh sign-in (previously it prompted immediately after typing the password), and signing out now pops every open screen so nothing from the previous session stays above the sign-in screen. App-lock settings are only read while signed in.
+- MainActivity: setRecentsScreenshotEnabled(false) on Android 13+, so the recent-apps preview no longer shows balances; unlike FLAG_SECURE the user can still take screenshots.
+- Build 19 was signed with a stale keystore (its run started 46 s before KEYSTORE_BASE64 got its final value on Aug 15), so no later build could install over it ("App not installed"); the user uninstalled once and installed Build 26. The release job now checks the APK's signing certificate against Builds 24+ (SHA-256 c71da223...623bacdc) with apksigner and refuses to publish on a mismatch.
+- CI: new android-check job on branches compiles a debug APK (the dev machine has no Android SDK, so Kotlin/Gradle changes were previously first compiled by a release on main) and exercises the apksigner lookup. Actions minutes are free now that the repo is public.
+- New test/app_lock_gate_test.dart: cold-start lock hides the app until unlocked, returning from the background covers a pushed screen and keeps it after unlock, no prompt right after sign-in (but locks on next return), sign-out closes every screen and removes the lock, nothing happens with app lock off, and lock screen layout at 320x568 and 1440x900.
+- Verified locally: flutter analyze clean; dart format clean. flutter test and the Android build not run locally - verified in CI.
