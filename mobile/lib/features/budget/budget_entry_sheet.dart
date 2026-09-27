@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/amount_input.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/budget_advisor.dart';
@@ -158,14 +159,14 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
 
   double get _plannedTotal {
     return _controllers.values.fold(0, (total, controller) {
-      final amount = double.tryParse(controller.text.trim());
+      final amount = parseAmount(controller.text);
       return total + (amount != null && amount > 0 ? amount : 0);
     });
   }
 
   int get _budgetedCategoryCount {
     return _controllers.values.where((controller) {
-      final amount = double.tryParse(controller.text.trim());
+      final amount = parseAmount(controller.text);
       return amount != null && amount > 0;
     }).length;
   }
@@ -180,9 +181,12 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
     for (final entry in _controllers.entries) {
       final text = entry.value.text.trim();
       if (text.isEmpty) continue;
-      final amount = double.tryParse(text);
-      if (amount == null || amount < 0) {
-        setState(() => _error = 'Check the amount for ${entry.key}.');
+      final problem = validateAmount(text, allowZero: true);
+      final amount = parseAmount(text);
+      if (problem != null || amount == null) {
+        setState(
+          () => _error = '${entry.key}: ${problem ?? 'Check the amount'}.',
+        );
         return;
       }
       values[entry.key] = amount;

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/amount_input.dart';
+import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
@@ -117,7 +119,7 @@ class _InvestmentEntrySheetState extends State<InvestmentEntrySheet> {
           .createInvestment(
             name: _nameController.text,
             description: _descriptionController.text,
-            amount: double.parse(_amountController.text.trim()),
+            amount: parseAmount(_amountController.text)!,
             fromAccountId: _accountId!,
             occurredAt: _dateWithCurrentTime(_selectedDate),
             note: _noteController.text,
@@ -276,7 +278,7 @@ class _InvestmentFundsSheetState extends State<InvestmentFundsSheet> {
       await (widget.dataSource ?? MoneyRepository(Supabase.instance.client))
           .addInvestmentFunds(
             investmentId: widget.investment.id,
-            amount: double.parse(_amountController.text.trim()),
+            amount: parseAmount(_amountController.text)!,
             fromAccountId: _accountId!,
             occurredAt: _dateWithCurrentTime(_selectedDate),
             note: _noteController.text,
@@ -425,7 +427,7 @@ class _InvestmentReturnSheetState extends State<InvestmentReturnSheet> {
       await (widget.dataSource ?? MoneyRepository(Supabase.instance.client))
           .recordInvestmentReturn(
             investmentId: _investmentId!,
-            amount: double.parse(_amountController.text.trim()),
+            amount: parseAmount(_amountController.text)!,
             toAccountId: _accountId!,
             occurredAt: _dateWithCurrentTime(_selectedDate),
             closeInvestment: _closeInvestment,
@@ -645,13 +647,7 @@ class _InvestmentAmountField extends StatelessWidget {
           prefixText: '\u09F3 ',
           prefixIcon: Icon(Icons.payments_outlined, color: accent),
         ),
-        validator: (text) {
-          final amount = double.tryParse(text?.trim() ?? '');
-          if (amount == null || amount <= 0) {
-            return 'Enter an amount greater than 0';
-          }
-          return null;
-        },
+        validator: validateAmount,
       ),
     );
   }
@@ -850,11 +846,12 @@ Future<DateTime?> _pickInvestmentDate(
   BuildContext context,
   DateTime initialDate,
 ) {
+  final range = pickableDateRange(initialDate);
   return showDatePicker(
     context: context,
     initialDate: initialDate,
-    firstDate: DateTime(2020),
-    lastDate: DateTime.now(),
+    firstDate: range.first,
+    lastDate: range.last,
     builder: (context, child) {
       return Theme(
         data: Theme.of(context).copyWith(

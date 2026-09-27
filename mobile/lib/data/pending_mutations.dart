@@ -12,10 +12,16 @@ import 'offline_mutation_queue.dart';
 /// pending, and new transactions get a [TransactionRecord.pendingIdPrefix]
 /// id until the server assigns a real one. People and investments use the
 /// mutation id, which the server also uses as their id.
+///
+/// Mutations whose ids are in [alreadySaved] were saved by the server but
+/// aren't in [snapshot] yet (it was fetched before them). They're applied
+/// the same way so a save shows at once, without waiting for the full
+/// refresh, but their rows aren't marked pending.
 DashboardSnapshot applyPendingMutations(
   DashboardSnapshot snapshot,
-  List<QueuedMoneyMutation> pending,
-) {
+  List<QueuedMoneyMutation> pending, {
+  Set<String> alreadySaved = const {},
+}) {
   if (pending.isEmpty) return snapshot;
 
   final accounts = [...snapshot.accounts];
@@ -26,6 +32,7 @@ DashboardSnapshot applyPendingMutations(
 
   for (final mutation in pending) {
     final payload = mutation.payload;
+    final waiting = !alreadySaved.contains(mutation.id);
     String? text(String key) => _blankToNull(payload[key]);
     final occurredAt =
         parseNullableLocalDateTime(payload['occurred_at']) ??
@@ -55,7 +62,7 @@ DashboardSnapshot applyPendingMutations(
           note: text('note'),
           occurredAt: at ?? occurredAt,
           createdAt: mutation.createdAt,
-          pending: true,
+          pending: waiting,
         ),
       );
     }
@@ -207,7 +214,7 @@ DashboardSnapshot applyPendingMutations(
             date: original.date,
             occurredAt: occurredAt,
             createdAt: original.createdAt,
-            pending: true,
+            pending: waiting,
           ),
         );
       case 'delete_transaction':

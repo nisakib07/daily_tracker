@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/date_times.dart';
 import '../../core/formatters.dart';
 import '../../data/app_update_checker.dart';
 import '../../data/cached_money_data_source.dart';
@@ -37,6 +38,7 @@ class DashboardScreen extends StatefulWidget {
     this.snapshotLoader,
     this.dataSource,
     this.updateChecker,
+    this.signOut,
   });
 
   final User user;
@@ -45,6 +47,9 @@ class DashboardScreen extends StatefulWidget {
 
   /// Defaults to asking GitHub Releases through [AppUpdateChecker].
   final Future<AppUpdateInfo?> Function()? updateChecker;
+
+  /// Defaults to signing out of Supabase.
+  final Future<void> Function()? signOut;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -158,19 +163,50 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Future<void> _refreshAfterMutation(String message) async {
-    if (mounted) setState(() => _isMutating = true);
-    try {
-      await _refresh();
-      if (!mounted) return;
-      _showSavedSnack(message);
-    } finally {
-      if (mounted) setState(() => _isMutating = false);
-    }
+  /// Confirms a saved change straight away. The cache already shows it, so
+  /// the full refresh runs in the background instead of freezing the
+  /// dashboard until the whole history has downloaded again.
+  void _refreshAfterMutation(String message) {
+    if (!mounted) return;
+    _showSavedSnack(message);
+    unawaited(_refresh());
   }
 
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
+    // Unsynced changes aren't lost by signing out: they stay on this phone
+    // and sync the next time this account signs in here. But nothing said
+    // so, and uninstalling first would lose them.
+    final dataSource = widget.dataSource;
+    if (dataSource is CachedMoneyDataSource) {
+      final pending = dataSource.pendingMutationCount;
+      final failed = dataSource.failedMutationCount;
+      if (pending + failed > 0) {
+        String changes(int count) => '$count change${count == 1 ? '' : 's'}';
+        final confirmed = await showAppDestructiveConfirmation(
+          context: context,
+          title: 'Sign out with unsynced changes?',
+          message: [
+            if (pending > 0)
+              pending == 1
+                  ? "1 change hasn't reached the server yet. It'll stay on "
+                        'this phone and sync the next time you sign in here '
+                        'with this account.'
+                  : "${changes(pending)} haven't reached the server yet. "
+                        "They'll stay on this phone and sync the next time "
+                        'you sign in here with this account.',
+            if (failed > 0)
+              "${changes(failed)} couldn't be saved; review them first if "
+                  'you still need them.',
+            'Uninstalling the app before then would lose '
+                '${pending + failed == 1 ? 'it' : 'them'}.',
+          ].join(' '),
+          confirmLabel: 'Sign out anyway',
+          icon: Icons.cloud_off_outlined,
+        );
+        if (!confirmed) return;
+      }
+    }
+    await (widget.signOut?.call() ?? Supabase.instance.client.auth.signOut());
   }
 
   Future<void> _showEntrySheet(
@@ -185,7 +221,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refreshAfterMutation('Transaction saved');
+    _refreshAfterMutation('Transaction saved');
   }
 
   Future<void> _showAccountSheet(AccountBalance accountBalance) async {
@@ -196,10 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Account updated');
+    _refreshAfterMutation('Account updated');
   }
 
   Future<void> _showAnalytics() async {
@@ -238,10 +271,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       dataSource: widget.dataSource,
     );
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Person added');
+    _refreshAfterMutation('Person added');
   }
 
   Future<void> _showPersonEditSheet(Person person) async {
@@ -251,10 +281,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       dataSource: widget.dataSource,
     );
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Person updated');
+    _refreshAfterMutation('Person updated');
   }
 
   Future<void> _showPersonHistorySheet(
@@ -308,10 +335,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() => _isMutating = true);
     try {
       await _dataSource.deletePerson(person.id);
-      await _refresh();
-
       if (!mounted) return;
-      _showSavedSnack('Person deleted');
+      _refreshAfterMutation('Person deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete person. Please try again.');
@@ -336,10 +361,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Loan entry saved');
+    _refreshAfterMutation('Loan entry saved');
   }
 
   Future<void> _showEditTransactionSheet(
@@ -355,7 +377,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refreshAfterMutation('Transaction updated');
+    _refreshAfterMutation('Transaction updated');
   }
 
   Future<void> _showBudgetSheet(DashboardSnapshot snapshot) async {
@@ -377,10 +399,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Budgets updated');
+    _refreshAfterMutation('Budgets updated');
   }
 
   Future<void> _showInvestmentSheet(DashboardSnapshot snapshot) async {
@@ -391,10 +410,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Investment created');
+    _refreshAfterMutation('Investment created');
   }
 
   Future<void> _showInvestmentFundsSheet(
@@ -409,10 +425,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Investment funds added');
+    _refreshAfterMutation('Investment funds added');
   }
 
   Future<void> _showInvestmentReturnSheet(
@@ -431,10 +444,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Investment return recorded');
+    _refreshAfterMutation('Investment return recorded');
   }
 
   Future<void> _deleteInvestment(Investment investment) async {
@@ -452,10 +462,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() => _isMutating = true);
     try {
       await _dataSource.deleteInvestment(investment.id);
-      await _refresh();
-
       if (!mounted) return;
-      _showSavedSnack('Investment deleted');
+      _refreshAfterMutation('Investment deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete investment. Please try again.');
@@ -469,7 +477,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDay.isAfter(today) ? today : _selectedDay,
-      firstDate: DateTime(2020),
+      firstDate: earliestPickableDate,
       lastDate: today,
     );
 
@@ -488,7 +496,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       initialDate: _selectedActivityMonth.isAfter(nowMonth)
           ? nowMonth
           : _selectedActivityMonth,
-      firstDate: DateTime(2020),
+      firstDate: earliestPickableDate,
       lastDate: DateTime(nowMonth.year, nowMonth.month + 1, 0),
     );
 
@@ -538,7 +546,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() => _isMutating = true);
     try {
       await _dataSource.deleteTransaction(transaction.id);
-      await _refreshAfterMutation('Transaction deleted');
+      _refreshAfterMutation('Transaction deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete transaction. Refresh and try again.');
@@ -2578,6 +2586,13 @@ class _ActivityTab extends StatelessWidget {
                     color: AppTheme.neonAmber,
                     onChanged: onTypeFilterChanged,
                   ),
+                  _FilterChipButton(
+                    label: 'Investments',
+                    value: 'investments',
+                    activeValue: typeFilter,
+                    color: AppTheme.neonViolet,
+                    onChanged: onTypeFilterChanged,
+                  ),
                 ],
               ),
             ),
@@ -2663,11 +2678,18 @@ class _ActivityTab extends StatelessWidget {
     };
   }
 
+  // Each type belongs to exactly one filter. Income and Expense used to
+  // include loans and investments too, so they didn't match the monthly
+  // totals, which only count real income and spending.
   bool _matchesTypeFilter(TransactionRecord transaction) {
     return switch (typeFilter) {
-      'income' => transaction.isIncomeLike,
-      'expense' => transaction.isExpenseLike,
+      'income' => transaction.type == 'income',
+      'expense' => transaction.type == 'expense',
       'transfer' => transaction.type == 'transfer',
+      'investments' => const {
+        'invest',
+        'invest_return',
+      }.contains(transaction.type),
       'loans' => const {
         'lend',
         'borrow',

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/amount_input.dart';
 import '../../core/app_lock_controller.dart';
 import '../../core/daily_reminder_controller.dart';
 import '../../core/error_messages.dart';
@@ -1342,10 +1343,12 @@ class _QuickAddSettingsSectionState extends State<_QuickAddSettingsSection> {
     double? amount;
     final amountText = _amountController.text.trim();
     if (amountText.isNotEmpty) {
-      amount = double.tryParse(amountText);
-      if (amount == null || amount <= 0) {
+      final problem = validateAmount(amountText);
+      amount = parseAmount(amountText);
+      if (problem != null || amount == null) {
         setState(
-          () => _formError = 'Amount must be greater than 0, or left blank.',
+          () => _formError =
+              'Amount: ${problem ?? 'Check the amount'}, or leave it blank.',
         );
         return;
       }

@@ -84,6 +84,93 @@ void main() {
     expect(find.text('1 change waiting to sync.'), findsOneWidget);
     await cache.close();
   });
+
+  testWidgets('signing out with unsynced changes asks first', (tester) async {
+    _useTallView(tester);
+    final remote = _FakeRemote(_snapshot());
+    final cache = CachedMoneyDataSource(
+      remote,
+      cacheKey: 'user-1',
+      staleAfter: const Duration(days: 1),
+      cacheStore: MemoryDashboardCacheStore(),
+    );
+    await cache.fetchDashboard();
+    remote.offline = true;
+    await cache.createMoneyOut(
+      amount: 60,
+      accountId: 'cash',
+      category: 'Snacks',
+      occurredAt: DateTime.now(),
+    );
+    var signOuts = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: DashboardScreen(
+          user: _user,
+          dataSource: cache,
+          signOut: () async => signOuts++,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> chooseSignOut() async {
+      await tester.tap(find.byTooltip('Account'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Sign out'));
+      await tester.pumpAndSettle();
+    }
+
+    await chooseSignOut();
+    expect(find.text('Sign out with unsynced changes?'), findsOneWidget);
+    expect(
+      find.textContaining("1 change hasn't reached the server"),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(signOuts, 0);
+
+    await chooseSignOut();
+    await tester.tap(find.text('Sign out anyway'));
+    await tester.pumpAndSettle();
+    expect(signOuts, 1);
+    await cache.close();
+  });
+
+  testWidgets('with everything synced, sign out needs no confirmation', (
+    tester,
+  ) async {
+    _useTallView(tester);
+    final cache = CachedMoneyDataSource(
+      _FakeRemote(_snapshot()),
+      cacheKey: 'user-1',
+      staleAfter: const Duration(days: 1),
+      cacheStore: MemoryDashboardCacheStore(),
+    );
+    var signOuts = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: DashboardScreen(
+          user: _user,
+          dataSource: cache,
+          signOut: () async => signOuts++,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Account'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign out'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Sign out with unsynced changes?'), findsNothing);
+    expect(signOuts, 1);
+    await cache.close();
+  });
 }
 
 void _useTallView(WidgetTester tester) {

@@ -51,6 +51,14 @@ class CachedMoneyDataSource
   bool _lastMutationQueued = false;
   int _statusRevision = 0;
 
+  // Changes the server has saved that the current snapshot may predate,
+  // each with the number of saves up to and including it. They're shown on
+  // top of the snapshot until a refresh that started after them lands, so a
+  // save appears at once instead of after re-downloading everything.
+  final List<({int sequence, QueuedMoneyMutation mutation})> _savedSinceFetch =
+      [];
+  int _saveCount = 0;
+
   Stream<DashboardSnapshot> get snapshots => _snapshotChanges.stream;
 
   Stream<int> get statusChanges => _statusChanges.stream;
@@ -148,9 +156,13 @@ class CachedMoneyDataSource
   }
 
   Future<DashboardSnapshot> _fetchAndStore() async {
+    // Saves made before this point are in what the server returns; ones
+    // made while it downloads may not be.
+    final savesIncluded = _saveCount;
     try {
       final fresh = await remote.fetchDashboard();
       _snapshot = fresh;
+      _savedSinceFetch.removeWhere((saved) => saved.sequence <= savesIncluded);
       _lastSyncedAt = _clock();
       _lastSyncError = null;
       _needsRemoteRefresh = false;
@@ -169,10 +181,23 @@ class CachedMoneyDataSource
     }
   }
 
-  // Only the server's own snapshot is persisted; pending changes live in the
-  // queue and are applied on top whenever a snapshot is handed out.
+  // Only the server's own snapshot is persisted; saved-but-not-refreshed
+  // changes and changes waiting in the queue are applied on top whenever a
+  // snapshot is handed out.
   DashboardSnapshot _withPending(DashboardSnapshot server) {
-    return applyPendingMutations(server, _mutationQueue.pendingMutations);
+    final saved = [for (final entry in _savedSinceFetch) entry.mutation];
+    final savedIds = {for (final mutation in saved) mutation.id};
+    return applyPendingMutations(server, [
+      ...saved,
+      // A queued change is briefly in both while the queue removes it.
+      ..._mutationQueue.pendingMutations.where(
+        (mutation) => !savedIds.contains(mutation.id),
+      ),
+    ], alreadySaved: savedIds);
+  }
+
+  void _rememberSaved(QueuedMoneyMutation mutation) {
+    _savedSinceFetch.add((sequence: ++_saveCount, mutation: mutation));
   }
 
   /// Sends the current snapshot, with pending changes applied, to listeners.
@@ -248,6 +273,10 @@ class CachedMoneyDataSource
     try {
       await executor.executeMutation(mutation);
       _lastMutationQueued = false;
+      // Show it right away; the full refresh that follows runs in the
+      // background and replaces it with the server's own copy.
+      _rememberSaved(mutation);
+      _publish();
     } catch (error) {
       if (!isRetryableMutationError(error)) rethrow;
       await _mutationQueue.enqueue(mutation);
@@ -271,7 +300,9 @@ class CachedMoneyDataSource
     final mutationExecutor = executor as IdempotentMoneyMutationExecutor;
 
     try {
-      final applied = await _mutationQueue.drain(mutationExecutor);
+      final applied = await _mutationQueue.drain(
+        _RememberSaved(mutationExecutor, _rememberSaved),
+      );
       if (applied > 0) {
         _needsRemoteRefresh = true;
         await refresh();
@@ -593,5 +624,20 @@ class CachedMoneyDataSource
     _closed = true;
     await _snapshotChanges.close();
     await _statusChanges.close();
+  }
+}
+
+/// Runs queued mutations through [_inner] and reports each one the server
+/// saved, so it stays visible until the refresh after the sync lands.
+class _RememberSaved implements IdempotentMoneyMutationExecutor {
+  _RememberSaved(this._inner, this._onSaved);
+
+  final IdempotentMoneyMutationExecutor _inner;
+  final void Function(QueuedMoneyMutation mutation) _onSaved;
+
+  @override
+  Future<void> executeMutation(QueuedMoneyMutation mutation) async {
+    await _inner.executeMutation(mutation);
+    _onSaved(mutation);
   }
 }

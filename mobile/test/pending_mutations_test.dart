@@ -106,6 +106,27 @@ void main() {
     expect(_balance(shown, 'cash'), 1250);
   });
 
+  test('saved changes show without being marked as waiting to sync', () {
+    final expense = _mutation('money_out', {
+      'amount': 250,
+      'account_id': 'cash',
+      'category': 'Food',
+      'occurred_at': _at(DateTime(2026, 9, 15, 13)),
+    });
+
+    final shown = applyPendingMutations(
+      _snapshot(),
+      [expense],
+      alreadySaved: {expense.id},
+    );
+
+    final added = shown.transactions[1];
+    expect(added.pending, isFalse);
+    // Still no server id until the refresh brings the real row.
+    expect(added.existsOnServer, isFalse);
+    expect(_balance(shown, 'cash'), 1250);
+  });
+
   test('server balances are ignored while changes are pending', () {
     final server = _snapshot(
       serverSummary: DashboardServerSummary(

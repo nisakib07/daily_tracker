@@ -3,6 +3,8 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/category_store.dart';
+import '../../core/amount_input.dart';
+import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
@@ -174,7 +176,7 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final amount = double.parse(_amountController.text.trim());
+    final amount = parseAmount(_amountController.text)!;
     final occurredAt = _dateWithCurrentTime(_selectedDate);
     final repository =
         widget.dataSource ?? MoneyRepository(Supabase.instance.client);
@@ -222,11 +224,12 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
   }
 
   Future<void> _pickDate() async {
+    final range = pickableDateRange(_selectedDate);
     final next = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      firstDate: range.first,
+      lastDate: range.last,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -584,7 +587,7 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
       await (widget.dataSource ?? MoneyRepository(Supabase.instance.client))
           .updateTransaction(
             transaction: _transaction,
-            amount: double.parse(_amountController.text.trim()),
+            amount: parseAmount(_amountController.text)!,
             accountId: _accountId!,
             toAccountId: _isTransfer ? _toAccountId : null,
             personId: _showPerson ? _personId : _transaction.personId,
@@ -609,11 +612,12 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
   }
 
   Future<void> _pickDate() async {
+    final range = pickableDateRange(_selectedDate);
     final next = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      firstDate: range.first,
+      lastDate: range.last,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -862,7 +866,7 @@ class _AmountField extends StatelessWidget {
     return ValueListenableBuilder<TextEditingValue>(
       valueListenable: controller,
       builder: (context, value, _) {
-        final amount = double.tryParse(value.text.trim()) ?? 0;
+        final amount = parseAmount(value.text) ?? 0;
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -884,13 +888,7 @@ class _AmountField extends StatelessWidget {
               suffixStyle: TextStyle(color: color, fontWeight: FontWeight.w700),
               filled: true,
             ),
-            validator: (text) {
-              final amount = double.tryParse(text?.trim() ?? '');
-              if (amount == null || amount <= 0) {
-                return 'Enter an amount greater than 0';
-              }
-              return null;
-            },
+            validator: validateAmount,
           ),
         );
       },

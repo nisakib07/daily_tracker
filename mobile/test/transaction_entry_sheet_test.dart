@@ -192,7 +192,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Add Income'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Enter an amount greater than 0'), findsOneWidget);
+    expect(find.text('Enter an amount'), findsOneWidget);
   });
 
   testWidgets('Transfer needs at least two accounts', (tester) async {

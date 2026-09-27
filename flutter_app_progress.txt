@@ -1102,3 +1102,45 @@ September 27, 2026 (night, #11)
 - The website still keeps its categories in localStorage; this syncs between phones only.
 - Tests: new preferences_sync_test.dart (new phone, empty account, first-sync merge, instant upload, offline change uploaded later, newer account copy wins, another user's leftovers not uploaded, offline/signed-out pull does nothing).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026
+- Merged #10 (export/backup) and #11 (preferences sync) to main after CI run #39 passed (194 tests).
+- Flaw #12 (every change re-downloads the whole transaction history), the part that could be fixed without a database change: after each save the dashboard froze (AbsorbPointer) until the full history had downloaded again. Now a change the server has confirmed is shown at once: CachedMoneyDataSource remembers it (with a sequence number) and applyPendingMutations applies it on top of the snapshot - with alreadySaved, so it isn't marked "waiting to sync" - until a refresh that started after it lands; saves made while a refresh is downloading survive that older refresh. Changes synced from the offline queue are remembered the same way, so they no longer blink out between leaving the queue and the refresh arriving. The dashboard's _refreshAfterMutation confirms immediately and refreshes in the background (13 save/delete flows).
+- Not changed: the refresh still downloads every transaction. Making it incremental needs a database change (an updated_at column with a trigger, plus a record of deletions) and a sync protocol; left for the user to decide on.
+- Tests: pending_mutations_test (saved changes shown but not marked pending) and two cache tests (save shown before the refresh brings the server copy; a save made while a refresh downloads survives that refresh and is replaced by the next one).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#13)
+- Fixed flaw #13, which turned out worse than listed: with email confirmation on (Supabase's default), tapping Create account ended with nothing on screen - signUp returned no session and the app showed no message. The confirmation email's link opened the website, which can't finish a sign-up started in the app (same PKCE problem as the old password reset); the account did get confirmed, but people saw an error page.
+- New mobile/lib/features/auth/confirm_email_screen.dart, opened after signUp when there's no session: enter the emailed code (verifyOTP with OtpType.signup) to confirm and sign in, Resend code limited to once a minute (auth.resend), friendly wrong/expired-code message, and a note that the link still works as a fallback. Injectable EmailConfirmationAuth for tests.
+- Requires the Supabase "Confirm signup" email template to include {{ .Token }} for the code to appear in the email.
+- Tests: new confirm_email_screen_test.dart (validation, success pops with a welcome message, wrong/expired code, resend countdown, layout at 320x568 and 1440x900).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#14)
+- Fixed flaw #14: nine amount fields each parsed with double.tryParse, so "1,000" was rejected with the misleading "Enter an amount greater than 0", while "1e5", "Infinity", "NaN" and any number of decimals got through, and there was no upper limit. New mobile/lib/core/amount_input.dart: parseAmount accepts thousands separators (including Indian grouping like 1,25,000), spaces and a ৳ sign, at most two decimals, no signs/exponents/NaN/Infinity; validateAmount says what is wrong ("Enter an amount", "Use at most 2 decimal places", "Enter a number, like 250 or 18.50", over ৳100 crore) with required/allowZero options. Used by the transaction add/edit, loan, investment (three forms), account adjustment (optional, zero allowed), budget (zero allowed; error names the category) and quick-add shortcut (optional) forms.
+- Updated three tests for the new messages; new amount_input_test.dart (parsing, rejections, messages, optional/zero, and an expense of "1,000" saving as 1000).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#15)
+- Fixed flaw #15: every date picker started at 2020, hiding older history, and the edit form's picker started at the transaction's own date, so a transaction dated before 2020 or after today (imported from a backup, or entered on the website) made the picker refuse to open (an assertion error in debug builds). New pickableDateRange in core/date_times.dart: from 2000 (earliestPickableDate) to today, widened to include the record's own date. Used by the transaction add/edit, loan and investment pickers; the dashboard's day/month pickers now also go back to 2000.
+- Deliberately unchanged: future dates still aren't offered, since an entry dated ahead would change today's balance before the money moves (there's no scheduled-transaction concept). Easy to change if wanted.
+- Tests: new date_range_test.dart (range, widening for old/future records, editing a 2019 transaction opens its date picker).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#16)
+- Fixed flaw #16: the Activity "Income" filter used isIncomeLike (also borrow, receive, invest_return) and "Expense" used isExpenseLike (also lend, repay, invest), so they didn't match the monthly totals, which count only real income and expenses. Income and Expense are now strict, and a new "Investments" filter (invest, invest_return) sits beside Loans, so every transaction type belongs to exactly one filter. Tile colours still use the income-like/expense-like grouping.
+- Test in dashboard_screen_test.dart: each filter shows exactly its own types.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#17)
+- Fixed flaw #17: signing out from the dashboard with changes still waiting to sync (or ones that failed) gave no warning. They aren't lost - the queue is stored per user and syncs the next time that account signs in on this phone - but nothing said so, and uninstalling first would lose them. Signing out now asks first when anything is unsynced, saying how many changes, that pending ones will sync on the next sign-in here, that failed ones should be reviewed, and that uninstalling first would lose them ("Sign out anyway"). With nothing unsynced it signs out straight away as before. DashboardScreen gained an optional signOut (for tests). The lock screen's "Sign out instead" is unchanged.
+- Tests in offline_changes_dashboard_test.dart: the warning (Cancel keeps you signed in, "Sign out anyway" signs out) and no confirmation when everything is synced.
+- That completes the 17 flaws from the app review.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

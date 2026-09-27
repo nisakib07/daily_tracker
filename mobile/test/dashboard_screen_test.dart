@@ -70,6 +70,48 @@ void main() {
     expect(find.text('Delete Person'), findsOneWidget);
   });
 
+  testWidgets('each Activity filter shows exactly its own types', (
+    tester,
+  ) async {
+    await _pumpDashboard(
+      tester,
+      const Size(900, 2600),
+      snapshotLoader: () async => _snapshot,
+    );
+    await tester.pumpAndSettle();
+
+    Future<Set<String>> shownAfter(String filter) async {
+      final chip = find.widgetWithText(ChoiceChip, filter);
+      await _scrollTo(tester, chip);
+      await tester.tap(chip);
+      await tester.pumpAndSettle();
+      return {
+        for (final id in [
+          'income-1',
+          'expense-1',
+          'transfer-1',
+          'lend-1',
+          'invest-1',
+          'return-1',
+        ])
+          if (find
+              .byKey(ValueKey('transaction-swipe-$id'))
+              .evaluate()
+              .isNotEmpty)
+            id,
+      };
+    }
+
+    // Income and Expense used to include loans and investments too, unlike
+    // the monthly totals.
+    expect(await shownAfter('Income'), {'income-1'});
+    expect(await shownAfter('Expense'), {'expense-1'});
+    expect(await shownAfter('Loans'), {'lend-1'});
+    expect(await shownAfter('Investments'), {'invest-1', 'return-1'});
+    expect(await shownAfter('Transfer'), {'transfer-1'});
+    expect(await shownAfter('All'), hasLength(6));
+  });
+
   testWidgets('the update banner is above the list and takes taps', (
     tester,
   ) async {
