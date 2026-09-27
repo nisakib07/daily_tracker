@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/date_times.dart';
 import '../models/money_models.dart';
+import 'loan_position.dart';
 import 'offline_mutation_queue.dart';
 
 class AccountBalance {
@@ -213,47 +214,19 @@ class DashboardSnapshot {
   }
 
   List<LedgerEntry> get ledgerEntries {
-    const loanTypes = {'borrow', 'lend', 'repay', 'receive'};
-
     final entries = people
         .map((person) {
-          final personTransactions = transactions.where((transaction) {
-            return transaction.personId == person.id &&
-                loanTypes.contains(transaction.type);
-          });
-
-          var youOwe = 0.0;
-          var theyOwe = 0.0;
-          DateTime? lastActivityAt;
-
-          for (final transaction in personTransactions) {
-            final amount = transaction.amount;
-            final activityAt = transaction.displayDate;
-            if (lastActivityAt == null || activityAt.isAfter(lastActivityAt)) {
-              lastActivityAt = activityAt;
-            }
-
-            switch (transaction.type) {
-              case 'borrow':
-                youOwe += amount;
-              case 'lend':
-                theyOwe += amount;
-              case 'repay':
-                youOwe -= amount;
-              case 'receive':
-                theyOwe -= amount;
-            }
-          }
-
-          final safeYouOwe = youOwe < 0 ? 0.0 : youOwe;
-          final safeTheyOwe = theyOwe < 0 ? 0.0 : theyOwe;
-
+          final position = LoanPosition.from(
+            transactions.where(
+              (transaction) => transaction.personId == person.id,
+            ),
+          );
           return LedgerEntry(
             person: person,
-            youOwe: safeYouOwe,
-            theyOwe: safeTheyOwe,
-            netBalance: safeTheyOwe - safeYouOwe,
-            lastActivityAt: lastActivityAt,
+            youOwe: position.youOwe,
+            theyOwe: position.theyOwe,
+            netBalance: position.netBalance,
+            lastActivityAt: position.lastActivityAt,
           );
         })
         .where((entry) {

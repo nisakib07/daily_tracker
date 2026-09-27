@@ -328,6 +328,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       accounts: snapshot.accountBalances,
       people: snapshot.people,
       initialPersonId: personId,
+      transactions: snapshot.transactions,
       dataSource: widget.dataSource,
     );
 

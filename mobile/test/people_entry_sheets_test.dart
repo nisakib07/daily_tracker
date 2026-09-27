@@ -48,6 +48,112 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('repay shows what you owe and warns when paying more', (
+    tester,
+  ) async {
+    await _pumpOnPhone(
+      tester,
+      LoanEntrySheet(
+        action: LoanAction.repay,
+        accounts: _accounts,
+        people: [_rahim],
+        transactions: [_rahimLoan('borrow', 1000)],
+      ),
+    );
+    await tester.pumpAndSettle();
+    final amount = find.widgetWithText(TextFormField, 'Amount');
+
+    expect(find.text('You owe Rahim ৳1,000'), findsOneWidget);
+
+    await tester.enterText(amount, '800');
+    await tester.pump();
+    expect(find.textContaining('more than is owed'), findsNothing);
+
+    await tester.enterText(amount, '1500');
+    await tester.pump();
+    expect(
+      find.text(
+        'This is ৳500 more than is owed. The extra will show as Rahim '
+        'owing you.',
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('receiving when nothing is owed says where it will show', (
+    tester,
+  ) async {
+    await _pumpOnPhone(
+      tester,
+      LoanEntrySheet(
+        action: LoanAction.receive,
+        accounts: _accounts,
+        people: [_rahim],
+        transactions: const [],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text("Rahim doesn't owe you anything"), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextFormField, 'Amount'), '100');
+    await tester.pump();
+    expect(
+      find.text(
+        'Nothing is owed right now, so this will show as you owing Rahim '
+        '৳100.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('lending shows no repayment hint', (tester) async {
+    await _pumpOnPhone(
+      tester,
+      LoanEntrySheet(
+        action: LoanAction.lend,
+        accounts: _accounts,
+        people: [_rahim],
+        transactions: [_rahimLoan('borrow', 1000)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('You owe'), findsNothing);
+  });
+
+  testWidgets('history shows an overpaid loan the other way round', (
+    tester,
+  ) async {
+    await _pumpOnPhone(
+      tester,
+      PersonHistorySheet(
+        person: _rahim,
+        transactions: [_rahimLoan('borrow', 1000), _rahimLoan('repay', 1500)],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('They owe you'), findsWidgets);
+    expect(find.text('৳500'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+}
+
+final _rahim = Person(id: 'rahim', name: 'Rahim', createdAt: _now);
+
+var _loanSequence = 0;
+
+TransactionRecord _rahimLoan(String type, double amount) {
+  return TransactionRecord(
+    id: 'rahim-loan-${_loanSequence++}',
+    type: type,
+    amount: amount,
+    personId: _rahim.id,
+    occurredAt: _now,
+    createdAt: _now,
+  );
 }
 
 Future<void> _pumpOnPhone(WidgetTester tester, Widget child) async {

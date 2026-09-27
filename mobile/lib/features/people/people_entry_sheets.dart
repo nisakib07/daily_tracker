@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/formatters.dart';
+import '../../data/loan_position.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
@@ -57,6 +58,7 @@ Future<bool?> showLoanEntrySheet({
   required List<AccountBalance> accounts,
   required List<Person> people,
   String? initialPersonId,
+  List<TransactionRecord>? transactions,
   MoneyDataSource? dataSource,
 }) {
   return Navigator.of(context).push<bool>(
@@ -67,6 +69,7 @@ Future<bool?> showLoanEntrySheet({
         accounts: accounts,
         people: people,
         initialPersonId: initialPersonId,
+        transactions: transactions,
         dataSource: dataSource,
       ),
     ),
@@ -364,6 +367,7 @@ class LoanEntrySheet extends StatefulWidget {
     required this.accounts,
     required this.people,
     this.initialPersonId,
+    this.transactions,
     this.dataSource,
   });
 
@@ -371,6 +375,10 @@ class LoanEntrySheet extends StatefulWidget {
   final List<AccountBalance> accounts;
   final List<Person> people;
   final String? initialPersonId;
+
+  /// All transactions, to show what's currently owed and warn when a
+  /// repayment is more than that. Without them no balance is shown.
+  final List<TransactionRecord>? transactions;
   final MoneyDataSource? dataSource;
 
   @override
@@ -442,6 +450,63 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
     LoanAction.repay => Icons.call_made,
     LoanAction.receive => Icons.call_received,
   };
+
+  bool get _isRepayment =>
+      widget.action == LoanAction.repay || widget.action == LoanAction.receive;
+
+  String get _personName {
+    for (final person in widget.people) {
+      if (person.id == _personId) return person.name;
+    }
+    return 'this person';
+  }
+
+  /// The selected person's position, when transactions were provided.
+  LoanPosition? get _position {
+    final transactions = widget.transactions;
+    final personId = _personId;
+    if (transactions == null || personId == null) return null;
+    return LoanPosition.from(
+      transactions.where((transaction) => transaction.personId == personId),
+    );
+  }
+
+  /// What's owed in the direction this repayment settles, as a helper line.
+  String? get _owedHint {
+    final position = _position;
+    if (!_isRepayment || position == null) return null;
+    final name = _personName;
+    if (widget.action == LoanAction.repay) {
+      return position.youOwe > 0
+          ? 'You owe $name ${formatMoney(position.youOwe)}'
+          : "You don't owe $name anything";
+    }
+    return position.theyOwe > 0
+        ? '$name owes you ${formatMoney(position.theyOwe)}'
+        : "$name doesn't owe you anything";
+  }
+
+  /// A warning when the amount is more than what's owed. The extra isn't
+  /// lost (the ledger shows it as owed the other way), but it's usually a
+  /// typo or the wrong action.
+  String? get _overpaymentWarning {
+    final position = _position;
+    final amount = double.tryParse(_amountController.text.trim());
+    if (!_isRepayment || position == null || amount == null || amount <= 0) {
+      return null;
+    }
+    final name = _personName;
+    final repaying = widget.action == LoanAction.repay;
+    final owed = repaying ? position.youOwe : position.theyOwe;
+    final extra = amount - owed;
+    if (extra < 0.005) return null;
+    final flipped = repaying ? '$name owing you' : 'you owing $name';
+    return owed == 0
+        ? 'Nothing is owed right now, so this will show as $flipped '
+              '${formatMoney(amount)}.'
+        : 'This is ${formatMoney(extra)} more than is owed. The extra will '
+              'show as $flipped.';
+  }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -533,6 +598,9 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
                             color: _color,
                           ),
                         ),
+                        onChanged: (_) {
+                          if (_isRepayment) setState(() {});
+                        },
                         validator: (value) {
                           final amount = double.tryParse(value?.trim() ?? '');
                           if (amount == null || amount <= 0) {
@@ -575,6 +643,7 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Person',
+                        helperText: _owedHint,
                         prefixIcon: Icon(Icons.person_outline, color: _color),
                       ),
                       items: widget.people.map((person) {
@@ -591,6 +660,14 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
                       validator: (value) =>
                           value == null ? 'Select a person' : null,
                     ),
+                    if (_overpaymentWarning case final warning?) ...[
+                      const SizedBox(height: 12),
+                      AppInlineNotice(
+                        icon: Icons.info_outline,
+                        message: warning,
+                        color: AppTheme.neonAmber,
+                      ),
+                    ],
                     const SizedBox(height: 12),
                     SizedBox(
                       width: double.infinity,
@@ -660,9 +737,9 @@ class PersonHistorySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final rows = transactions.where((transaction) {
       return transaction.personId == person.id &&
-          _loanTypes.contains(transaction.type);
+          loanTransactionTypes.contains(transaction.type);
     }).toList()..sort((a, b) => b.displayDate.compareTo(a.displayDate));
-    final summary = _PersonLedgerSummary.from(rows);
+    final summary = LoanPosition.from(rows);
     final receive = summary.netBalance >= 0;
     final color = receive ? AppTheme.neonEmerald : AppTheme.neonAmber;
     final status = receive ? 'They owe you' : 'You owe';
@@ -935,40 +1012,6 @@ DateTime _dateWithCurrentTime(DateTime date) {
     now.minute,
     now.second,
   );
-}
-
-const _loanTypes = {'borrow', 'lend', 'repay', 'receive'};
-
-class _PersonLedgerSummary {
-  const _PersonLedgerSummary({required this.theyOwe, required this.youOwe});
-
-  final double theyOwe;
-  final double youOwe;
-
-  double get netBalance => theyOwe - youOwe;
-
-  factory _PersonLedgerSummary.from(List<TransactionRecord> transactions) {
-    var theyOwe = 0.0;
-    var youOwe = 0.0;
-
-    for (final transaction in transactions) {
-      switch (transaction.type) {
-        case 'borrow':
-          youOwe += transaction.amount;
-        case 'lend':
-          theyOwe += transaction.amount;
-        case 'repay':
-          youOwe -= transaction.amount;
-        case 'receive':
-          theyOwe -= transaction.amount;
-      }
-    }
-
-    return _PersonLedgerSummary(
-      theyOwe: theyOwe < 0 ? 0 : theyOwe,
-      youOwe: youOwe < 0 ? 0 : youOwe,
-    );
-  }
 }
 
 String _loanLabel(String type) {
