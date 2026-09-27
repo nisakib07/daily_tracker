@@ -174,6 +174,60 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('amounts with paisa fit a narrow phone across every tab', (
+    tester,
+  ) async {
+    // Amounts used to be rounded to whole Taka; with paisa shown, figures
+    // like ৳500,000.37 are longer and must still fit.
+    final withPaisa = DashboardSnapshot(
+      accounts: _snapshot.accounts,
+      people: _snapshot.people,
+      investments: _snapshot.investments,
+      budgets: _snapshot.budgets,
+      transactions: [
+        for (final item in _snapshot.transactions)
+          TransactionRecord(
+            id: item.id,
+            type: item.type,
+            amount: item.amount + 0.37,
+            fromAccountId: item.fromAccountId,
+            toAccountId: item.toAccountId,
+            personId: item.personId,
+            investmentId: item.investmentId,
+            category: item.category,
+            note: item.note,
+            occurredAt: item.occurredAt,
+            createdAt: item.createdAt,
+          ),
+      ],
+    );
+    await _pumpDashboard(
+      tester,
+      const Size(320, 568),
+      snapshotLoader: () async => withPaisa,
+    );
+    await tester.pumpAndSettle();
+    // Some amount on screen shows paisa (balances sum several of them).
+    expect(find.textContaining(RegExp(r'৳-?[\d,]+\.\d\d')), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    for (final tab in const [
+      'dashboard-tab-ledger',
+      'dashboard-tab-budget',
+      'dashboard-tab-investments',
+      'dashboard-tab-activity',
+    ]) {
+      await _openTab(tester, tab);
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-scroll-view')),
+        const Offset(0, -1500),
+        1000,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: tab);
+    }
+  });
+
   testWidgets('dashboard stays centered and compact on wide desktop', (
     tester,
   ) async {
