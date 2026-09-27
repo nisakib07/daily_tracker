@@ -118,7 +118,12 @@ class TransactionRecord {
     this.date,
     required this.occurredAt,
     required this.createdAt,
+    this.pending = false,
   });
+
+  /// Id prefix of transactions that were created offline and don't exist on
+  /// the server yet, so they have no real id to edit or delete by.
+  static const pendingIdPrefix = 'pending-';
 
   final String id;
   final String type;
@@ -132,6 +137,14 @@ class TransactionRecord {
   final DateTime? date;
   final DateTime occurredAt;
   final DateTime createdAt;
+
+  /// Whether this row shows a change saved on this device that hasn't
+  /// synced yet. Never stored; set only when pending changes are applied.
+  final bool pending;
+
+  /// False for a transaction created offline that the server hasn't
+  /// assigned an id to yet.
+  bool get existsOnServer => !id.startsWith(pendingIdPrefix);
 
   // occurred_at is the timestamp written by the app and preserves the
   // selected transaction day across timezone conversions. The legacy date

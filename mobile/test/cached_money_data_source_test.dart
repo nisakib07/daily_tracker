@@ -132,6 +132,57 @@ void main() {
     await cache.close();
   });
 
+  test('a change saved offline shows at once and is not duplicated once it '
+      'syncs', () async {
+    final remote = _OfflineCapableDataSource(_snapshot());
+    final cache = CachedMoneyDataSource(
+      remote,
+      cacheKey: 'offline-overlay',
+      staleAfter: const Duration(days: 1),
+      cacheStore: MemoryDashboardCacheStore(),
+    );
+    await cache.fetchDashboard();
+    final published = <DashboardSnapshot>[];
+    final subscription = cache.snapshots.listen(published.add);
+
+    remote.offline = true;
+    await cache.createMoneyOut(
+      amount: 40,
+      accountId: _account.id,
+      category: 'Food',
+      occurredAt: DateTime(2026, 7, 10, 12),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(cache.lastMutationQueued, isTrue);
+    expect(cache.pendingMutationCount, 1);
+    final offlineView = await cache.fetchDashboard();
+    final pending = offlineView.transactions.where((item) => item.pending);
+    expect(pending.single.amount, 40);
+    expect(pending.single.existsOnServer, isFalse);
+    expect(offlineView.totalBalance, 60);
+    // The dashboard redraws from this stream, so it must carry the change
+    // even though no refresh succeeded.
+    expect(published.last.transactions.any((item) => item.pending), isTrue);
+
+    remote.offline = false;
+    // Syncs everything queued (nothing has failed) and waits for it, unlike
+    // the background sync fetchDashboard starts.
+    await cache.retryFailedMutations();
+    await cache.refresh();
+    final synced = await cache.fetchDashboard();
+
+    expect(cache.pendingMutationCount, 0);
+    expect(synced.transactions.where((item) => item.pending), isEmpty);
+    expect(
+      synced.transactions.where((item) => item.type == 'expense'),
+      hasLength(1),
+    );
+    expect(synced.totalBalance, 60);
+    await subscription.cancel();
+    await cache.close();
+  });
+
   test('discarding a failed change removes it for good', () async {
     final store = MemoryDashboardCacheStore();
     final queue = OfflineMutationQueue(store: store, key: 'failed-discard');
@@ -363,6 +414,45 @@ class _FakeMoneyDataSource
 
   Future<void> _unsupported() async {
     throw UnimplementedError();
+  }
+}
+
+/// A server that can be taken offline, and that records an expense as a
+/// real transaction once one syncs.
+class _OfflineCapableDataSource extends _FakeMoneyDataSource {
+  _OfflineCapableDataSource(super.snapshot);
+
+  bool offline = false;
+
+  @override
+  Future<DashboardSnapshot> fetchDashboard() async {
+    if (offline) throw TimeoutException('offline');
+    return super.fetchDashboard();
+  }
+
+  @override
+  Future<void> executeMutation(QueuedMoneyMutation mutation) async {
+    if (offline) throw TimeoutException('offline');
+    if (mutation.kind != 'money_out') return super.executeMutation(mutation);
+    final at = DateTime.parse(mutation.payload['occurred_at'] as String);
+    snapshot = DashboardSnapshot(
+      accounts: snapshot.accounts,
+      people: snapshot.people,
+      investments: snapshot.investments,
+      budgets: snapshot.budgets,
+      transactions: [
+        TransactionRecord(
+          id: 'server-${mutation.id}',
+          type: 'expense',
+          amount: (mutation.payload['amount'] as num).toDouble(),
+          fromAccountId: mutation.payload['account_id'] as String,
+          category: mutation.payload['category'] as String,
+          occurredAt: at,
+          createdAt: at,
+        ),
+        ...snapshot.transactions,
+      ],
+    );
   }
 }
 
