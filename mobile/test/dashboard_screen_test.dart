@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:money_master/data/app_update_checker.dart';
 import 'package:money_master/data/money_repository.dart';
 import 'package:money_master/features/dashboard/dashboard_screen.dart';
 import 'package:money_master/models/money_models.dart';
@@ -10,6 +11,46 @@ import 'package:money_master/shared/theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  testWidgets('the update banner is above the list and takes taps', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: DashboardScreen(
+          user: _user,
+          snapshotLoader: () async => _snapshot,
+          updateChecker: () async => const AppUpdateInfo(
+            buildNumber: 25,
+            downloadUrl: 'https://example.com/app-release.apk',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Update available'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    // The banner used to be drawn under the full-screen dashboard list,
+    // which covered it and took every tap meant for its buttons.
+    final update = find.widgetWithText(TextButton, 'Update');
+    final hit = tester.hitTestOnBinding(tester.getCenter(update));
+    expect(
+      hit.path.any((entry) => entry.target == tester.renderObject(update)),
+      isTrue,
+    );
+
+    await tester.tap(find.byTooltip('Dismiss'));
+    await tester.pumpAndSettle();
+    expect(find.text('Update available'), findsNothing);
+  });
+
   testWidgets('dashboard fits a narrow phone across every tab', (tester) async {
     tester.view.physicalSize = const Size(320, 568);
     tester.view.devicePixelRatio = 1;

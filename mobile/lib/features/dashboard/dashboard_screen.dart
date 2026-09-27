@@ -36,11 +36,15 @@ class DashboardScreen extends StatefulWidget {
     required this.user,
     this.snapshotLoader,
     this.dataSource,
+    this.updateChecker,
   });
 
   final User user;
   final Future<DashboardSnapshot> Function()? snapshotLoader;
   final MoneyDataSource? dataSource;
+
+  /// Defaults to asking GitHub Releases through [AppUpdateChecker].
+  final Future<AppUpdateInfo?> Function()? updateChecker;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -93,7 +97,9 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _checkForUpdate() async {
-    final info = await AppUpdateChecker().checkForUpdate();
+    final info =
+        await (widget.updateChecker?.call() ??
+            AppUpdateChecker().checkForUpdate());
     if (!mounted || info == null) return;
     setState(() => _updateInfo = info);
   }
@@ -563,19 +569,6 @@ class _DashboardScreenState extends State<DashboardScreen>
       body: Stack(
         children: [
           const Positioned.fill(child: AuroraBackground()),
-          if (_updateInfo != null)
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: SafeArea(
-                bottom: false,
-                child: _UpdateBanner(
-                  onUpdate: () => _launchUpdate(_updateInfo!.downloadUrl),
-                  onDismiss: () => setState(() => _updateInfo = null),
-                ),
-              ),
-            ),
           Positioned.fill(
             child: AbsorbPointer(
               absorbing: _isMutating,
@@ -619,6 +612,15 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 wide ? 48 : 32,
                               ),
                               children: [
+                                if (_updateInfo case final update?) ...[
+                                  _UpdateBanner(
+                                    onUpdate: () =>
+                                        _launchUpdate(update.downloadUrl),
+                                    onDismiss: () =>
+                                        setState(() => _updateInfo = null),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 if (cachedDataSource is CachedMoneyDataSource &&
                                     cachedDataSource.failedMutationCount >
                                         0) ...[
@@ -985,70 +987,63 @@ class _UpdateBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-        decoration: BoxDecoration(
-          color: AppTheme.neonEmerald.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: AppTheme.neonEmerald.withValues(alpha: 0.35),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+      decoration: BoxDecoration(
+        color: AppTheme.neonEmerald.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppTheme.neonEmerald.withValues(alpha: 0.35)),
+        boxShadow: [
+          BoxShadow(
+            color: AppTheme.neonEmerald.withValues(alpha: 0.2),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
           ),
-          boxShadow: [
-            BoxShadow(
-              color: AppTheme.neonEmerald.withValues(alpha: 0.2),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.system_update_alt_rounded,
-              color: AppTheme.neonEmerald,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Update available',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      color: AppTheme.neonEmerald,
-                    ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.system_update_alt_rounded,
+            color: AppTheme.neonEmerald,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Update available',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: AppTheme.neonEmerald,
                   ),
-                  Text(
-                    'A newer build is ready to install.',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
+                ),
+                Text(
+                  'A newer build is ready to install.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            TextButton(
-              onPressed: onUpdate,
-              style: TextButton.styleFrom(
-                foregroundColor: AppTheme.neonEmerald,
-              ),
-              child: const Text('Update'),
-            ),
-            IconButton(
-              tooltip: 'Dismiss',
-              onPressed: onDismiss,
-              icon: const Icon(Icons.close, size: 18),
-              visualDensity: VisualDensity.compact,
-            ),
-          ],
-        ),
+          ),
+          TextButton(
+            onPressed: onUpdate,
+            style: TextButton.styleFrom(foregroundColor: AppTheme.neonEmerald),
+            child: const Text('Update'),
+          ),
+          IconButton(
+            tooltip: 'Dismiss',
+            onPressed: onDismiss,
+            icon: const Icon(Icons.close, size: 18),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
       ),
     );
   }

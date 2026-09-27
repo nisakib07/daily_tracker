@@ -1025,3 +1025,11 @@ September 27, 2026 (later)
 - New mobile/lib/features/sync/unsynced_changes_screen.dart: lists each failed change in words ("Expense ৳250 · Food · from Cash · 12 Sep 2026") with its reason, and Try again / Discard (with confirmation) per change plus "Try all again". The dashboard shows "N changes could not be saved." with a Review button whenever any exist. AppInlineNotice gained an optional action button.
 - Tests: offline_mutation_queue_test.dart rewritten (permanent vs offline vs server errors, attempt limit, order preservation, retry/discard persistence, old-format queues), two new cache tests, and new unsynced_changes_screen_test.dart (descriptions, dashboard banner, list, discard confirmation, retry success and repeat failure, layout at 320x568 and 1440x900).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (later still)
+- Build 24 was the first release the installed app could see (repo made public), and it exposed a layout bug: the "Update available" banner was a Positioned overlay placed before the full-screen dashboard list in the body Stack, so the list painted over it and took every tap - neither Update nor Dismiss could be pressed. No test had ever shown the banner.
+- Moved the banner into the dashboard list as its first item (above the sync notices), so nothing covers it; it scrolls with the content and stays dismissible. DashboardScreen gained an optional updateChecker (like snapshotLoader) so tests can show it.
+- Added a dashboard test at 320x568 that shows the banner, checks a tap on Update reaches the button, and dismisses it.
+- Builds 19-24 all carry the broken banner, so the build with this fix has to be installed by hand once; updates work from the banner after that.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
