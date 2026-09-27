@@ -112,28 +112,41 @@ void main() {
     expect(snapshot.recentTransactions.last.id, 'transaction-11');
   });
 
-  test('server summary supplies optimized balances and current totals', () {
+  test('server summary supplies balances, but month totals are local', () {
     final now = DateTime.now();
+    // The summary RPC splits months at UTC midnight, so an income from the
+    // early hours of the 1st (local) is in its previous month. The app must
+    // count it in this month, like the Monthly snapshot panel does.
+    final earlyOnTheFirst = DateTime(now.year, now.month, 1, 2, 30);
     final snapshot = DashboardSnapshot(
       accounts: [
         Account(id: 'cash', name: 'Cash', type: 'cash', createdAt: now),
       ],
       people: const [],
       investments: const [],
-      transactions: const [],
+      transactions: [
+        TransactionRecord(
+          id: 'early-income',
+          type: 'income',
+          amount: 400,
+          toAccountId: 'cash',
+          occurredAt: earlyOnTheFirst,
+          createdAt: earlyOnTheFirst,
+        ),
+      ],
       budgets: const [],
       serverSummary: DashboardServerSummary(
         month: DateTime(now.year, now.month),
         accountBalances: const {'cash': 750},
-        monthIncome: 900,
+        monthIncome: 0,
         monthExpense: 150,
         transactionCount: 12,
       ),
     );
 
     expect(snapshot.accountBalances.single.balance, 750);
-    expect(snapshot.monthIncome, 900);
-    expect(snapshot.monthExpense, 150);
+    expect(snapshot.monthIncome, 400);
+    expect(snapshot.monthExpense, 0);
   });
 
   test('activity date uses occurred_at when a legacy date differs', () {

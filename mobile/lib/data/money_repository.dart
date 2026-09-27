@@ -182,20 +182,16 @@ class DashboardSnapshot {
     return accountBalances.fold(0, (total, item) => total + item.balance);
   }
 
-  double get monthIncome => _serverMonthlyTotal('income');
+  // This month's totals are always worked out here, in the phone's time
+  // zone, rather than taken from serverSummary: the summary RPC splits
+  // months at UTC midnight (06:00 in Bangladesh), so transactions from the
+  // early hours of the 1st landed in the previous month and the header
+  // disagreed with the Monthly snapshot panel. Every transaction is loaded
+  // anyway. The summary's account balances don't depend on time zone and
+  // are still used.
+  double get monthIncome => _monthlyTotal('income');
 
-  double get monthExpense => _serverMonthlyTotal('expense');
-
-  double _serverMonthlyTotal(String type) {
-    final now = DateTime.now();
-    final summary = serverSummary;
-    if (summary != null &&
-        summary.month.year == now.year &&
-        summary.month.month == now.month) {
-      return type == 'income' ? summary.monthIncome : summary.monthExpense;
-    }
-    return _monthlyTotal(type);
-  }
+  double get monthExpense => _monthlyTotal('expense');
 
   double _monthlyTotal(String type) {
     final now = DateTime.now();

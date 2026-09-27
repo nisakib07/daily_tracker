@@ -1072,3 +1072,9 @@ September 27, 2026 (night, #7)
 - Fixed flaw #7: formatMoney rounded every amount to whole Taka, so ৳18.50 showed as ৳19 and ৳0.40 as ৳0, and balances never quite matched bKash or the bank. It now works in whole paisa and shows paisa only when there are any (৳250, ৳18.50, ৳1,234.56); floating-point leftovers never show and a tiny negative never prints "-0". Every amount on screen goes through formatMoney, so this is the only change needed; chart axis labels were not affected.
 - Tests: new formatters_test.dart, and a dashboard test that walks every tab on a 320x568 phone with paisa on every amount (longer figures still fit).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (night, #8)
+- Fixed flaw #8: the dashboard header's "Money in / Money out" came from the money_master_dashboard_summary RPC, which splits months at UTC midnight (p_month::timestamp compared with timestamptz uses the session time zone, UTC on Supabase), i.e. 06:00 in Bangladesh. Transactions from the early hours of the 1st counted toward the previous month, and the header could disagree with the Monthly snapshot panel right below it, which already computed locally. DashboardSnapshot.monthIncome/monthExpense are now always computed from the loaded transactions in the phone's time zone; the summary's account balances (time-zone independent) are still used. No database change needed; the RPC's month fields are simply no longer read.
+- Updated the dashboard_snapshot_test.dart server-summary test: balances from the summary, month totals local, including an income at 02:30 on the 1st.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
