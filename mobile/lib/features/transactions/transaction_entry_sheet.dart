@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/category_store.dart';
 import '../../core/amount_input.dart';
+import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
@@ -223,11 +224,12 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
   }
 
   Future<void> _pickDate() async {
+    final range = pickableDateRange(_selectedDate);
     final next = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      firstDate: range.first,
+      lastDate: range.last,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -610,11 +612,12 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
   }
 
   Future<void> _pickDate() async {
+    final range = pickableDateRange(_selectedDate);
     final next = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      firstDate: range.first,
+      lastDate: range.last,
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(

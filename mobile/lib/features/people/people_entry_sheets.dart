@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/amount_input.dart';
+import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/loan_position.dart';
@@ -545,11 +546,12 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
   }
 
   Future<void> _pickDate() async {
+    final range = pickableDateRange(_selectedDate);
     final next = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
+      firstDate: range.first,
+      lastDate: range.last,
     );
 
     if (next != null) {

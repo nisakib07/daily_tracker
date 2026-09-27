@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../core/date_times.dart';
 import '../../core/formatters.dart';
 import '../../data/app_update_checker.dart';
 import '../../data/cached_money_data_source.dart';
@@ -439,7 +440,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDay.isAfter(today) ? today : _selectedDay,
-      firstDate: DateTime(2020),
+      firstDate: earliestPickableDate,
       lastDate: today,
     );
 
@@ -458,7 +459,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       initialDate: _selectedActivityMonth.isAfter(nowMonth)
           ? nowMonth
           : _selectedActivityMonth,
-      firstDate: DateTime(2020),
+      firstDate: earliestPickableDate,
       lastDate: DateTime(nowMonth.year, nowMonth.month + 1, 0),
     );
 

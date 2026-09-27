@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/amount_input.dart';
+import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
@@ -845,11 +846,12 @@ Future<DateTime?> _pickInvestmentDate(
   BuildContext context,
   DateTime initialDate,
 ) {
+  final range = pickableDateRange(initialDate);
   return showDatePicker(
     context: context,
     initialDate: initialDate,
-    firstDate: DateTime(2020),
-    lastDate: DateTime.now(),
+    firstDate: range.first,
+    lastDate: range.last,
     builder: (context, child) {
       return Theme(
         data: Theme.of(context).copyWith(
