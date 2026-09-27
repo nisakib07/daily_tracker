@@ -9,6 +9,7 @@ Run from mobile/:
   python tool/preview_ci_web.py                 # current branch, waits for a running build
   python tool/preview_ci_web.py --run 123456    # a specific workflow run
   python tool/preview_ci_web.py --serve-only    # re-serve the last download
+  python tool/preview_ci_web.py --download-only # fetch without serving
 """
 
 import argparse
@@ -119,8 +120,11 @@ def main() -> None:
     parser.add_argument("--branch", help="branch to preview (default: current)")
     parser.add_argument("--run", type=int, help="workflow run id to preview")
     parser.add_argument("--port", type=int, default=52710)
-    parser.add_argument("--serve-only", action="store_true",
-                        help="serve the last download without fetching")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--serve-only", action="store_true",
+                      help="serve the last download without fetching")
+    mode.add_argument("--download-only", action="store_true",
+                      help="fetch the preview and exit without serving")
     args = parser.parse_args()
 
     if not args.serve_only:
@@ -129,7 +133,8 @@ def main() -> None:
                 sys.exit(f"Run {args.run} has no downloadable web preview.")
         else:
             download_latest(args.branch or current_branch())
-    serve(args.port)
+    if not args.download_only:
+        serve(args.port)
 
 
 if __name__ == "__main__":
