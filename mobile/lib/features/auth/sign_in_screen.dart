@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../shared/theme/app_theme.dart';
 import '../../shared/widgets/app_state_widgets.dart';
 import '../../shared/widgets/aurora_background.dart';
+import 'confirm_email_screen.dart';
 import 'forgot_password_screen.dart';
 
 class SignInScreen extends StatefulWidget {
@@ -38,10 +39,20 @@ class _SignInScreenState extends State<SignInScreen> {
     final client = Supabase.instance.client;
     try {
       if (createAccount) {
-        await client.auth.signUp(
-          email: _emailController.text.trim(),
+        final email = _emailController.text.trim();
+        final response = await client.auth.signUp(
+          email: email,
           password: _passwordController.text,
         );
+        // No session means the project wants the email confirmed first.
+        // Without this nothing appeared after tapping Create account.
+        if (response.session == null && mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ConfirmEmailScreen(email: email),
+            ),
+          );
+        }
       } else {
         await client.auth.signInWithPassword(
           email: _emailController.text.trim(),

@@ -1110,3 +1110,11 @@ September 28, 2026
 - Not changed: the refresh still downloads every transaction. Making it incremental needs a database change (an updated_at column with a trigger, plus a record of deletions) and a sync protocol; left for the user to decide on.
 - Tests: pending_mutations_test (saved changes shown but not marked pending) and two cache tests (save shown before the refresh brings the server copy; a save made while a refresh downloads survives that refresh and is replaced by the next one).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#13)
+- Fixed flaw #13, which turned out worse than listed: with email confirmation on (Supabase's default), tapping Create account ended with nothing on screen - signUp returned no session and the app showed no message. The confirmation email's link opened the website, which can't finish a sign-up started in the app (same PKCE problem as the old password reset); the account did get confirmed, but people saw an error page.
+- New mobile/lib/features/auth/confirm_email_screen.dart, opened after signUp when there's no session: enter the emailed code (verifyOTP with OtpType.signup) to confirm and sign in, Resend code limited to once a minute (auth.resend), friendly wrong/expired-code message, and a note that the link still works as a fallback. Injectable EmailConfirmationAuth for tests.
+- Requires the Supabase "Confirm signup" email template to include {{ .Token }} for the code to appear in the email.
+- Tests: new confirm_email_screen_test.dart (validation, success pops with a welcome message, wrong/expired code, resend countdown, layout at 320x568 and 1440x900).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
