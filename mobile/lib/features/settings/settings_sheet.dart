@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/app_lock_controller.dart';
 import '../../core/daily_reminder_controller.dart';
+import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../core/theme_mode_controller.dart';
 import '../../data/category_store.dart';
@@ -86,7 +87,7 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        _error = 'Could not load settings. ${error.toString()}';
+        _error = 'Could not load settings. ${friendlyErrorMessage(error)}';
       });
     }
   }
@@ -117,7 +118,8 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(
-        () => _error = 'Could not save quick add shortcut. ${error.toString()}',
+        () => _error =
+            'Could not save quick add shortcut. ${friendlyErrorMessage(error)}',
       );
     } finally {
       if (mounted) setState(() => _isUpdatingQuickAdd = false);
@@ -137,8 +139,8 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(
-        () =>
-            _error = 'Could not update quick add shortcut. ${error.toString()}',
+        () => _error =
+            'Could not update quick add shortcut. ${friendlyErrorMessage(error)}',
       );
     } finally {
       if (mounted) setState(() => _isUpdatingQuickAdd = false);
@@ -168,8 +170,8 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     } catch (error) {
       if (!mounted) return;
       setState(
-        () =>
-            _error = 'Could not delete quick add shortcut. ${error.toString()}',
+        () => _error =
+            'Could not delete quick add shortcut. ${friendlyErrorMessage(error)}',
       );
     } finally {
       if (mounted) setState(() => _isUpdatingQuickAdd = false);
@@ -208,7 +210,10 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = 'Could not save category. ${error.toString()}');
+      setState(
+        () =>
+            _error = 'Could not save category. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _updatingKinds.remove(kind));
     }
@@ -243,7 +248,10 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
       await _load();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = 'Could not delete category. ${error.toString()}');
+      setState(
+        () => _error =
+            'Could not delete category. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _updatingKinds.remove(kind));
     }

@@ -1078,3 +1078,9 @@ September 27, 2026 (night, #8)
 - Fixed flaw #8: the dashboard header's "Money in / Money out" came from the money_master_dashboard_summary RPC, which splits months at UTC midnight (p_month::timestamp compared with timestamptz uses the session time zone, UTC on Supabase), i.e. 06:00 in Bangladesh. Transactions from the early hours of the 1st counted toward the previous month, and the header could disagree with the Monthly snapshot panel right below it, which already computed locally. DashboardSnapshot.monthIncome/monthExpense are now always computed from the loaded transactions in the phone's time zone; the summary's account balances (time-zone independent) are still used. No database change needed; the RPC's month fields are simply no longer read.
 - Updated the dashboard_snapshot_test.dart server-summary test: balances from the summary, month totals local, including an income at 02:30 on the 1st.
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (night, #9)
+- Fixed flaw #9: 17 form and settings messages appended error.toString(), so people saw text like "Could not save. PostgrestException(message: ..., code: 23503, ...)". New mobile/lib/core/error_messages.dart: friendlyErrorMessage(error) gives one plain sentence (no internet / server too slow / something it uses no longer exists / details not valid / session expired / generic retry; Supabase Auth messages pass through) and logs the raw error with AppLogger for debugging. Every error.toString() in the UI now goes through it.
+- Tests: new error_messages_test.dart (connection problems, database codes, auth pass-through, generic fallback, and an expense form whose save fails showing the friendly text and not the raw exception).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

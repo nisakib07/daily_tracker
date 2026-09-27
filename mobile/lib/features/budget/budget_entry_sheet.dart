@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/budget_advisor.dart';
 import '../../data/money_repository.dart';
@@ -200,7 +201,9 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not save budgets. ${error.toString()}');
+      setState(
+        () => _error = 'Could not save budgets. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -231,7 +234,10 @@ class _BudgetEntrySheetState extends State<BudgetEntrySheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not clear budgets. ${error.toString()}');
+      setState(
+        () =>
+            _error = 'Could not clear budgets. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

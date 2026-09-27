@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/loan_position.dart';
 import '../../data/money_repository.dart';
@@ -121,7 +122,9 @@ class _PersonEntrySheetState extends State<PersonEntrySheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not add person. ${error.toString()}');
+      setState(
+        () => _error = 'Could not add person. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -268,7 +271,10 @@ class _PersonEditSheetState extends State<PersonEditSheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not update person. ${error.toString()}');
+      setState(
+        () =>
+            _error = 'Could not update person. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -531,7 +537,7 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not save. ${error.toString()}');
+      setState(() => _error = 'Could not save. ${friendlyErrorMessage(error)}');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
