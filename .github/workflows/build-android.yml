@@ -1,36 +1,48 @@
+# Keep this file's path unchanged: APP_BUILD_NUMBER comes from
+# github.run_number, which is counted per workflow file. A renamed or new
+# file restarts at 1, and installed apps would never see a newer build.
 name: Build Android APK
 
 on:
   workflow_dispatch: {}
+  # Every branch runs the checks job. Other branches also build a web
+  # preview; only main goes on to build and publish a release (see each
+  # job's `if`). This lets changes be tested on a branch without pushing an
+  # update to installed apps.
   push:
-    branches: [main]
     paths:
       - "mobile/**"
       - ".github/workflows/build-android.yml"
 
+# Superseded branch runs are cancelled; main runs are allowed to finish so a
+# release is never cut off halfway through publishing.
+concurrency:
+  group: mobile-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
 jobs:
-  build:
+  checks:
+    name: Format, analyze, test
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: mobile
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
           cache: true
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.pub-cache
           key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
           restore-keys: ${{ runner.os }}-pub-
-
-      - uses: gradle/actions/setup-gradle@v4
 
       - name: Install dependencies
         run: flutter pub get
@@ -43,6 +55,81 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  # Local Flutter builds are blocked on the main dev machine (Windows Smart
+  # App Control rejects the SDK's unsigned impellerc.exe), so branch builds
+  # of the web app are made here and served locally with
+  # mobile/tool/preview_ci_web.py. Runs alongside checks, not after them, so
+  # a preview is available even while a test is failing.
+  web-preview:
+    name: Build web preview
+    if: github.ref != 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build web
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          flutter build web --release \
+            --dart-define=SUPABASE_URL="$SUPABASE_URL" \
+            --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: money-master-web-preview
+          path: mobile/build/web
+          retention-days: 7
+
+  release:
+    name: Build and publish signed APK
+    needs: checks
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('mobile/pubspec.lock') }}
+          restore-keys: ${{ runner.os }}-pub-
+
+      # Pinned to v5, not v6: v6 moved caching into a closed-source component
+      # whose separate Terms of Use are accepted by upgrading.
+      - uses: gradle/actions/setup-gradle@v5
+
+      - name: Install dependencies
+        run: flutter pub get
 
       - name: Decode signing keystore
         env:
@@ -72,7 +159,7 @@ jobs:
             --dart-define=SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY" \
             --dart-define=APP_BUILD_NUMBER="$GITHUB_RUN_NUMBER"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: money-master-release-apk
           path: mobile/build/app/outputs/flutter-apk/app-release.apk
@@ -86,7 +173,7 @@ jobs:
       # rebuild-and-reinstall every time - there's no $25 Play Store
       # account behind this app, so this is the free equivalent.
       - name: Publish GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
