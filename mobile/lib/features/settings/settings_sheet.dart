@@ -1,12 +1,17 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_lock_controller.dart';
 import '../../core/daily_reminder_controller.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../core/theme_mode_controller.dart';
+import '../../data/cached_money_data_source.dart';
 import '../../data/category_store.dart';
+import '../../data/data_export.dart';
 import '../../data/money_repository.dart';
 import '../../data/quick_add_shortcut_store.dart';
 import '../../shared/theme/app_theme.dart';
@@ -18,11 +23,39 @@ Future<void> showSettingsSheet({
   required BuildContext context,
   required String? email,
   List<AccountBalance> accounts = const [],
+  String? userId,
+  CachedMoneyDataSource? exportSource,
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
       fullscreenDialog: true,
-      builder: (context) => SettingsSheet(email: email, accounts: accounts),
+      builder: (context) => SettingsSheet(
+        email: email,
+        accounts: accounts,
+        userId: userId,
+        exportSource: exportSource,
+      ),
+    ),
+  );
+}
+
+/// Hands a file to the phone's share sheet (save to Files/Drive, email...).
+typedef ShareFile = Future<void> Function(ExportFile file, String subject);
+
+Future<void> _shareWithSystemSheet(ExportFile file, String subject) async {
+  await SharePlus.instance.share(
+    ShareParams(
+      files: [
+        XFile.fromData(
+          Uint8List.fromList(file.bytes),
+          mimeType: file.mimeType,
+          name: file.name,
+        ),
+      ],
+      // XFile.fromData ignores name on Android/iOS; this is what names the
+      // file there.
+      fileNameOverrides: [file.name],
+      subject: subject,
     ),
   );
 }
@@ -32,10 +65,18 @@ class SettingsSheet extends ConsumerStatefulWidget {
     super.key,
     required this.email,
     this.accounts = const [],
+    this.userId,
+    this.exportSource,
+    this.shareFile = _shareWithSystemSheet,
   });
 
   final String? email;
   final List<AccountBalance> accounts;
+
+  /// Needed for exports; the Your data section is hidden without both.
+  final String? userId;
+  final CachedMoneyDataSource? exportSource;
+  final ShareFile shareFile;
 
   @override
   ConsumerState<SettingsSheet> createState() => _SettingsSheetState();
@@ -52,6 +93,7 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
   List<QuickAddShortcut> _quickAddShortcuts = const [];
   final Set<CategoryKind> _updatingKinds = {};
   bool _isUpdatingQuickAdd = false;
+  _ExportKind? _exporting;
   bool _isLoading = true;
   String? _error;
   String? _incomeInputError;
@@ -257,6 +299,76 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     }
   }
 
+  Future<void> _export(_ExportKind kind) async {
+    final source = widget.exportSource;
+    final userId = widget.userId;
+    if (source == null || userId == null) return;
+    setState(() {
+      _exporting = kind;
+      _error = null;
+    });
+    try {
+      final export = await source.snapshotForExport();
+      final now = DateTime.now();
+      final date = exportFileDate(now);
+      final ExportFile file;
+      if (kind == _ExportKind.backup) {
+        file = ExportFile(
+          name: 'money-master-backup-$date.json',
+          mimeType: 'application/json',
+          contents: backupJson(
+            export.snapshot,
+            userId: userId,
+            exportedAt: now,
+            customIncomeCategories: await _store.loadCustom(
+              CategoryKind.income,
+            ),
+            customExpenseCategories: await _store.loadCustom(
+              CategoryKind.expense,
+            ),
+          ),
+        );
+      } else {
+        file = ExportFile(
+          name: 'money-master-transactions-$date.csv',
+          mimeType: 'text/csv',
+          contents: transactionsCsv(export.snapshot),
+        );
+      }
+      await widget.shareFile(
+        file,
+        kind == _ExportKind.backup
+            ? 'Money Master backup'
+            : 'Money Master transactions',
+      );
+      if (!mounted) return;
+
+      final pending = source.pendingMutationCount;
+      final syncedAt = export.syncedAt;
+      final notes = [
+        if (!export.fresh && syncedAt != null)
+          "You're offline, so this has your data as last synced on "
+              '${DateFormat('d MMM, h:mm a').format(syncedAt)}.',
+        if (pending > 0)
+          '$pending change${pending == 1 ? '' : 's'} waiting to sync '
+              '${pending == 1 ? 'is' : 'are'} not included yet.',
+      ];
+      if (notes.isNotEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(notes.join(' '))));
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _error = 'Could not export. ${friendlyErrorMessage(error)}',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _exporting = null);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -301,14 +413,22 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
                         ),
                         const SizedBox(height: 14),
                         const _SecuritySection(),
+                        if (widget.exportSource != null &&
+                            widget.userId != null) ...[
+                          const SizedBox(height: 14),
+                          _DataExportSection(
+                            exporting: _exporting,
+                            onExport: _export,
+                          ),
+                        ],
+                        if (_error != null && !_isLoading) ...[
+                          const SizedBox(height: 12),
+                          _SettingsError(message: _error!),
+                        ],
                         const SizedBox(height: 18),
                         if (_isLoading)
                           const _SettingsLoadingState()
                         else ...[
-                          if (_error != null) ...[
-                            _SettingsError(message: _error!),
-                            const SizedBox(height: 12),
-                          ],
                           LayoutBuilder(
                             builder: (context, sectionConstraints) {
                               final income = _CategorySettingsSection(
@@ -393,6 +513,102 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+enum _ExportKind { csv, backup }
+
+class _DataExportSection extends StatelessWidget {
+  const _DataExportSection({required this.exporting, required this.onExport});
+
+  final _ExportKind? exporting;
+  final ValueChanged<_ExportKind> onExport;
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = exporting != null;
+    Widget button(_ExportKind kind, IconData icon, String label) {
+      final running = exporting == kind;
+      return OutlinedButton.icon(
+        key: ValueKey('settings-export-${kind.name}'),
+        onPressed: busy ? null : () => onExport(kind),
+        icon: running
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : Icon(icon),
+        label: Text(label),
+      );
+    }
+
+    return Card(
+      elevation: 8,
+      shadowColor: AppTheme.neonCyan.withValues(alpha: 0.25),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppTheme.neonCyan.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.download_outlined,
+                    color: AppTheme.neonCyan,
+                    size: 18,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your data',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      Text(
+                        'Save a copy to Files, Drive or email',
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            button(
+              _ExportKind.csv,
+              Icons.table_chart_outlined,
+              'Export transactions (CSV)',
+            ),
+            const SizedBox(height: 8),
+            button(_ExportKind.backup, Icons.backup_outlined, 'Full backup'),
+            const SizedBox(height: 10),
+            Text(
+              'The CSV opens in Excel or Google Sheets. The backup has '
+              'everything, and can be restored from the Money Master website '
+              '(Settings > Import Data).',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
