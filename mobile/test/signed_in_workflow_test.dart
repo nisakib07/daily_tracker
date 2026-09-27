@@ -238,7 +238,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete').last);
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, 'Delete Person'));
+    // This person still has a loan balance, so the confirmation warns and
+    // its button reads "Delete anyway" rather than "Delete Person".
+    expect(find.textContaining('still owes you'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'Delete anyway'));
     await tester.pumpAndSettle();
     expect(dataSource.calls, contains('delete-person'));
     expect(dataSource.lastId, _person.id);

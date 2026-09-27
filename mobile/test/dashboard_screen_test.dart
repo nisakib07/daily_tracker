@@ -11,6 +11,65 @@ import 'package:money_master/shared/theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  testWidgets('deleting a person who still owes you warns with the amount', (
+    tester,
+  ) async {
+    await _pumpDashboard(
+      tester,
+      const Size(900, 1400),
+      snapshotLoader: () async => _snapshot,
+    );
+    await tester.pumpAndSettle();
+    await _openTab(tester, 'dashboard-tab-ledger');
+
+    final actions = find.byTooltip('Person actions').first;
+    await _scrollTo(tester, actions);
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('${_person.name} still owes you ৳12,000.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('record the repayment instead'), findsOneWidget);
+    expect(find.text('Delete anyway'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete anyway'), findsNothing);
+  });
+
+  testWidgets('deleting a settled person keeps the plain confirmation', (
+    tester,
+  ) async {
+    final settled = DashboardSnapshot(
+      accounts: _snapshot.accounts,
+      people: [_person],
+      investments: const [],
+      transactions: const [],
+      budgets: const [],
+    );
+    await _pumpDashboard(
+      tester,
+      const Size(900, 1400),
+      snapshotLoader: () async => settled,
+    );
+    await tester.pumpAndSettle();
+    await _openTab(tester, 'dashboard-tab-ledger');
+
+    final actions = find.byTooltip('Person actions').first;
+    await _scrollTo(tester, actions);
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('still owes'), findsNothing);
+    expect(find.text('Delete Person'), findsOneWidget);
+  });
+
   testWidgets('the update banner is above the list and takes taps', (
     tester,
   ) async {
@@ -113,6 +172,60 @@ void main() {
     await tester.fling(find.byType(ListView), const Offset(0, -900), 1000);
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('amounts with paisa fit a narrow phone across every tab', (
+    tester,
+  ) async {
+    // Amounts used to be rounded to whole Taka; with paisa shown, figures
+    // like ৳500,000.37 are longer and must still fit.
+    final withPaisa = DashboardSnapshot(
+      accounts: _snapshot.accounts,
+      people: _snapshot.people,
+      investments: _snapshot.investments,
+      budgets: _snapshot.budgets,
+      transactions: [
+        for (final item in _snapshot.transactions)
+          TransactionRecord(
+            id: item.id,
+            type: item.type,
+            amount: item.amount + 0.37,
+            fromAccountId: item.fromAccountId,
+            toAccountId: item.toAccountId,
+            personId: item.personId,
+            investmentId: item.investmentId,
+            category: item.category,
+            note: item.note,
+            occurredAt: item.occurredAt,
+            createdAt: item.createdAt,
+          ),
+      ],
+    );
+    await _pumpDashboard(
+      tester,
+      const Size(320, 568),
+      snapshotLoader: () async => withPaisa,
+    );
+    await tester.pumpAndSettle();
+    // Some amount on screen shows paisa (balances sum several of them).
+    expect(find.textContaining(RegExp(r'৳-?[\d,]+\.\d\d')), findsWidgets);
+    expect(tester.takeException(), isNull);
+
+    for (final tab in const [
+      'dashboard-tab-ledger',
+      'dashboard-tab-budget',
+      'dashboard-tab-investments',
+      'dashboard-tab-activity',
+    ]) {
+      await _openTab(tester, tab);
+      await tester.fling(
+        find.byKey(const ValueKey('dashboard-scroll-view')),
+        const Offset(0, -1500),
+        1000,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull, reason: tab);
+    }
   });
 
   testWidgets('dashboard stays centered and compact on wide desktop', (

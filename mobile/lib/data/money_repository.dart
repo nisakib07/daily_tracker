@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/date_times.dart';
 import '../models/money_models.dart';
+import 'loan_position.dart';
 import 'offline_mutation_queue.dart';
 
 class AccountBalance {
@@ -181,20 +182,16 @@ class DashboardSnapshot {
     return accountBalances.fold(0, (total, item) => total + item.balance);
   }
 
-  double get monthIncome => _serverMonthlyTotal('income');
+  // This month's totals are always worked out here, in the phone's time
+  // zone, rather than taken from serverSummary: the summary RPC splits
+  // months at UTC midnight (06:00 in Bangladesh), so transactions from the
+  // early hours of the 1st landed in the previous month and the header
+  // disagreed with the Monthly snapshot panel. Every transaction is loaded
+  // anyway. The summary's account balances don't depend on time zone and
+  // are still used.
+  double get monthIncome => _monthlyTotal('income');
 
-  double get monthExpense => _serverMonthlyTotal('expense');
-
-  double _serverMonthlyTotal(String type) {
-    final now = DateTime.now();
-    final summary = serverSummary;
-    if (summary != null &&
-        summary.month.year == now.year &&
-        summary.month.month == now.month) {
-      return type == 'income' ? summary.monthIncome : summary.monthExpense;
-    }
-    return _monthlyTotal(type);
-  }
+  double get monthExpense => _monthlyTotal('expense');
 
   double _monthlyTotal(String type) {
     final now = DateTime.now();
@@ -213,47 +210,19 @@ class DashboardSnapshot {
   }
 
   List<LedgerEntry> get ledgerEntries {
-    const loanTypes = {'borrow', 'lend', 'repay', 'receive'};
-
     final entries = people
         .map((person) {
-          final personTransactions = transactions.where((transaction) {
-            return transaction.personId == person.id &&
-                loanTypes.contains(transaction.type);
-          });
-
-          var youOwe = 0.0;
-          var theyOwe = 0.0;
-          DateTime? lastActivityAt;
-
-          for (final transaction in personTransactions) {
-            final amount = transaction.amount;
-            final activityAt = transaction.displayDate;
-            if (lastActivityAt == null || activityAt.isAfter(lastActivityAt)) {
-              lastActivityAt = activityAt;
-            }
-
-            switch (transaction.type) {
-              case 'borrow':
-                youOwe += amount;
-              case 'lend':
-                theyOwe += amount;
-              case 'repay':
-                youOwe -= amount;
-              case 'receive':
-                theyOwe -= amount;
-            }
-          }
-
-          final safeYouOwe = youOwe < 0 ? 0.0 : youOwe;
-          final safeTheyOwe = theyOwe < 0 ? 0.0 : theyOwe;
-
+          final position = LoanPosition.from(
+            transactions.where(
+              (transaction) => transaction.personId == person.id,
+            ),
+          );
           return LedgerEntry(
             person: person,
-            youOwe: safeYouOwe,
-            theyOwe: safeTheyOwe,
-            netBalance: safeTheyOwe - safeYouOwe,
-            lastActivityAt: lastActivityAt,
+            youOwe: position.youOwe,
+            theyOwe: position.theyOwe,
+            netBalance: position.netBalance,
+            lastActivityAt: position.lastActivityAt,
           );
         })
         .where((entry) {

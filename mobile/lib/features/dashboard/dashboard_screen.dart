@@ -265,13 +265,38 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// What [person] owes on net in the snapshot on screen: positive when they
+  /// owe you, negative when you owe them.
+  Future<double> _outstandingBalance(Person person) async {
+    try {
+      final snapshot = await _snapshotFuture;
+      for (final entry in snapshot.ledgerEntries) {
+        if (entry.person.id == person.id) return entry.netBalance;
+      }
+    } catch (_) {
+      // No data on screen yet; treat as settled.
+    }
+    return 0;
+  }
+
   Future<void> _deletePerson(Person person) async {
+    // Deleting a person unlinks their loan transactions (people FK is
+    // "on delete set null"), so an unsettled balance silently disappears
+    // from the ledger. Say so, with the amount, before it happens.
+    final balance = await _outstandingBalance(person);
+    if (!mounted) return;
+    final owed = balance.abs() >= 0.005;
+    final amount = formatMoney(balance.abs());
     final confirmed = await showAppDestructiveConfirmation(
       context: context,
       title: 'Delete Person?',
-      message:
-          'Remove ${person.name} from the ledger? Their existing transactions will remain in Activity.',
-      confirmLabel: 'Delete Person',
+      message: owed
+          ? '${balance > 0 ? '${person.name} still owes you $amount' : 'You still owe ${person.name} $amount'}. '
+                'Deleting them removes this from your ledger totals, and their '
+                'loan transactions stay in Activity without a name. If it has '
+                'been settled, record the repayment instead.'
+          : 'Remove ${person.name} from the ledger? Their existing transactions will remain in Activity.',
+      confirmLabel: owed ? 'Delete anyway' : 'Delete Person',
       icon: Icons.person_remove_outlined,
     );
 
@@ -303,6 +328,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       accounts: snapshot.accountBalances,
       people: snapshot.people,
       initialPersonId: personId,
+      transactions: snapshot.transactions,
       dataSource: widget.dataSource,
     );
 

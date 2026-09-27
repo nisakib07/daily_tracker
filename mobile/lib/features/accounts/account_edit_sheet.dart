@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
 import '../../shared/theme/app_theme.dart';
@@ -88,7 +89,9 @@ class _AccountEditSheetState extends State<AccountEditSheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not save account. ${error.toString()}');
+      setState(
+        () => _error = 'Could not save account. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

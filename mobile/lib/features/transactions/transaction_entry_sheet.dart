@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../data/category_store.dart';
+import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
 import '../../data/quick_add_shortcut_store.dart';
@@ -214,7 +215,7 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not save. ${error.toString()}');
+      setState(() => _error = 'Could not save. ${friendlyErrorMessage(error)}');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -599,7 +600,9 @@ class _EditTransactionSheetState extends State<EditTransactionSheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not save changes. ${error.toString()}');
+      setState(
+        () => _error = 'Could not save changes. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

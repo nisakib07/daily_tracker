@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
@@ -127,7 +128,8 @@ class _InvestmentEntrySheetState extends State<InvestmentEntrySheet> {
       setState(() => _error = error.message);
     } catch (error) {
       setState(
-        () => _error = 'Could not create investment. ${error.toString()}',
+        () => _error =
+            'Could not create investment. ${friendlyErrorMessage(error)}',
       );
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -284,7 +286,9 @@ class _InvestmentFundsSheetState extends State<InvestmentFundsSheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not add funds. ${error.toString()}');
+      setState(
+        () => _error = 'Could not add funds. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -432,7 +436,10 @@ class _InvestmentReturnSheetState extends State<InvestmentReturnSheet> {
     } on AuthException catch (error) {
       setState(() => _error = error.message);
     } catch (error) {
-      setState(() => _error = 'Could not record return. ${error.toString()}');
+      setState(
+        () =>
+            _error = 'Could not record return. ${friendlyErrorMessage(error)}',
+      );
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
