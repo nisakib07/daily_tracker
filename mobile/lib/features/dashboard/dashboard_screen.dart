@@ -21,6 +21,7 @@ import '../budget/budget_entry_sheet.dart';
 import '../investments/investment_entry_sheets.dart';
 import '../people/people_entry_sheets.dart';
 import '../settings/settings_sheet.dart';
+import '../sync/unsynced_changes_screen.dart';
 import '../transactions/transaction_entry_sheet.dart';
 
 enum DashboardTab { activity, ledger, budget, investments }
@@ -618,6 +619,23 @@ class _DashboardScreenState extends State<DashboardScreen>
                                 wide ? 48 : 32,
                               ),
                               children: [
+                                if (cachedDataSource is CachedMoneyDataSource &&
+                                    cachedDataSource.failedMutationCount >
+                                        0) ...[
+                                  AppInlineNotice(
+                                    icon: Icons.error_outline,
+                                    color: AppTheme.neonRose,
+                                    message:
+                                        '${cachedDataSource.failedMutationCount} change${cachedDataSource.failedMutationCount == 1 ? '' : 's'} could not be saved.',
+                                    actionLabel: 'Review',
+                                    onAction: () => showUnsyncedChangesScreen(
+                                      context: context,
+                                      dataSource: cachedDataSource,
+                                      snapshot: data,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                ],
                                 if (cachedDataSource is CachedMoneyDataSource &&
                                     cachedDataSource.pendingMutationCount >
                                         0) ...[

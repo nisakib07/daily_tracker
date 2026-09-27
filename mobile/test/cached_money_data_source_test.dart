@@ -7,6 +7,7 @@ import 'package:money_master/data/offline_mutation_queue.dart';
 import 'package:money_master/data/secure_cache_store.dart';
 import 'package:money_master/models/money_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show PostgrestException;
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
@@ -92,6 +93,70 @@ void main() {
 
     remote.complete();
     expect((await Future.wait([first, second])).length, 2);
+    await cache.close();
+  });
+
+  test('failed changes are exposed and a retry syncs them and refreshes the '
+      'snapshot', () async {
+    final store = MemoryDashboardCacheStore();
+    final queue = OfflineMutationQueue(store: store, key: 'failed-retry');
+    final failed = queue.create('money_in', {'amount': 25});
+    await queue.enqueue(failed);
+    await queue.drain(
+      _ScriptedExecutor(const PostgrestException(message: 'fk', code: '23503')),
+    );
+
+    final remote = _FakeMoneyDataSource(_snapshot());
+    final cache = CachedMoneyDataSource(
+      remote,
+      cacheKey: 'failed-retry',
+      staleAfter: const Duration(days: 1),
+      cacheStore: store,
+      mutationQueue: queue,
+    );
+    await cache.fetchDashboard();
+    expect(cache.failedMutationCount, 1);
+    expect(cache.failedMutations.single.id, failed.id);
+
+    final statusEvents = <int>[];
+    final subscription = cache.statusChanges.listen(statusEvents.add);
+    await cache.retryFailedMutations(id: failed.id);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(remote.createMoneyInCount, 1);
+    expect(cache.failedMutationCount, 0);
+    expect(cache.pendingMutationCount, 0);
+    expect(remote.fetchCount, 2);
+    expect(statusEvents, isNotEmpty);
+    await subscription.cancel();
+    await cache.close();
+  });
+
+  test('discarding a failed change removes it for good', () async {
+    final store = MemoryDashboardCacheStore();
+    final queue = OfflineMutationQueue(store: store, key: 'failed-discard');
+    final failed = queue.create('money_in', {'amount': 25});
+    await queue.enqueue(failed);
+    await queue.drain(
+      _ScriptedExecutor(const PostgrestException(message: 'fk', code: '23503')),
+    );
+
+    final remote = _FakeMoneyDataSource(_snapshot());
+    final cache = CachedMoneyDataSource(
+      remote,
+      cacheKey: 'failed-discard',
+      staleAfter: const Duration(days: 1),
+      cacheStore: store,
+      mutationQueue: queue,
+    );
+    await cache.fetchDashboard();
+    await cache.discardFailedMutation(failed.id);
+
+    expect(cache.failedMutationCount, 0);
+    expect(remote.createMoneyInCount, 0);
+    final reloaded = OfflineMutationQueue(store: store, key: 'failed-discard');
+    await reloaded.load();
+    expect(reloaded.failedCount, 0);
     await cache.close();
   });
 
@@ -298,6 +363,17 @@ class _FakeMoneyDataSource
 
   Future<void> _unsupported() async {
     throw UnimplementedError();
+  }
+}
+
+class _ScriptedExecutor implements IdempotentMoneyMutationExecutor {
+  _ScriptedExecutor(this.error);
+
+  final Object error;
+
+  @override
+  Future<void> executeMutation(QueuedMoneyMutation mutation) async {
+    throw error;
   }
 }
 

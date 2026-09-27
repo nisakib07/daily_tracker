@@ -86,11 +86,15 @@ class AppInlineNotice extends StatelessWidget {
     required this.icon,
     required this.message,
     this.color = AppTheme.blue,
+    this.actionLabel,
+    this.onAction,
   });
 
   final IconData icon;
   final String message;
   final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -115,6 +119,19 @@ class AppInlineNotice extends StatelessWidget {
               ),
             ),
           ),
+          if (actionLabel != null && onAction != null) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: onAction,
+              style: TextButton.styleFrom(
+                foregroundColor: color,
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 32),
+              ),
+              child: Text(actionLabel!),
+            ),
+          ],
         ],
       ),
     );
