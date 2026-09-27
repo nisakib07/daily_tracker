@@ -1137,3 +1137,10 @@ September 28, 2026 (#16)
 - Fixed flaw #16: the Activity "Income" filter used isIncomeLike (also borrow, receive, invest_return) and "Expense" used isExpenseLike (also lend, repay, invest), so they didn't match the monthly totals, which count only real income and expenses. Income and Expense are now strict, and a new "Investments" filter (invest, invest_return) sits beside Loans, so every transaction type belongs to exactly one filter. Tile colours still use the income-like/expense-like grouping.
 - Test in dashboard_screen_test.dart: each filter shows exactly its own types.
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#17)
+- Fixed flaw #17: signing out from the dashboard with changes still waiting to sync (or ones that failed) gave no warning. They aren't lost - the queue is stored per user and syncs the next time that account signs in on this phone - but nothing said so, and uninstalling first would lose them. Signing out now asks first when anything is unsynced, saying how many changes, that pending ones will sync on the next sign-in here, that failed ones should be reviewed, and that uninstalling first would lose them ("Sign out anyway"). With nothing unsynced it signs out straight away as before. DashboardScreen gained an optional signOut (for tests). The lock screen's "Sign out instead" is unchanged.
+- Tests in offline_changes_dashboard_test.dart: the warning (Cancel keeps you signed in, "Sign out anyway" signs out) and no confirmation when everything is synced.
+- That completes the 17 flaws from the app review.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

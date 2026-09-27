@@ -38,6 +38,7 @@ class DashboardScreen extends StatefulWidget {
     this.snapshotLoader,
     this.dataSource,
     this.updateChecker,
+    this.signOut,
   });
 
   final User user;
@@ -46,6 +47,9 @@ class DashboardScreen extends StatefulWidget {
 
   /// Defaults to asking GitHub Releases through [AppUpdateChecker].
   final Future<AppUpdateInfo?> Function()? updateChecker;
+
+  /// Defaults to signing out of Supabase.
+  final Future<void> Function()? signOut;
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -169,7 +173,40 @@ class _DashboardScreenState extends State<DashboardScreen>
   }
 
   Future<void> _signOut() async {
-    await Supabase.instance.client.auth.signOut();
+    // Unsynced changes aren't lost by signing out: they stay on this phone
+    // and sync the next time this account signs in here. But nothing said
+    // so, and uninstalling first would lose them.
+    final dataSource = widget.dataSource;
+    if (dataSource is CachedMoneyDataSource) {
+      final pending = dataSource.pendingMutationCount;
+      final failed = dataSource.failedMutationCount;
+      if (pending + failed > 0) {
+        String changes(int count) => '$count change${count == 1 ? '' : 's'}';
+        final confirmed = await showAppDestructiveConfirmation(
+          context: context,
+          title: 'Sign out with unsynced changes?',
+          message: [
+            if (pending > 0)
+              pending == 1
+                  ? "1 change hasn't reached the server yet. It'll stay on "
+                        'this phone and sync the next time you sign in here '
+                        'with this account.'
+                  : "${changes(pending)} haven't reached the server yet. "
+                        "They'll stay on this phone and sync the next time "
+                        'you sign in here with this account.',
+            if (failed > 0)
+              "${changes(failed)} couldn't be saved; review them first if "
+                  'you still need them.',
+            'Uninstalling the app before then would lose '
+                '${pending + failed == 1 ? 'it' : 'them'}.',
+          ].join(' '),
+          confirmLabel: 'Sign out anyway',
+          icon: Icons.cloud_off_outlined,
+        );
+        if (!confirmed) return;
+      }
+    }
+    await (widget.signOut?.call() ?? Supabase.instance.client.auth.signOut());
   }
 
   Future<void> _showEntrySheet(
