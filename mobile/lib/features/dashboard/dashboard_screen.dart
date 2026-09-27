@@ -2549,6 +2549,13 @@ class _ActivityTab extends StatelessWidget {
                     color: AppTheme.neonAmber,
                     onChanged: onTypeFilterChanged,
                   ),
+                  _FilterChipButton(
+                    label: 'Investments',
+                    value: 'investments',
+                    activeValue: typeFilter,
+                    color: AppTheme.neonViolet,
+                    onChanged: onTypeFilterChanged,
+                  ),
                 ],
               ),
             ),
@@ -2634,11 +2641,18 @@ class _ActivityTab extends StatelessWidget {
     };
   }
 
+  // Each type belongs to exactly one filter. Income and Expense used to
+  // include loans and investments too, so they didn't match the monthly
+  // totals, which only count real income and spending.
   bool _matchesTypeFilter(TransactionRecord transaction) {
     return switch (typeFilter) {
-      'income' => transaction.isIncomeLike,
-      'expense' => transaction.isExpenseLike,
+      'income' => transaction.type == 'income',
+      'expense' => transaction.type == 'expense',
       'transfer' => transaction.type == 'transfer',
+      'investments' => const {
+        'invest',
+        'invest_return',
+      }.contains(transaction.type),
       'loans' => const {
         'lend',
         'borrow',

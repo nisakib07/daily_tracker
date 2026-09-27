@@ -1131,3 +1131,9 @@ September 28, 2026 (#15)
 - Deliberately unchanged: future dates still aren't offered, since an entry dated ahead would change today's balance before the money moves (there's no scheduled-transaction concept). Easy to change if wanted.
 - Tests: new date_range_test.dart (range, widening for old/future records, editing a 2019 transaction opens its date picker).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#16)
+- Fixed flaw #16: the Activity "Income" filter used isIncomeLike (also borrow, receive, invest_return) and "Expense" used isExpenseLike (also lend, repay, invest), so they didn't match the monthly totals, which count only real income and expenses. Income and Expense are now strict, and a new "Investments" filter (invest, invest_return) sits beside Loans, so every transaction type belongs to exactly one filter. Tile colours still use the income-like/expense-like grouping.
+- Test in dashboard_screen_test.dart: each filter shows exactly its own types.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
