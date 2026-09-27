@@ -1118,3 +1118,9 @@ September 28, 2026 (#13)
 - Requires the Supabase "Confirm signup" email template to include {{ .Token }} for the code to appear in the email.
 - Tests: new confirm_email_screen_test.dart (validation, success pops with a welcome message, wrong/expired code, resend countdown, layout at 320x568 and 1440x900).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (#14)
+- Fixed flaw #14: nine amount fields each parsed with double.tryParse, so "1,000" was rejected with the misleading "Enter an amount greater than 0", while "1e5", "Infinity", "NaN" and any number of decimals got through, and there was no upper limit. New mobile/lib/core/amount_input.dart: parseAmount accepts thousands separators (including Indian grouping like 1,25,000), spaces and a ৳ sign, at most two decimals, no signs/exponents/NaN/Infinity; validateAmount says what is wrong ("Enter an amount", "Use at most 2 decimal places", "Enter a number, like 250 or 18.50", over ৳100 crore) with required/allowZero options. Used by the transaction add/edit, loan, investment (three forms), account adjustment (optional, zero allowed), budget (zero allowed; error names the category) and quick-add shortcut (optional) forms.
+- Updated three tests for the new messages; new amount_input_test.dart (parsing, rejections, messages, optional/zero, and an expense of "1,000" saving as 1000).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

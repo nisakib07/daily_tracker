@@ -104,7 +104,10 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, 'Save Budgets'));
       await tester.pumpAndSettle();
 
-      expect(find.text('Check the amount for Food.'), findsOneWidget);
+      expect(
+        find.text('Food: Enter a number, like 250 or 18.50.'),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );

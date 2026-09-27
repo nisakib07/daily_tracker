@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/amount_input.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/money_repository.dart';
@@ -98,7 +99,7 @@ class _AccountEditSheetState extends State<AccountEditSheet> {
   }
 
   double get _adjustmentAmount {
-    return double.tryParse(_amountController.text.trim()) ?? 0;
+    return parseAmount(_amountController.text) ?? 0;
   }
 
   double get _previewBalance {
@@ -228,15 +229,11 @@ class _AccountEditSheetState extends State<AccountEditSheet> {
                                       prefixText: '\u09F3 ',
                                       prefixIcon: Icon(Icons.payments_outlined),
                                     ),
-                                    validator: (value) {
-                                      final text = (value ?? '').trim();
-                                      if (text.isEmpty) return null;
-                                      final amount = double.tryParse(text);
-                                      if (amount == null || amount < 0) {
-                                        return 'Enter 0 or more';
-                                      }
-                                      return null;
-                                    },
+                                    validator: (value) => validateAmount(
+                                      value,
+                                      required: false,
+                                      allowZero: true,
+                                    ),
                                   ),
                                   if (_adjustmentAmount > 0) ...[
                                     const SizedBox(height: 10),

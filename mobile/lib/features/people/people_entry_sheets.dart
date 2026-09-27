@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../../core/amount_input.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../data/loan_position.dart';
@@ -497,7 +498,7 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
   /// typo or the wrong action.
   String? get _overpaymentWarning {
     final position = _position;
-    final amount = double.tryParse(_amountController.text.trim());
+    final amount = parseAmount(_amountController.text);
     if (!_isRepayment || position == null || amount == null || amount <= 0) {
       return null;
     }
@@ -526,7 +527,7 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
       await (widget.dataSource ?? MoneyRepository(Supabase.instance.client))
           .createLoanTransaction(
             type: _type,
-            amount: double.parse(_amountController.text.trim()),
+            amount: parseAmount(_amountController.text)!,
             accountId: _accountId!,
             personId: _personId!,
             occurredAt: _dateWithCurrentTime(_selectedDate),
@@ -607,13 +608,7 @@ class _LoanEntrySheetState extends State<LoanEntrySheet> {
                         onChanged: (_) {
                           if (_isRepayment) setState(() {});
                         },
-                        validator: (value) {
-                          final amount = double.tryParse(value?.trim() ?? '');
-                          if (amount == null || amount <= 0) {
-                            return 'Enter an amount greater than 0';
-                          }
-                          return null;
-                        },
+                        validator: validateAmount,
                       ),
                     ),
                     const SizedBox(height: 12),

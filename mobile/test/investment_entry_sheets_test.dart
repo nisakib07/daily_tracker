@@ -26,7 +26,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Create Investment'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Enter an amount greater than 0'), findsOneWidget);
+    expect(find.text('Enter an amount'), findsOneWidget);
     expect(find.text('Enter a name'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
