@@ -1102,3 +1102,11 @@ September 27, 2026 (night, #11)
 - The website still keeps its categories in localStorage; this syncs between phones only.
 - Tests: new preferences_sync_test.dart (new phone, empty account, first-sync merge, instant upload, offline change uploaded later, newer account copy wins, another user's leftovers not uploaded, offline/signed-out pull does nothing).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026
+- Merged #10 (export/backup) and #11 (preferences sync) to main after CI run #39 passed (194 tests).
+- Flaw #12 (every change re-downloads the whole transaction history), the part that could be fixed without a database change: after each save the dashboard froze (AbsorbPointer) until the full history had downloaded again. Now a change the server has confirmed is shown at once: CachedMoneyDataSource remembers it (with a sequence number) and applyPendingMutations applies it on top of the snapshot - with alreadySaved, so it isn't marked "waiting to sync" - until a refresh that started after it lands; saves made while a refresh is downloading survive that older refresh. Changes synced from the offline queue are remembered the same way, so they no longer blink out between leaving the queue and the refresh arriving. The dashboard's _refreshAfterMutation confirms immediately and refreshes in the background (13 save/delete flows).
+- Not changed: the refresh still downloads every transaction. Making it incremental needs a database change (an updated_at column with a trigger, plus a record of deletions) and a sync protocol; left for the user to decide on.
+- Tests: pending_mutations_test (saved changes shown but not marked pending) and two cache tests (save shown before the refresh brings the server copy; a save made while a refresh downloads survives that refresh and is replaced by the next one).
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

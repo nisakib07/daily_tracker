@@ -183,6 +183,82 @@ void main() {
     await cache.close();
   });
 
+  test(
+    'a save shows at once, before the refresh brings the server copy',
+    () async {
+      final remote = _OfflineCapableDataSource(_snapshot());
+      final cache = CachedMoneyDataSource(
+        remote,
+        cacheKey: 'instant-save',
+        staleAfter: const Duration(days: 1),
+        cacheStore: MemoryDashboardCacheStore(),
+      );
+      await cache.fetchDashboard();
+
+      await cache.createMoneyOut(
+        amount: 40,
+        accountId: _account.id,
+        category: 'Food',
+        occurredAt: DateTime(2026, 7, 10, 12),
+      );
+
+      // Shown right away, from the save itself, and not as waiting to sync.
+      final beforeRefresh = cache.snapshot!;
+      final shown = beforeRefresh.transactions.where(
+        (t) => t.type == 'expense',
+      );
+      expect(shown.single.pending, isFalse);
+      expect(shown.single.existsOnServer, isFalse);
+      expect(beforeRefresh.totalBalance, 60);
+      expect(cache.lastMutationQueued, isFalse);
+
+      final refreshed = await cache.refresh();
+      final expenses = refreshed.transactions.where((t) => t.type == 'expense');
+      expect(expenses.single.existsOnServer, isTrue);
+      expect(refreshed.totalBalance, 60);
+      await cache.close();
+    },
+  );
+
+  test('a save made while a refresh downloads survives that refresh', () async {
+    final remote = _SlowRemote(_snapshot());
+    final cache = CachedMoneyDataSource(
+      remote,
+      cacheKey: 'save-during-refresh',
+      staleAfter: const Duration(days: 1),
+      cacheStore: MemoryDashboardCacheStore(),
+    );
+    remote.autoRelease = true;
+    await cache.fetchDashboard();
+    remote.autoRelease = false;
+
+    // This refresh asks the server before the save below happens.
+    final early = cache.refresh();
+    await Future<void>.delayed(Duration.zero);
+    await cache.createMoneyOut(
+      amount: 40,
+      accountId: _account.id,
+      category: 'Food',
+      occurredAt: DateTime(2026, 7, 10, 12),
+    );
+    remote.releaseAll();
+    final afterEarly = await early;
+
+    expect(
+      afterEarly.transactions.where((t) => t.type == 'expense'),
+      hasLength(1),
+    );
+    expect(afterEarly.totalBalance, 60);
+
+    // A refresh that started after the save replaces it with the real row.
+    remote.autoRelease = true;
+    final afterLate = await cache.refresh();
+    final expenses = afterLate.transactions.where((t) => t.type == 'expense');
+    expect(expenses.single.existsOnServer, isTrue);
+    expect(afterLate.totalBalance, 60);
+    await cache.close();
+  });
+
   test('discarding a failed change removes it for good', () async {
     final store = MemoryDashboardCacheStore();
     final queue = OfflineMutationQueue(store: store, key: 'failed-discard');
@@ -453,6 +529,33 @@ class _OfflineCapableDataSource extends _FakeMoneyDataSource {
         ...snapshot.transactions,
       ],
     );
+  }
+}
+
+/// Answers each fetch with the data as it was when the fetch was sent, but
+/// only once released, so a save can happen while a download is in flight.
+class _SlowRemote extends _OfflineCapableDataSource {
+  _SlowRemote(super.snapshot);
+
+  bool autoRelease = false;
+  final _gates = <Completer<void>>[];
+
+  void releaseAll() {
+    for (final gate in _gates) {
+      if (!gate.isCompleted) gate.complete();
+    }
+  }
+
+  @override
+  Future<DashboardSnapshot> fetchDashboard() async {
+    final asked = snapshot;
+    if (!autoRelease) {
+      final gate = Completer<void>();
+      _gates.add(gate);
+      await gate.future;
+    }
+    fetchCount++;
+    return asked;
   }
 }
 

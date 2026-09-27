@@ -158,15 +158,13 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
-  Future<void> _refreshAfterMutation(String message) async {
-    if (mounted) setState(() => _isMutating = true);
-    try {
-      await _refresh();
-      if (!mounted) return;
-      _showSavedSnack(message);
-    } finally {
-      if (mounted) setState(() => _isMutating = false);
-    }
+  /// Confirms a saved change straight away. The cache already shows it, so
+  /// the full refresh runs in the background instead of freezing the
+  /// dashboard until the whole history has downloaded again.
+  void _refreshAfterMutation(String message) {
+    if (!mounted) return;
+    _showSavedSnack(message);
+    unawaited(_refresh());
   }
 
   Future<void> _signOut() async {
@@ -185,7 +183,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refreshAfterMutation('Transaction saved');
+    _refreshAfterMutation('Transaction saved');
   }
 
   Future<void> _showAccountSheet(AccountBalance accountBalance) async {
@@ -196,10 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Account updated');
+    _refreshAfterMutation('Account updated');
   }
 
   Future<void> _showAnalytics() async {
@@ -238,10 +233,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       dataSource: widget.dataSource,
     );
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Person added');
+    _refreshAfterMutation('Person added');
   }
 
   Future<void> _showPersonEditSheet(Person person) async {
@@ -251,10 +243,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       dataSource: widget.dataSource,
     );
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Person updated');
+    _refreshAfterMutation('Person updated');
   }
 
   Future<void> _showPersonHistorySheet(
@@ -308,10 +297,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() => _isMutating = true);
     try {
       await _dataSource.deletePerson(person.id);
-      await _refresh();
-
       if (!mounted) return;
-      _showSavedSnack('Person deleted');
+      _refreshAfterMutation('Person deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete person. Please try again.');
@@ -336,10 +323,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Loan entry saved');
+    _refreshAfterMutation('Loan entry saved');
   }
 
   Future<void> _showEditTransactionSheet(
@@ -355,7 +339,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refreshAfterMutation('Transaction updated');
+    _refreshAfterMutation('Transaction updated');
   }
 
   Future<void> _showBudgetSheet(DashboardSnapshot snapshot) async {
@@ -377,10 +361,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Budgets updated');
+    _refreshAfterMutation('Budgets updated');
   }
 
   Future<void> _showInvestmentSheet(DashboardSnapshot snapshot) async {
@@ -391,10 +372,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Investment created');
+    _refreshAfterMutation('Investment created');
   }
 
   Future<void> _showInvestmentFundsSheet(
@@ -409,10 +387,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Investment funds added');
+    _refreshAfterMutation('Investment funds added');
   }
 
   Future<void> _showInvestmentReturnSheet(
@@ -431,10 +406,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
 
     if (!mounted || saved != true) return;
-    await _refresh();
-
-    if (!mounted) return;
-    _showSavedSnack('Investment return recorded');
+    _refreshAfterMutation('Investment return recorded');
   }
 
   Future<void> _deleteInvestment(Investment investment) async {
@@ -452,10 +424,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() => _isMutating = true);
     try {
       await _dataSource.deleteInvestment(investment.id);
-      await _refresh();
-
       if (!mounted) return;
-      _showSavedSnack('Investment deleted');
+      _refreshAfterMutation('Investment deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete investment. Please try again.');
@@ -538,7 +508,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     setState(() => _isMutating = true);
     try {
       await _dataSource.deleteTransaction(transaction.id);
-      await _refreshAfterMutation('Transaction deleted');
+      _refreshAfterMutation('Transaction deleted');
     } catch (_) {
       if (!mounted) return;
       _showSnack('Could not delete transaction. Refresh and try again.');
