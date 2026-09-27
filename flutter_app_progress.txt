@@ -1051,3 +1051,9 @@ September 27, 2026 (night)
 - Dashboard: pending transactions show "Waiting to sync"; ones created offline have no edit/delete (no server id yet). Save/update/delete messages say "... on this phone. It will sync when you are back online." when the change was queued.
 - Tests: new pending_mutations_test.dart (every mutation kind, date ordering, server balances ignored while pending, offline person + loan), a cache test (offline save shows at once, is broadcast, and isn't duplicated after it syncs), and offline_changes_dashboard_test.dart (pending marker without actions; deleting offline removes the row at once with the offline message and the pending banner).
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 27, 2026 (night, later)
+- Fixed flaw #5: deleting a person with an unsettled balance silently erased the debt. people is referenced "on delete set null", so their loan transactions are unlinked and the amount drops out of the ledger totals, but the confirmation only said their transactions stay in Activity. It now looks up the person's net balance in the snapshot on screen and, when it isn't zero, says "<name> still owes you ৳X" / "You still owe <name> ৳X", explains what deleting does, suggests recording the repayment instead, and labels the button "Delete anyway". Settled people get the old confirmation.
+- Tests in dashboard_screen_test.dart: the warning with the amount (and Cancel), and the plain confirmation for a settled person.
+- Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

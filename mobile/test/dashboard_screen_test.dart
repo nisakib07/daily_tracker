@@ -11,6 +11,65 @@ import 'package:money_master/shared/theme/app_theme.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  testWidgets('deleting a person who still owes you warns with the amount', (
+    tester,
+  ) async {
+    await _pumpDashboard(
+      tester,
+      const Size(900, 1400),
+      snapshotLoader: () async => _snapshot,
+    );
+    await tester.pumpAndSettle();
+    await _openTab(tester, 'dashboard-tab-ledger');
+
+    final actions = find.byTooltip('Person actions').first;
+    await _scrollTo(tester, actions);
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.textContaining('${_person.name} still owes you ৳12,000.'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('record the repayment instead'), findsOneWidget);
+    expect(find.text('Delete anyway'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete anyway'), findsNothing);
+  });
+
+  testWidgets('deleting a settled person keeps the plain confirmation', (
+    tester,
+  ) async {
+    final settled = DashboardSnapshot(
+      accounts: _snapshot.accounts,
+      people: [_person],
+      investments: const [],
+      transactions: const [],
+      budgets: const [],
+    );
+    await _pumpDashboard(
+      tester,
+      const Size(900, 1400),
+      snapshotLoader: () async => settled,
+    );
+    await tester.pumpAndSettle();
+    await _openTab(tester, 'dashboard-tab-ledger');
+
+    final actions = find.byTooltip('Person actions').first;
+    await _scrollTo(tester, actions);
+    await tester.tap(actions);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('still owes'), findsNothing);
+    expect(find.text('Delete Person'), findsOneWidget);
+  });
+
   testWidgets('the update banner is above the list and takes taps', (
     tester,
   ) async {
