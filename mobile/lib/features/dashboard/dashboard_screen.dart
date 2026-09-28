@@ -5029,11 +5029,17 @@ class _TransactionTile extends StatelessWidget {
       ),
       child: Icon(_iconFor(transaction.type), color: color, size: 20),
     );
+    // The note ("Breakfast", "Rickshaw") is what people remember, so it
+    // leads and the category follows in the small line. Without a note the
+    // category is the title, as before.
+    final category = transaction.category ?? transaction.type;
+    final note = transaction.note?.trim() ?? '';
+    final title = note.isEmpty ? category : note;
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          transaction.category ?? transaction.type,
+          title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(
@@ -5043,7 +5049,7 @@ class _TransactionTile extends StatelessWidget {
         Text(
           [
             formatShortDate(transaction.displayDate),
-            if (transaction.note != null) transaction.note!,
+            if (note.isNotEmpty) category,
           ].join(' | '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -5153,7 +5159,7 @@ class _TransactionTile extends StatelessWidget {
     final semanticContent = Semantics(
       button: onEdit != null,
       label:
-          '${transaction.category ?? transaction.type}, ${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
+          '$title, ${note.isEmpty ? '' : '$category, '}${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
       hint: onEdit != null
           ? 'Open to edit. More transaction actions are available.'
           : null,

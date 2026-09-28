@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:money_master/core/formatters.dart';
 import 'package:money_master/core/mimi_time.dart';
 import 'package:money_master/data/category_store.dart';
 import 'package:money_master/data/money_repository.dart';
@@ -80,6 +81,57 @@ void main() {
     expect(find.byKey(const ValueKey('mimi-time-notice')), findsNothing);
     await _fillAndSave(tester, 'Add Income', note: 'September');
     expect(recorder.saved, [('income', 'Salary', 'September')]);
+  });
+
+  testWidgets('Activity rows lead with the note, category underneath', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 2600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final now = DateTime.now();
+    TransactionRecord expense(String id, String category, String? note) {
+      return TransactionRecord(
+        id: id,
+        type: 'expense',
+        amount: 50,
+        fromAccountId: 'cash',
+        category: category,
+        note: note,
+        occurredAt: now,
+        createdAt: now,
+      );
+    }
+
+    final snapshot = DashboardSnapshot(
+      accounts: [_cash],
+      people: const [],
+      investments: const [],
+      budgets: const [],
+      transactions: [
+        expense('mimi', 'Mimi', 'Food · lunch'),
+        expense('plain', 'Transport', null),
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark(),
+        home: DashboardScreen(
+          user: _user,
+          snapshotLoader: () async => snapshot,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final day = formatShortDate(now);
+    // With a note: the note is the title and the category sits below.
+    expect(find.text('Food · lunch'), findsOneWidget);
+    expect(find.text('$day | Mimi'), findsOneWidget);
+    // Without one, the category stays the title.
+    expect(find.text('Transport'), findsWidgets);
+    expect(find.text('$day | Transport'), findsNothing);
   });
 
   testWidgets('the dashboard MT box turns Mimi time on and off', (
