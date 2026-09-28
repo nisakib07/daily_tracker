@@ -132,6 +132,10 @@ void main() {
     final consultingChip = find.byKey(
       const ValueKey('settings-income-chip-Consulting'),
     );
+    // The income list includes the built-in categories now, so on a small
+    // phone this chip sits above the expense field and must be scrolled to.
+    await tester.ensureVisible(consultingChip);
+    await tester.pumpAndSettle();
     await tester.tap(
       find.descendant(of: consultingChip, matching: find.byIcon(Icons.close)),
     );
