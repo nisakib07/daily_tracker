@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/date_times.dart';
 import '../../core/formatters.dart';
+import '../../core/mimi_time.dart';
 import '../../data/app_update_checker.dart';
 import '../../data/cached_money_data_source.dart';
 import '../../data/money_repository.dart';
@@ -99,6 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       });
     }
     _checkForUpdate();
+    unawaited(MimiTime.instance.load());
   }
 
   Future<void> _checkForUpdate() async {
@@ -707,6 +709,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                                   const SizedBox(height: 12),
                                 ],
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: MimiTime.instance.enabled,
+                                  builder: (context, on, _) => _MimiTimeToggle(
+                                    on: on,
+                                    onChanged: MimiTime.instance.setEnabled,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
                                 _DashboardOverview(
                                   snapshot: data,
                                   email: widget.user.email,
@@ -1025,6 +1035,77 @@ class _AnimatedMoneyState extends State<_AnimatedMoney>
           style: widget.style,
         );
       },
+    );
+  }
+}
+
+/// The MT tick box. While Mimi time is on it becomes a highlighted strip,
+/// since every new expense goes to Mimi until it's ticked off again.
+class _MimiTimeToggle extends StatelessWidget {
+  const _MimiTimeToggle({required this.on, required this.onChanged});
+
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = AppTheme.neonViolet;
+    final theme = Theme.of(context);
+    return Material(
+      color: on
+          ? color.withValues(alpha: 0.16)
+          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: on
+              ? color.withValues(alpha: 0.6)
+              : theme.colorScheme.outlineVariant,
+        ),
+      ),
+      child: InkWell(
+        key: const ValueKey('mimi-time-toggle'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => onChanged(!on),
+        child: MergeSemantics(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 14, 4),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: on,
+                  activeColor: color,
+                  onChanged: (value) => onChanged(value ?? false),
+                ),
+                Text(
+                  'MT',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: on ? color : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    on
+                        ? 'Mimi time is on: new expenses go to Mimi'
+                        : 'Mimi time',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: on
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: on ? FontWeight.w700 : null,
+                    ),
+                  ),
+                ),
+                if (on) const Icon(Icons.favorite, color: color, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

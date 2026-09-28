@@ -7,6 +7,7 @@ import '../../core/amount_input.dart';
 import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
+import '../../core/mimi_time.dart';
 import '../../data/money_repository.dart';
 import '../../data/quick_add_shortcut_store.dart';
 import '../../models/money_models.dart';
@@ -142,14 +143,23 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
     if (_isExpense) {
       _loadQuickAddShortcuts();
     }
+    MimiTime.instance.enabled.addListener(_onMimiTimeChanged);
   }
 
   @override
   void dispose() {
+    MimiTime.instance.enabled.removeListener(_onMimiTimeChanged);
     _amountController.dispose();
     _noteController.dispose();
     super.dispose();
   }
+
+  void _onMimiTimeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  /// Whether this expense will be saved under Mimi (see MimiTime).
+  bool get _mimiTime => _isExpense && MimiTime.instance.isOn;
 
   List<String> get _defaultCategories {
     if (_isIncome) return defaultIncomeCategories;
@@ -196,12 +206,15 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
           note: _noteController.text,
         );
       } else if (_isExpense) {
+        final saved = _mimiTime
+            ? MimiTime.apply(category: _category!, note: _noteController.text)
+            : (category: _category!, note: _noteController.text);
         await repository.createMoneyOut(
           amount: amount,
           accountId: _primaryAccountId!,
-          category: _category!,
+          category: saved.category,
           occurredAt: occurredAt,
-          note: _noteController.text,
+          note: saved.note,
         );
       } else {
         await repository.createTransfer(
@@ -340,10 +353,23 @@ class _TransactionEntrySheetState extends State<TransactionEntrySheet> {
                             onSelect: _applyShortcut,
                           ),
                         ],
+                        if (_mimiTime) ...[
+                          const SizedBox(height: 12),
+                          const AppInlineNotice(
+                            key: ValueKey('mimi-time-notice'),
+                            icon: Icons.favorite_outline,
+                            message:
+                                'Mimi time is on, so this expense is saved '
+                                'under Mimi. What it was for goes at the '
+                                'start of its note.',
+                            color: AppTheme.neonViolet,
+                          ),
+                        ],
                         const SizedBox(height: 12),
                         _CategoryDropdown(
                           value: _category,
                           categories: _categories,
+                          label: _mimiTime ? 'What for' : 'Category',
                           onChanged: (value) {
                             setState(() => _category = value);
                           },
@@ -1056,20 +1082,22 @@ class _CategoryDropdown extends StatelessWidget {
     required this.value,
     required this.categories,
     required this.onChanged,
+    this.label = 'Category',
   });
 
   final String? value;
   final List<String> categories;
   final ValueChanged<String?> onChanged;
+  final String label;
 
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
       initialValue: value,
       isExpanded: true,
-      decoration: const InputDecoration(
-        labelText: 'Category',
-        prefixIcon: Icon(Icons.sell_outlined),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: const Icon(Icons.sell_outlined),
       ),
       items: categories.map((category) {
         return DropdownMenuItem(

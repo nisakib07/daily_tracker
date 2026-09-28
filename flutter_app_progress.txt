@@ -1144,3 +1144,12 @@ September 28, 2026 (#17)
 - Tests in offline_changes_dashboard_test.dart: the warning (Cancel keeps you signed in, "Sign out anyway" signs out) and no confirmation when everything is synced.
 - That completes the 17 flaws from the app review.
 - Verified locally: flutter analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.
+
+
+September 28, 2026 (Mimi time)
+- New feature requested by the user: a "Mimi" expense category and an "MT" (Mimi time) tick box on the dashboard. While MT is ticked, every new expense (including ones from quick-add shortcuts) is saved under Mimi, and what it was for is kept at the start of its note ("Food · lunch"), so Mimi's total is right without losing the detail. Choosing Mimi itself doesn't repeat it in the note. Income, transfers, loans and investments are unaffected, as are edits to existing transactions. MT stays on across restarts until unticked (user's choice over auto-off at midnight).
+- Mimi is a built-in expense category (mimiCategory in category_store.dart), so budgets, analytics and exports pick it up. New mobile/lib/core/mimi_time.dart: a persisted ValueNotifier (key dmt_mimi_time) rather than a Riverpod provider, because the dashboard and expense form aren't Riverpod consumers, plus MimiTime.apply for the category/note rule.
+- Dashboard: a slim MT row at the top of the list that turns into a highlighted "Mimi time is on: new expenses go to Mimi" strip when ticked. Expense form: a notice while Mimi time is on, and the category field is labelled "What for".
+- Tooling: Smart App Control started blocking dartvm.exe today, so `flutter analyze` no longer runs locally; `dart.exe analyze` (from the SDK's dart-sdk/bin) still works and was used.
+- Tests: new mimi_time_test.dart (category present, note rule, persistence, form saves under Mimi with the note, notice and "What for" label, normal expenses unchanged, income unaffected, dashboard MT box on/off and saved).
+- Verified locally: dart analyze clean; dart format clean. flutter test not run locally (Smart App Control) - verified in CI.

@@ -11,6 +11,9 @@ const defaultIncomeCategories = [
   'Other Income',
 ];
 
+/// Where expenses go during Mimi time (see MimiTime).
+const mimiCategory = 'Mimi';
+
 const defaultExpenseCategories = [
   'Food',
   'Transport',
@@ -22,6 +25,7 @@ const defaultExpenseCategories = [
   'Rent',
   'Charity',
   'Personal_Care',
+  mimiCategory,
   'Other Expense',
 ];
 
