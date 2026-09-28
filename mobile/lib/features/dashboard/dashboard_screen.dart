@@ -11,6 +11,7 @@ import '../../core/formatters.dart';
 import '../../core/mimi_time.dart';
 import '../../data/app_update_checker.dart';
 import '../../data/cached_money_data_source.dart';
+import '../../data/category_store.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
@@ -5033,8 +5034,19 @@ class _TransactionTile extends StatelessWidget {
     // leads and the category follows in the small line. Without a note the
     // category is the title, as before.
     final category = transaction.category ?? transaction.type;
-    final note = transaction.note?.trim() ?? '';
-    final title = note.isEmpty ? category : note;
+    var note = transaction.note?.trim() ?? '';
+    final labels = <String>[];
+    if (category == mimiCategory) {
+      // Mimi-time expenses keep what they were for at the start of the note
+      // ("Transport · Rickshaw"); show it like a category instead:
+      // Rickshaw over "Sep 28 | Transport | Mimi".
+      final parts = MimiTime.split(note);
+      if (parts.whatFor != null) labels.add(parts.whatFor!);
+      note = parts.note;
+    }
+    labels.add(category);
+    final title = note.isEmpty ? labels.first : note;
+    final subtitleLabels = labels.where((label) => label != title).toList();
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -5049,7 +5061,7 @@ class _TransactionTile extends StatelessWidget {
         Text(
           [
             formatShortDate(transaction.displayDate),
-            if (note.isNotEmpty) category,
+            ...subtitleLabels,
           ].join(' | '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -5159,7 +5171,7 @@ class _TransactionTile extends StatelessWidget {
     final semanticContent = Semantics(
       button: onEdit != null,
       label:
-          '$title, ${note.isEmpty ? '' : '$category, '}${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
+          '$title, ${subtitleLabels.map((label) => '$label, ').join()}${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
       hint: onEdit != null
           ? 'Open to edit. More transaction actions are available.'
           : null,

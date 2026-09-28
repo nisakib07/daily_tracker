@@ -17,6 +17,9 @@ class MimiTime {
 
   static const _prefsKey = 'dmt_mimi_time';
 
+  /// Between what an expense was for and its note: "Transport · Rickshaw".
+  static const _separator = ' · ';
+
   final ValueNotifier<bool> _enabled = ValueNotifier(false);
 
   ValueListenable<bool> get enabled => _enabled;
@@ -45,7 +48,19 @@ class MimiTime {
     }
     return (
       category: mimiCategory,
-      note: text.isEmpty ? category : '$category · $text',
+      note: text.isEmpty ? category : '$category$_separator$text',
+    );
+  }
+
+  /// Splits a Mimi-time note back into what the expense was for and the
+  /// note itself, for display: "Transport · Rickshaw" gives Transport and
+  /// Rickshaw. A note without the separator is all note.
+  static ({String? whatFor, String note}) split(String note) {
+    final index = note.indexOf(_separator);
+    if (index <= 0) return (whatFor: null, note: note.trim());
+    return (
+      whatFor: note.substring(0, index).trim(),
+      note: note.substring(index + _separator.length).trim(),
     );
   }
 

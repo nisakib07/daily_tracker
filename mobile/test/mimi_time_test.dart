@@ -38,6 +38,15 @@ void main() {
     ));
   });
 
+  test('splits a Mimi note back into what it was for and the note', () {
+    expect(MimiTime.split('Transport · Rickshaw'), (
+      whatFor: 'Transport',
+      note: 'Rickshaw',
+    ));
+    expect(MimiTime.split('movie'), (whatFor: null, note: 'movie'));
+    expect(MimiTime.split('Food'), (whatFor: null, note: 'Food'));
+  });
+
   test('stays on across restarts until turned off', () async {
     await MimiTime.instance.setEnabled(true);
     MimiTime.instance.reset();
@@ -110,7 +119,9 @@ void main() {
       investments: const [],
       budgets: const [],
       transactions: [
-        expense('mimi', 'Mimi', 'Food · lunch'),
+        expense('mimi', 'Mimi', 'Transport · Rickshaw'),
+        expense('mimi-no-note', 'Mimi', 'Food'),
+        expense('normal', 'Food', 'Breakfast'),
         expense('plain', 'Transport', null),
       ],
     );
@@ -126,11 +137,15 @@ void main() {
     await tester.pumpAndSettle();
 
     final day = formatShortDate(now);
-    // With a note: the note is the title and the category sits below.
-    expect(find.text('Food · lunch'), findsOneWidget);
+    // Mimi time: the note leads, then what it was for and Mimi.
+    expect(find.text('Rickshaw'), findsOneWidget);
+    expect(find.text('$day | Transport | Mimi'), findsOneWidget);
+    // Mimi time without a note: what it was for leads.
     expect(find.text('$day | Mimi'), findsOneWidget);
-    // Without one, the category stays the title.
-    expect(find.text('Transport'), findsWidgets);
+    // Otherwise the note leads and the category sits below.
+    expect(find.text('Breakfast'), findsOneWidget);
+    expect(find.text('$day | Food'), findsOneWidget);
+    // Without a note the category stays the title, with just the date.
     expect(find.text('$day | Transport'), findsNothing);
   });
 
