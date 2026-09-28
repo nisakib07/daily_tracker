@@ -150,11 +150,109 @@ void main() {
     });
   });
 
+  test('a month covers exactly that calendar month', () {
+    final september = ExportPeriod.month(DateTime(2026, 9, 14, 20));
+
+    expect(september.first, DateTime(2026, 9));
+    expect(september.last, DateTime(2026, 9, 30));
+    expect(september.includes(DateTime(2026, 9, 30, 23, 59)), isTrue);
+    expect(september.includes(DateTime(2026, 10, 1)), isFalse);
+    expect(september.includes(DateTime(2026, 8, 31, 23)), isFalse);
+    expect(september.fileLabel, '2026-09');
+    expect(september.description, 'September 2026');
+  });
+
+  test('a date range includes both ends', () {
+    final range = ExportPeriod.range(
+      DateTime(2026, 9, 10, 15),
+      DateTime(2026, 9, 14, 8),
+    );
+
+    expect(range.includes(DateTime(2026, 9, 10)), isTrue);
+    expect(range.includes(DateTime(2026, 9, 14, 23)), isTrue);
+    expect(range.includes(DateTime(2026, 9, 15)), isFalse);
+    expect(range.fileLabel, '2026-09-10-to-2026-09-14');
+    expect(
+      ExportPeriod.range(DateTime(2026, 9, 3), DateTime(2026, 9, 3)).fileLabel,
+      '2026-09-03',
+    );
+    expect(const ExportPeriod.all().fileLabel, isNull);
+  });
+
+  test('the CSV only has the transactions in the period', () {
+    final range = ExportPeriod.range(
+      DateTime(2026, 9, 10),
+      DateTime(2026, 9, 14),
+    );
+    final csv = transactionsCsv(_snapshot, period: range);
+    final rows = csv.substring(1).split('\r\n').where((l) => l.isNotEmpty);
+
+    // Header, 14 Sep and 10 Sep; not the 1 Sep investment.
+    expect(rows.length, 3);
+    expect(csv, isNot(contains('Savings bond')));
+    expect(transactionsCsv(_snapshot).contains('Savings bond'), isTrue);
+  });
+
+  testWidgets('a month export is named after the month', (tester) async {
+    final shared = <ExportFile>[];
+    final setup = await _pumpSettings(tester, shared);
+
+    await _tapExport(tester, 'settings-export-csv');
+    expect(find.text('All transactions'), findsOneWidget);
+    expect(find.text('One month'), findsOneWidget);
+    expect(find.text('Date range'), findsOneWidget);
+    await _choosePeriod(tester, 'export-period-month');
+    // The month picker opens on today; accept it.
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    final month = DateTime.now();
+    final label = '${month.year}-${month.month.toString().padLeft(2, '0')}';
+    if (shared.isEmpty) {
+      // No fixture transactions fall in the current month.
+      expect(find.textContaining('No transactions in'), findsOneWidget);
+    } else {
+      expect(shared.single.name, 'money-master-transactions-$label.csv');
+    }
+    await setup.close();
+  });
+
+  testWidgets('a date range asks for a start date, then an end date', (
+    tester,
+  ) async {
+    final shared = <ExportFile>[];
+    final setup = await _pumpSettings(tester, shared);
+
+    await _tapExport(tester, 'settings-export-csv');
+    await _choosePeriod(tester, 'export-period-range');
+    // Ordinary date pickers with month arrows, not the scrolling range one.
+    expect(find.text('Export from'), findsOneWidget);
+    expect(find.byTooltip('Previous month'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Export until'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    final today = DateTime.now();
+    String two(int value) => value.toString().padLeft(2, '0');
+    final from = '${today.year}-${two(today.month)}-01';
+    final until = '${today.year}-${two(today.month)}-${two(today.day)}';
+    final label = from == until ? from : '$from-to-$until';
+    if (shared.isEmpty) {
+      expect(find.textContaining('No transactions in'), findsOneWidget);
+    } else {
+      expect(shared.single.name, 'money-master-transactions-$label.csv');
+    }
+    await setup.close();
+  });
+
   testWidgets('Settings exports a CSV through the share sheet', (tester) async {
     final shared = <ExportFile>[];
     final setup = await _pumpSettings(tester, shared);
 
     await _tapExport(tester, 'settings-export-csv');
+    await _choosePeriod(tester, 'export-period-all');
 
     final file = shared.single;
     expect(file.name, startsWith('money-master-transactions-'));
@@ -192,6 +290,7 @@ void main() {
     (setup.remote as _FakeRemote).offline = true;
 
     await _tapExport(tester, 'settings-export-csv');
+    await _choosePeriod(tester, 'export-period-all');
 
     expect(shared, hasLength(1));
     expect(find.textContaining("You're offline"), findsOneWidget);
@@ -221,7 +320,7 @@ Future<CachedMoneyDataSource> _pumpSettings(
         home: SettingsSheet(
           email: 'me@example.com',
           userId: 'user-1',
-          exportSource: cache,
+          dataSource: cache,
           shareFile: (file, subject) async => shared.add(file),
         ),
       ),
@@ -229,6 +328,11 @@ Future<CachedMoneyDataSource> _pumpSettings(
   );
   await tester.pumpAndSettle();
   return cache;
+}
+
+Future<void> _choosePeriod(WidgetTester tester, String key) async {
+  await tester.tap(find.byKey(ValueKey(key)));
+  await tester.pumpAndSettle();
 }
 
 Future<void> _tapExport(WidgetTester tester, String key) async {

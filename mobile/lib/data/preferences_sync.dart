@@ -185,6 +185,12 @@ class PreferencesSync {
           prefs.getStringList(CategoryStore.incomeKey) ?? const <String>[],
       'expense_categories':
           prefs.getStringList(CategoryStore.expenseKey) ?? const <String>[],
+      'hidden_income_categories':
+          prefs.getStringList(CategoryStore.hiddenIncomeKey) ??
+          const <String>[],
+      'hidden_expense_categories':
+          prefs.getStringList(CategoryStore.hiddenExpenseKey) ??
+          const <String>[],
       'quick_add_shortcuts': shortcuts,
     };
   }
@@ -200,6 +206,16 @@ class PreferencesSync {
     await prefs.setStringList(
       CategoryStore.expenseKey,
       _strings(preferences['expense_categories']),
+    );
+    // Built-in categories the user removed. Copies saved before categories
+    // could be removed don't have these, which means nothing is hidden.
+    await prefs.setStringList(
+      CategoryStore.hiddenIncomeKey,
+      _strings(preferences['hidden_income_categories']),
+    );
+    await prefs.setStringList(
+      CategoryStore.hiddenExpenseKey,
+      _strings(preferences['hidden_expense_categories']),
     );
     final shortcuts = preferences['quick_add_shortcuts'];
     await prefs.setString(
@@ -233,6 +249,8 @@ class PreferencesSync {
     return {
       'income_categories': categories('income_categories'),
       'expense_categories': categories('expense_categories'),
+      'hidden_income_categories': categories('hidden_income_categories'),
+      'hidden_expense_categories': categories('hidden_expense_categories'),
       'quick_add_shortcuts': shortcuts,
     };
   }

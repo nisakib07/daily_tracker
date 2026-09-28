@@ -2,6 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/date_times.dart';
 import '../models/money_models.dart';
+import 'category_store.dart';
 import 'loan_position.dart';
 import 'offline_mutation_queue.dart';
 
@@ -85,6 +86,15 @@ class DashboardServerSummary {
       'transaction_count': transactionCount,
     };
   }
+}
+
+/// Renames a category on everything already saved with it.
+abstract interface class CategoryRenamer {
+  Future<void> renameCategory({
+    required CategoryKind kind,
+    required String from,
+    required String to,
+  });
 }
 
 abstract interface class AdvancedMoneyDataSource {
@@ -369,7 +379,8 @@ class MoneyRepository
     implements
         MoneyDataSource,
         AdvancedMoneyDataSource,
-        IdempotentMoneyMutationExecutor {
+        IdempotentMoneyMutationExecutor,
+        CategoryRenamer {
   MoneyRepository(this.client);
 
   final SupabaseClient client;
@@ -896,6 +907,61 @@ class MoneyRepository
         .delete()
         .eq('id', investmentId)
         .eq('user_id', userId);
+  }
+
+  /// Renames [from] to [to] on every income or expense transaction and,
+  /// for expenses, every budget. A budget already under [to] in the same
+  /// month absorbs the renamed one's amount. Needs a connection; it isn't
+  /// queued, since the category list only changes once this succeeds.
+  @override
+  Future<void> renameCategory({
+    required CategoryKind kind,
+    required String from,
+    required String to,
+  }) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) {
+      throw const AuthException('You must be signed in to rename a category.');
+    }
+
+    await client
+        .from('transactions')
+        .update({'category': to})
+        .eq('user_id', userId)
+        .eq('type', kind == CategoryKind.income ? 'income' : 'expense')
+        .eq('category', from);
+
+    if (kind != CategoryKind.expense) return;
+    final budgets = await client
+        .from('budgets')
+        .select('id,month,amount')
+        .eq('user_id', userId)
+        .eq('category', from);
+    final now = toSupabaseTimestamp(DateTime.now());
+    for (final budget in budgets) {
+      final existing = await client
+          .from('budgets')
+          .select('id,amount')
+          .eq('user_id', userId)
+          .eq('category', to)
+          .eq('month', budget['month'] as Object)
+          .maybeSingle();
+      if (existing == null) {
+        await client
+            .from('budgets')
+            .update({'category': to, 'updated_at': now})
+            .eq('id', budget['id'] as Object);
+      } else {
+        await client
+            .from('budgets')
+            .update({
+              'amount': _number(existing['amount']) + _number(budget['amount']),
+              'updated_at': now,
+            })
+            .eq('id', existing['id'] as Object);
+        await client.from('budgets').delete().eq('id', budget['id'] as Object);
+      }
+    }
   }
 
   @override

@@ -8,8 +8,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/date_times.dart';
 import '../../core/formatters.dart';
+import '../../core/mimi_time.dart';
 import '../../data/app_update_checker.dart';
 import '../../data/cached_money_data_source.dart';
+import '../../data/category_store.dart';
 import '../../data/money_repository.dart';
 import '../../models/money_models.dart';
 import '../../shared/theme/app_theme.dart';
@@ -99,6 +101,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       });
     }
     _checkForUpdate();
+    unawaited(MimiTime.instance.load());
   }
 
   Future<void> _checkForUpdate() async {
@@ -261,7 +264,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       email: widget.user.email,
       accounts: accounts,
       userId: widget.user.id,
-      exportSource: dataSource is CachedMoneyDataSource ? dataSource : null,
+      dataSource: dataSource is CachedMoneyDataSource ? dataSource : null,
     );
   }
 
@@ -707,6 +710,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                                   ),
                                   const SizedBox(height: 12),
                                 ],
+                                ValueListenableBuilder<bool>(
+                                  valueListenable: MimiTime.instance.enabled,
+                                  builder: (context, on, _) => _MimiTimeToggle(
+                                    on: on,
+                                    onChanged: MimiTime.instance.setEnabled,
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
                                 _DashboardOverview(
                                   snapshot: data,
                                   email: widget.user.email,
@@ -1025,6 +1036,77 @@ class _AnimatedMoneyState extends State<_AnimatedMoney>
           style: widget.style,
         );
       },
+    );
+  }
+}
+
+/// The MT tick box. While Mimi time is on it becomes a highlighted strip,
+/// since every new expense goes to Mimi until it's ticked off again.
+class _MimiTimeToggle extends StatelessWidget {
+  const _MimiTimeToggle({required this.on, required this.onChanged});
+
+  final bool on;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    const color = AppTheme.neonViolet;
+    final theme = Theme.of(context);
+    return Material(
+      color: on
+          ? color.withValues(alpha: 0.16)
+          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: on
+              ? color.withValues(alpha: 0.6)
+              : theme.colorScheme.outlineVariant,
+        ),
+      ),
+      child: InkWell(
+        key: const ValueKey('mimi-time-toggle'),
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => onChanged(!on),
+        child: MergeSemantics(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 14, 4),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: on,
+                  activeColor: color,
+                  onChanged: (value) => onChanged(value ?? false),
+                ),
+                Text(
+                  'MT',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w900,
+                    color: on ? color : null,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    on
+                        ? 'Mimi time is on: new expenses go to Mimi'
+                        : 'Mimi time',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: on
+                          ? theme.colorScheme.onSurface
+                          : theme.colorScheme.onSurfaceVariant,
+                      fontWeight: on ? FontWeight.w700 : null,
+                    ),
+                  ),
+                ),
+                if (on) const Icon(Icons.favorite, color: color, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -4948,11 +5030,28 @@ class _TransactionTile extends StatelessWidget {
       ),
       child: Icon(_iconFor(transaction.type), color: color, size: 20),
     );
+    // The note ("Breakfast", "Rickshaw") is what people remember, so it
+    // leads and the category follows in the small line. Without a note the
+    // category is the title, as before.
+    final category = transaction.category ?? transaction.type;
+    var note = transaction.note?.trim() ?? '';
+    final labels = <String>[];
+    if (category == mimiCategory) {
+      // Mimi-time expenses keep what they were for at the start of the note
+      // ("Transport · Rickshaw"); show it like a category instead:
+      // Rickshaw over "Sep 28 | Transport | Mimi".
+      final parts = MimiTime.split(note);
+      if (parts.whatFor != null) labels.add(parts.whatFor!);
+      note = parts.note;
+    }
+    labels.add(category);
+    final title = note.isEmpty ? labels.first : note;
+    final subtitleLabels = labels.where((label) => label != title).toList();
     final details = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          transaction.category ?? transaction.type,
+          title,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(
@@ -4962,7 +5061,7 @@ class _TransactionTile extends StatelessWidget {
         Text(
           [
             formatShortDate(transaction.displayDate),
-            if (transaction.note != null) transaction.note!,
+            ...subtitleLabels,
           ].join(' | '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
@@ -5072,7 +5171,7 @@ class _TransactionTile extends StatelessWidget {
     final semanticContent = Semantics(
       button: onEdit != null,
       label:
-          '${transaction.category ?? transaction.type}, ${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
+          '$title, ${subtitleLabels.map((label) => '$label, ').join()}${formatMoney(signedAmount)}, ${formatShortDate(transaction.displayDate)}${transaction.pending ? ', waiting to sync' : ''}',
       hint: onEdit != null
           ? 'Open to edit. More transaction actions are available.'
           : null,
