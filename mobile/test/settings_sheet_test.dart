@@ -58,7 +58,11 @@ void main() {
       find.byKey(const ValueKey('settings-income-chip-$_longCategory')),
       findsOneWidget,
     );
-    expect(find.text('No custom expense categories yet'), findsOneWidget);
+    // Every category is listed now, built-in ones included.
+    expect(
+      find.byKey(const ValueKey('settings-expense-chip-Food')),
+      findsOneWidget,
+    );
     expect(tester.takeException(), isNull);
 
     await tester.drag(

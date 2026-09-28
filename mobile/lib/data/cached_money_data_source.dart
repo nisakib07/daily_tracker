@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../core/date_times.dart';
+import 'category_store.dart';
 import 'money_repository.dart';
 import '../models/money_models.dart';
 import 'offline_mutation_queue.dart';
@@ -111,6 +112,26 @@ class CachedMoneyDataSource
     await _mutationQueue.retryFailed(id: id);
     _notifyStatus();
     await _drainQueue();
+  }
+
+  /// Renames a category on every saved transaction and budget (needs a
+  /// connection; not queued), then refreshes so screens show the new name.
+  Future<void> renameCategory({
+    required CategoryKind kind,
+    required String from,
+    required String to,
+  }) async {
+    final source = remote;
+    if (source is! CategoryRenamer) {
+      throw UnsupportedError('This data source cannot rename categories.');
+    }
+    await (source as CategoryRenamer).renameCategory(
+      kind: kind,
+      from: from,
+      to: to,
+    );
+    _needsRemoteRefresh = true;
+    await refresh();
   }
 
   Future<void> discardFailedMutation(String id) async {

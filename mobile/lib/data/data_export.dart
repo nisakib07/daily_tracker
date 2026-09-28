@@ -27,10 +27,75 @@ class ExportFile {
   List<int> get bytes => utf8.encode(contents);
 }
 
-/// A spreadsheet of every transaction, newest first, with names instead of
-/// ids. Starts with a byte-order mark so Excel reads ৳ and Bangla names as
-/// UTF-8.
-String transactionsCsv(DashboardSnapshot snapshot) {
+/// Which days a CSV export covers: all time, one month, or a date range.
+class ExportPeriod {
+  const ExportPeriod.all() : this._(null, null);
+
+  ExportPeriod.month(DateTime month)
+    : this._(
+        DateTime(month.year, month.month),
+        DateTime(month.year, month.month + 1, 0),
+      );
+
+  ExportPeriod.range(DateTime first, DateTime last)
+    : this._(_day(first), _day(last));
+
+  const ExportPeriod._(this.first, this.last);
+
+  /// The first and last day included, or null for all time.
+  final DateTime? first;
+  final DateTime? last;
+
+  bool includes(DateTime when) {
+    final from = first;
+    final until = last;
+    if (from == null || until == null) return true;
+    final day = _day(when);
+    return !day.isBefore(from) && !day.isAfter(until);
+  }
+
+  bool get _isWholeMonth {
+    final from = first;
+    return from != null &&
+        from.day == 1 &&
+        last == DateTime(from.year, from.month + 1, 0);
+  }
+
+  /// For the file name: "2026-09", "2026-09-01-to-2026-09-15", or null for
+  /// all time.
+  String? get fileLabel {
+    final from = first;
+    final until = last;
+    if (from == null || until == null) return null;
+    if (_isWholeMonth) return DateFormat('yyyy-MM').format(from);
+    final day = DateFormat('yyyy-MM-dd');
+    return from == until
+        ? day.format(from)
+        : '${day.format(from)}-to-${day.format(until)}';
+  }
+
+  /// For messages: "September 2026", "1 Sep - 15 Sep 2026", "all time".
+  String get description {
+    final from = first;
+    final until = last;
+    if (from == null || until == null) return 'all time';
+    if (_isWholeMonth) return DateFormat('MMMM yyyy').format(from);
+    final day = DateFormat('d MMM yyyy');
+    return from == until
+        ? day.format(from)
+        : '${day.format(from)} - ${day.format(until)}';
+  }
+}
+
+DateTime _day(DateTime value) => DateTime(value.year, value.month, value.day);
+
+/// A spreadsheet of the transactions in [period], newest first, with names
+/// instead of ids. Starts with a byte-order mark so Excel reads ৳ and Bangla
+/// names as UTF-8.
+String transactionsCsv(
+  DashboardSnapshot snapshot, {
+  ExportPeriod period = const ExportPeriod.all(),
+}) {
   String nameIn<T>(
     List<T> items,
     String? id,
@@ -65,28 +130,29 @@ String transactionsCsv(DashboardSnapshot snapshot) {
       'Note',
     ],
     for (final transaction in snapshot.transactions)
-      [
-        DateFormat('yyyy-MM-dd').format(transaction.displayDate),
-        DateFormat('HH:mm').format(transaction.displayDate),
-        _typeLabel(transaction.type),
-        transaction.amount.toStringAsFixed(2),
-        transaction.category ?? '',
-        account(transaction.fromAccountId),
-        account(transaction.toAccountId),
-        nameIn<Person>(
-          snapshot.people,
-          transaction.personId,
-          (item) => item.id,
-          (item) => item.name,
-        ),
-        nameIn<Investment>(
-          snapshot.investments,
-          transaction.investmentId,
-          (item) => item.id,
-          (item) => item.name,
-        ),
-        transaction.note ?? '',
-      ],
+      if (period.includes(transaction.displayDate))
+        [
+          DateFormat('yyyy-MM-dd').format(transaction.displayDate),
+          DateFormat('HH:mm').format(transaction.displayDate),
+          _typeLabel(transaction.type),
+          transaction.amount.toStringAsFixed(2),
+          transaction.category ?? '',
+          account(transaction.fromAccountId),
+          account(transaction.toAccountId),
+          nameIn<Person>(
+            snapshot.people,
+            transaction.personId,
+            (item) => item.id,
+            (item) => item.name,
+          ),
+          nameIn<Investment>(
+            snapshot.investments,
+            transaction.investmentId,
+            (item) => item.id,
+            (item) => item.name,
+          ),
+          transaction.note ?? '',
+        ],
   ];
 
   return '﻿${rows.map((row) => row.map(_csvField).join(',')).join('\r\n')}\r\n';

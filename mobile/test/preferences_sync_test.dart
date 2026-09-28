@@ -108,6 +108,29 @@ void main() {
     expect(account.stored!['expense_categories'], ['Rickshaw', 'Tea', 'Fees']);
   });
 
+  test('removed built-in categories sync both ways', () async {
+    SharedPreferences.setMockInitialValues({});
+    final account = use(_FakeAccount());
+
+    await CategoryStore().deleteCategory(CategoryKind.expense, 'Food');
+    expect(account.stored!['hidden_expense_categories'], ['Food']);
+
+    // Another phone restored it and removed Transport instead.
+    account.stored = {
+      ...account.stored!,
+      'hidden_expense_categories': ['Transport'],
+      'updated_at': DateTime.now()
+          .toUtc()
+          .add(const Duration(minutes: 5))
+          .toIso8601String(),
+    };
+    await PreferencesSync.instance.pull();
+
+    final list = await CategoryStore().loadMerged(CategoryKind.expense);
+    expect(list, contains('Food'));
+    expect(list, isNot(contains('Transport')));
+  });
+
   test('a change is uploaded as soon as it is made', () async {
     SharedPreferences.setMockInitialValues({});
     final account = use(_FakeAccount());

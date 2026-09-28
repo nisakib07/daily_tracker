@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../core/amount_input.dart';
 import '../../core/app_lock_controller.dart';
 import '../../core/daily_reminder_controller.dart';
+import '../../core/date_times.dart';
 import '../../core/error_messages.dart';
 import '../../core/formatters.dart';
 import '../../core/theme_mode_controller.dart';
@@ -25,7 +26,7 @@ Future<void> showSettingsSheet({
   required String? email,
   List<AccountBalance> accounts = const [],
   String? userId,
-  CachedMoneyDataSource? exportSource,
+  CachedMoneyDataSource? dataSource,
 }) {
   return Navigator.of(context).push<void>(
     MaterialPageRoute(
@@ -34,7 +35,7 @@ Future<void> showSettingsSheet({
         email: email,
         accounts: accounts,
         userId: userId,
-        exportSource: exportSource,
+        dataSource: dataSource,
       ),
     ),
   );
@@ -67,16 +68,17 @@ class SettingsSheet extends ConsumerStatefulWidget {
     required this.email,
     this.accounts = const [],
     this.userId,
-    this.exportSource,
+    this.dataSource,
     this.shareFile = _shareWithSystemSheet,
   });
 
   final String? email;
   final List<AccountBalance> accounts;
 
-  /// Needed for exports; the Your data section is hidden without both.
+  /// Needed for exports (the Your data section is hidden without both) and
+  /// for renaming categories on saved transactions and budgets.
   final String? userId;
-  final CachedMoneyDataSource? exportSource;
+  final CachedMoneyDataSource? dataSource;
   final ShareFile shareFile;
 
   @override
@@ -91,6 +93,8 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
 
   List<String> _incomeCategories = const [];
   List<String> _expenseCategories = const [];
+  List<String> _hiddenIncome = const [];
+  List<String> _hiddenExpense = const [];
   List<QuickAddShortcut> _quickAddShortcuts = const [];
   final Set<CategoryKind> _updatingKinds = {};
   bool _isUpdatingQuickAdd = false;
@@ -115,13 +119,17 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
 
   Future<void> _load() async {
     try {
-      final income = await _store.loadCustom(CategoryKind.income);
-      final expense = await _store.loadCustom(CategoryKind.expense);
+      final income = await _store.loadMerged(CategoryKind.income);
+      final expense = await _store.loadMerged(CategoryKind.expense);
+      final hiddenIncome = await _store.loadHidden(CategoryKind.income);
+      final hiddenExpense = await _store.loadHidden(CategoryKind.expense);
       final quickAdd = await _quickAddStore.load();
       if (!mounted) return;
       setState(() {
         _incomeCategories = income;
         _expenseCategories = expense;
+        _hiddenIncome = hiddenIncome;
+        _hiddenExpense = hiddenExpense;
         _quickAddShortcuts = quickAdd;
         _isLoading = false;
         _error = null;
@@ -275,7 +283,9 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     final confirmed = await showAppDestructiveConfirmation(
       context: context,
       title: 'Delete Category?',
-      message: 'Remove "$category" from your custom categories?',
+      message:
+          'Remove "$category" from the list? Transactions already saved '
+          'with it keep it.',
       confirmLabel: 'Delete Category',
       icon: Icons.label_off_outlined,
     );
@@ -287,7 +297,7 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     });
 
     try {
-      await _store.deleteCustom(kind, category);
+      await _store.deleteCategory(kind, category);
       await _load();
     } catch (error) {
       if (!mounted) return;
@@ -300,10 +310,141 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
     }
   }
 
+  Future<void> _rename(CategoryKind kind, String category) async {
+    if (_updatingKinds.contains(kind)) return;
+    final source = widget.dataSource;
+    final categories = kind == CategoryKind.income
+        ? _incomeCategories
+        : _expenseCategories;
+    final renamed = await showDialog<String>(
+      context: context,
+      builder: (context) => _RenameCategoryDialog(
+        category: category,
+        taken: categories,
+        renamesHistory: source != null,
+      ),
+    );
+    if (renamed == null || renamed == category || !mounted) return;
+
+    setState(() {
+      _updatingKinds.add(kind);
+      _error = null;
+    });
+    try {
+      // Saved transactions and budgets first: the list only changes once
+      // the server has the new name.
+      await source?.renameCategory(kind: kind, from: category, to: renamed);
+      await _store.renameCategory(kind, category, renamed);
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            source == null
+                ? 'Renamed "$category" to "$renamed".'
+                : 'Renamed "$category" to "$renamed", including saved '
+                      'transactions and budgets.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            'Could not rename category. ${friendlyErrorMessage(error)}',
+      );
+    } finally {
+      if (mounted) setState(() => _updatingKinds.remove(kind));
+    }
+  }
+
+  Future<void> _restoreDefaults(CategoryKind kind) async {
+    if (_updatingKinds.contains(kind)) return;
+    setState(() => _updatingKinds.add(kind));
+    try {
+      await _store.restoreDefaults(kind);
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      setState(
+        () => _error =
+            'Could not restore categories. ${friendlyErrorMessage(error)}',
+      );
+    } finally {
+      if (mounted) setState(() => _updatingKinds.remove(kind));
+    }
+  }
+
+  /// Asks which transactions a CSV export should cover.
+  Future<ExportPeriod?> _pickExportPeriod() async {
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              key: const ValueKey('export-period-all'),
+              leading: const Icon(Icons.all_inclusive),
+              title: const Text('All transactions'),
+              onTap: () => Navigator.of(context).pop('all'),
+            ),
+            ListTile(
+              key: const ValueKey('export-period-month'),
+              leading: const Icon(Icons.calendar_month_outlined),
+              title: const Text('One month'),
+              onTap: () => Navigator.of(context).pop('month'),
+            ),
+            ListTile(
+              key: const ValueKey('export-period-range'),
+              leading: const Icon(Icons.date_range_outlined),
+              title: const Text('Date range'),
+              onTap: () => Navigator.of(context).pop('range'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted) return null;
+    final today = DateTime.now();
+    switch (choice) {
+      case 'all':
+        return const ExportPeriod.all();
+      case 'month':
+        final picked = await showDatePicker(
+          context: context,
+          helpText: 'Pick any day in the month',
+          initialDate: today,
+          firstDate: earliestPickableDate,
+          lastDate: today,
+        );
+        return picked == null ? null : ExportPeriod.month(picked);
+      case 'range':
+        final picked = await showDateRangePicker(
+          context: context,
+          helpText: 'Choose the dates to export',
+          firstDate: earliestPickableDate,
+          lastDate: today,
+        );
+        return picked == null
+            ? null
+            : ExportPeriod.range(picked.start, picked.end);
+      default:
+        return null;
+    }
+  }
+
   Future<void> _export(_ExportKind kind) async {
-    final source = widget.exportSource;
+    final source = widget.dataSource;
     final userId = widget.userId;
     if (source == null || userId == null) return;
+    var period = const ExportPeriod.all();
+    if (kind == _ExportKind.csv) {
+      final picked = await _pickExportPeriod();
+      if (picked == null || !mounted) return;
+      period = picked;
+    }
     setState(() {
       _exporting = kind;
       _error = null;
@@ -330,10 +471,23 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
           ),
         );
       } else {
+        final inPeriod = export.snapshot.transactions.where(
+          (transaction) => period.includes(transaction.displayDate),
+        );
+        if (inPeriod.isEmpty) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('No transactions in ${period.description}.'),
+              ),
+            );
+          }
+          return;
+        }
         file = ExportFile(
-          name: 'money-master-transactions-$date.csv',
+          name: 'money-master-transactions-${period.fileLabel ?? date}.csv',
           mimeType: 'text/csv',
-          contents: transactionsCsv(export.snapshot),
+          contents: transactionsCsv(export.snapshot, period: period),
         );
       }
       await widget.shareFile(
@@ -414,7 +568,7 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
                         ),
                         const SizedBox(height: 14),
                         const _SecuritySection(),
-                        if (widget.exportSource != null &&
+                        if (widget.dataSource != null &&
                             widget.userId != null) ...[
                           const SizedBox(height: 14),
                           _DataExportSection(
@@ -435,13 +589,19 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
                               final income = _CategorySettingsSection(
                                 sectionKey: 'income',
                                 title: 'Income Categories',
-                                subtitle:
-                                    'Defaults stay available automatically',
+                                subtitle: 'Tap one to rename it',
                                 icon: Icons.south_west,
                                 color: AppTheme.neonEmerald,
                                 controller: _incomeController,
                                 categories: _incomeCategories,
-                                emptyText: 'No custom income categories yet',
+                                emptyText:
+                                    'No income categories. Add one or restore '
+                                    'the defaults.',
+                                hiddenCount: _hiddenIncome.length,
+                                onRename: (category) =>
+                                    _rename(CategoryKind.income, category),
+                                onRestore: () =>
+                                    _restoreDefaults(CategoryKind.income),
                                 inputError: _incomeInputError,
                                 isUpdating: _updatingKinds.contains(
                                   CategoryKind.income,
@@ -457,12 +617,19 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
                               final expense = _CategorySettingsSection(
                                 sectionKey: 'expense',
                                 title: 'Expense Categories',
-                                subtitle: 'Use these in expenses and budgets',
+                                subtitle: 'Tap one to rename it',
                                 icon: Icons.north_east,
                                 color: AppTheme.neonRose,
                                 controller: _expenseController,
                                 categories: _expenseCategories,
-                                emptyText: 'No custom expense categories yet',
+                                emptyText:
+                                    'No expense categories. Add one or restore '
+                                    'the defaults.',
+                                hiddenCount: _hiddenExpense.length,
+                                onRename: (category) =>
+                                    _rename(CategoryKind.expense, category),
+                                onRestore: () =>
+                                    _restoreDefaults(CategoryKind.expense),
                                 inputError: _expenseInputError,
                                 isUpdating: _updatingKinds.contains(
                                   CategoryKind.expense,
@@ -1034,6 +1201,9 @@ class _CategorySettingsSection extends StatelessWidget {
     required this.onInputChanged,
     required this.onAdd,
     required this.onDelete,
+    required this.onRename,
+    required this.onRestore,
+    this.hiddenCount = 0,
   });
 
   final String sectionKey;
@@ -1049,6 +1219,11 @@ class _CategorySettingsSection extends StatelessWidget {
   final VoidCallback onInputChanged;
   final VoidCallback onAdd;
   final ValueChanged<String> onDelete;
+  final ValueChanged<String> onRename;
+  final VoidCallback onRestore;
+
+  /// Built-in categories that were removed; offers to restore them.
+  final int hiddenCount;
 
   @override
   Widget build(BuildContext context) {
@@ -1189,30 +1364,147 @@ class _CategorySettingsSection extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 8,
                     children: categories.map((category) {
+                      final locked = CategoryStore.isLocked(category);
+                      final chip = InputChip(
+                        key: ValueKey('settings-$sectionKey-chip-$category'),
+                        avatar: locked
+                            ? const Icon(Icons.lock_outline, size: 16)
+                            : null,
+                        label: Text(
+                          category,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: locked || isUpdating
+                            ? null
+                            : () => onRename(category),
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                        onDeleted: locked || isUpdating
+                            ? null
+                            : () => onDelete(category),
+                      );
                       return ConstrainedBox(
                         constraints: BoxConstraints(
                           maxWidth: constraints.maxWidth,
                         ),
-                        child: InputChip(
-                          key: ValueKey('settings-$sectionKey-chip-$category'),
-                          label: Text(
-                            category,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          deleteIcon: const Icon(Icons.close, size: 16),
-                          onDeleted: isUpdating
-                              ? null
-                              : () => onDelete(category),
-                        ),
+                        child: locked
+                            ? Tooltip(
+                                message: 'Mimi time uses this category',
+                                child: chip,
+                              )
+                            : chip,
                       );
                     }).toList(),
                   );
                 },
               ),
+            if (hiddenCount > 0) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  key: ValueKey('settings-$sectionKey-restore'),
+                  onPressed: isUpdating ? null : onRestore,
+                  icon: const Icon(Icons.restore, size: 18),
+                  label: Text(
+                    'Restore $hiddenCount removed '
+                    'default${hiddenCount == 1 ? '' : 's'}',
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Asks for a category's new name, refusing names already in use.
+class _RenameCategoryDialog extends StatefulWidget {
+  const _RenameCategoryDialog({
+    required this.category,
+    required this.taken,
+    required this.renamesHistory,
+  });
+
+  final String category;
+  final List<String> taken;
+
+  /// Whether saved transactions and budgets are renamed too.
+  final bool renamesHistory;
+
+  @override
+  State<_RenameCategoryDialog> createState() => _RenameCategoryDialogState();
+}
+
+class _RenameCategoryDialogState extends State<_RenameCategoryDialog> {
+  late final _controller = TextEditingController(text: widget.category);
+  String? _error;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final name = _controller.text.trim();
+    if (name.isEmpty) {
+      setState(() => _error = 'Enter a name');
+      return;
+    }
+    final clash = widget.taken.any(
+      (item) =>
+          item.toLowerCase() == name.toLowerCase() &&
+          item.toLowerCase() != widget.category.toLowerCase(),
+    );
+    if (clash) {
+      setState(() => _error = 'That category already exists.');
+      return;
+    }
+    Navigator.of(context).pop(name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Rename category'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            key: const ValueKey('rename-category-input'),
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.words,
+            decoration: InputDecoration(
+              labelText: 'New name',
+              errorText: _error,
+            ),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) => _submit(),
+          ),
+          if (widget.renamesHistory) ...[
+            const SizedBox(height: 12),
+            Text(
+              'Transactions and budgets saved as "${widget.category}" will '
+              'be renamed too. This needs an internet connection.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Rename')),
+      ],
     );
   }
 }
