@@ -421,15 +421,25 @@ class _SettingsSheetState extends ConsumerState<SettingsSheet> {
         );
         return picked == null ? null : ExportPeriod.month(picked);
       case 'range':
-        final picked = await showDateRangePicker(
+        // Two ordinary date pickers rather than showDateRangePicker: its
+        // months are one long vertical list opened on this month, with no
+        // arrows, so earlier months were easy to miss.
+        final from = await showDatePicker(
           context: context,
-          helpText: 'Choose the dates to export',
+          helpText: 'Export from',
+          initialDate: DateTime(today.year, today.month),
           firstDate: earliestPickableDate,
           lastDate: today,
         );
-        return picked == null
-            ? null
-            : ExportPeriod.range(picked.start, picked.end);
+        if (from == null || !mounted) return null;
+        final until = await showDatePicker(
+          context: context,
+          helpText: 'Export until',
+          initialDate: today,
+          firstDate: from,
+          lastDate: today,
+        );
+        return until == null ? null : ExportPeriod.range(from, until);
       default:
         return null;
     }

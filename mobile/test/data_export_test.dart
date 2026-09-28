@@ -217,6 +217,36 @@ void main() {
     await setup.close();
   });
 
+  testWidgets('a date range asks for a start date, then an end date', (
+    tester,
+  ) async {
+    final shared = <ExportFile>[];
+    final setup = await _pumpSettings(tester, shared);
+
+    await _tapExport(tester, 'settings-export-csv');
+    await _choosePeriod(tester, 'export-period-range');
+    // Ordinary date pickers with month arrows, not the scrolling range one.
+    expect(find.text('Export from'), findsOneWidget);
+    expect(find.byTooltip('Previous month'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+    expect(find.text('Export until'), findsOneWidget);
+    await tester.tap(find.text('OK'));
+    await tester.pumpAndSettle();
+
+    final today = DateTime.now();
+    String two(int value) => value.toString().padLeft(2, '0');
+    final from = '${today.year}-${two(today.month)}-01';
+    final until = '${today.year}-${two(today.month)}-${two(today.day)}';
+    final label = from == until ? from : '$from-to-$until';
+    if (shared.isEmpty) {
+      expect(find.textContaining('No transactions in'), findsOneWidget);
+    } else {
+      expect(shared.single.name, 'money-master-transactions-$label.csv');
+    }
+    await setup.close();
+  });
+
   testWidgets('Settings exports a CSV through the share sheet', (tester) async {
     final shared = <ExportFile>[];
     final setup = await _pumpSettings(tester, shared);
